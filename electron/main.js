@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, globalShortcut } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -65,7 +65,8 @@ function createWindow() {
     height: 780,
     minWidth: 920,
     minHeight: 600,
-    backgroundColor: '#ffffff', title: 'LuckyGuy',
+    backgroundColor: '#0a0a0a',
+    title: 'LuckyGuy',
     icon: path.join(__dirname, 'icon.png'),
     frame: false,
     titleBarStyle: 'hidden',
@@ -77,18 +78,36 @@ function createWindow() {
     }
   });
 
-  // In production load built dist/index.html, in development load Vite dev server
+  const indexPath = path.join(__dirname, '../dist/index.html');
   const isDev = process.env.NODE_ENV === 'development';
+
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL('http://localhost:5173').catch(() => {
+      if (fs.existsSync(indexPath)) mainWindow.loadFile(indexPath);
+    });
   } else {
-    const indexPath = path.join(__dirname, '../dist/index.html');
     if (fs.existsSync(indexPath)) {
       mainWindow.loadFile(indexPath);
     } else {
       mainWindow.loadURL('http://localhost:5173');
     }
   }
+
+  // Handle reload failure safely
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.warn(`Page failed to load (${errorCode}: ${errorDescription}), falling back to built dist/index.html`);
+    if (fs.existsSync(indexPath)) {
+      mainWindow.loadFile(indexPath);
+    }
+  });
+
+  // Enable F12 to inspect console and debug anytime
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -180,7 +199,6 @@ ipcMain.handle('search-jiosaavn', async (event, query) => {
 
 // Download Manager IPC
 ipcMain.handle('download-start', async (event, taskConfig) => {
-  // Check duplicate / existing in history or disk
   if (historyManager.isDownloaded(taskConfig.title, taskConfig.artist, taskConfig.destinationPath)) {
     return {
       ...taskConfig,
@@ -189,7 +207,6 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     };
   }
 
-  // Enrich metadata via iTunes Search API
   let enriched = null;
   try {
     enriched = await fetchEnrichedMetadata(taskConfig.title, taskConfig.artist);
@@ -207,7 +224,6 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     ? taskConfig.artist.replace(/[\/\\?%*:|"<>]/g, '_') + ' - '
     : '';
 
-  // Categorize by genre/category if available
   let targetDir = preferences.downloadFolder;
   if (genre && genre !== 'Music') {
     const cleanGenre = genre.replace(/[\/\\?%*:|"<>]/g, '_');
@@ -238,7 +254,6 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
   });
 
   downloader.on('completed', async (snap) => {
-    // Embed ID3 tags and artwork into audio file
     if (targetPath.endsWith('.mp3')) {
       try {
         await embedId3Metadata(targetPath, {
@@ -261,10 +276,8 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
       }
     } catch (e) {}
 
-    // Record into download history log in AppData/LocalGuy
     historyManager.recordDownload(taskConfig.title, taskConfig.artist, targetPath, 'COMPLETED');
 
-    // Record into Bookkeeping ledger
     libraryManager.recordDownloadTransaction({
       ...snap,
       genre,
@@ -273,7 +286,6 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
       status: 'COMPLETED'
     });
 
-    // Auto-index into local library
     libraryManager.scanDirectories([preferences.downloadFolder, targetDir]);
 
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -283,112 +295,117 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
         fileSize: finalSize,
         status: 'COMPLETED'
       });
+      mainWindow.webContents.send('download-completed', {
+        ...snap,
+        filePath: targetPath,
+        fileSize: finalSize
+      });
     }
   });
 
-  return downloader.snapshot();
+  downloader.on('failed', (snap) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('download-failed', snap);
+    }
+  });
+
+  return downloader.start();
 });
 
-ipcMain.handle('download-pause', (e, id) => downloadManager.pauseTask(id));
-ipcMain.handle('download-pause-all', () => { downloadManager.pauseAll(); return true; });
-ipcMain.handle('download-resume-all', () => { downloadManager.resumeAll(); return true; });
-ipcMain.handle('download-check-exists', (e, title, artist, targetPath) => historyManager.isDownloaded(title, artist, targetPath));
-ipcMain.handle('download-resume', (e, id) => downloadManager.resumeTask(id));
-ipcMain.handle('download-cancel', (e, id) => downloadManager.cancelTask(id));
-ipcMain.handle('download-remove', (e, id) => downloadManager.removeTask(id));
-ipcMain.handle('download-get-all', () => downloadManager.getAllTasks());
+ipcMain.handle('download-pause', async (event, id) => downloadManager.pauseTask(id));
+ipcMain.handle('download-pause-all', async () => downloadManager.pauseAll());
+ipcMain.handle('download-resume-all', async () => downloadManager.resumeAll());
+ipcMain.handle('download-check-exists', async (event, title, artist, targetPath) => {
+  return historyManager.isDownloaded(title, artist, targetPath);
+});
+ipcMain.handle('download-resume', async (event, id) => downloadManager.resumeTask(id));
+ipcMain.handle('download-cancel', async (event, id) => downloadManager.cancelTask(id));
+ipcMain.handle('download-remove', async (event, id) => downloadManager.removeTask(id));
+ipcMain.handle('download-get-all', async () => downloadManager.getAllTasks());
 
-ipcMain.handle('delete-file-permanently', async (e, filePath, songId) => {
-  let deletedFromDisk = false;
-  if (filePath && typeof filePath === 'string' && fs.existsSync(filePath)) {
+// File System IPC
+ipcMain.handle('open-in-folder', async (event, filePath) => {
+  if (!filePath) return false;
+  try {
+    if (fs.existsSync(filePath)) {
+      shell.showItemInFolder(filePath);
+      return true;
+    } else {
+      shell.openPath(path.dirname(filePath) || preferences.downloadFolder);
+      return true;
+    }
+  } catch (e) {
+    return false;
+  }
+});
+
+ipcMain.handle('delete-file-permanently', async (event, filePath, songId) => {
+  let fileDeleted = false;
+  if (filePath && fs.existsSync(filePath)) {
     try {
       fs.unlinkSync(filePath);
-      deletedFromDisk = true;
-    } catch (err) {
-      console.warn('Failed to delete file from disk:', err);
+      fileDeleted = true;
+    } catch (e) {
+      console.warn('Failed to delete physical file:', e.message);
     }
   }
-  libraryManager.removeSong(songId, filePath);
-  return { success: true, deletedFromDisk, songs: libraryManager.songs };
-});
-
-ipcMain.handle('move-to-trash', async (e, filePath, songId) => {
-  let movedToTrash = false;
-  if (filePath && typeof filePath === 'string' && fs.existsSync(filePath)) {
-    try {
-      await shell.trashItem(filePath);
-      movedToTrash = true;
-    } catch (err) {
-      console.warn('Failed to move to trash:', err);
-    }
+  if (songId) {
+    libraryManager.deleteSong(songId);
   }
-  libraryManager.removeSong(songId, filePath);
-  return { success: true, movedToTrash, songs: libraryManager.songs };
+  return fileDeleted;
 });
 
-ipcMain.handle('open-in-folder', (e, filePath) => {
-  if (filePath && fs.existsSync(filePath)) {
-    shell.showItemInFolder(filePath);
-    return true;
+ipcMain.handle('verify-files-exist', async (event, filePaths) => {
+  if (!Array.isArray(filePaths)) return {};
+  const results = {};
+  for (const fp of filePaths) {
+    results[fp] = fs.existsSync(fp);
   }
-  return false;
+  return results;
 });
 
-// Library IPC
-ipcMain.handle('verify-files-exist', (e, paths) => {
-  if (!Array.isArray(paths)) return [];
-  return paths.filter(p => p && typeof p === 'string' && fs.existsSync(p));
+ipcMain.handle('check-file-exists', async (event, filePath) => {
+  if (!filePath) return false;
+  return fs.existsSync(filePath);
 });
 
-ipcMain.handle('check-file-exists', (e, filePath) => {
-  return Boolean(filePath && typeof filePath === 'string' && fs.existsSync(filePath));
-});
+// Library Manager IPC
+ipcMain.handle('library-get-songs', async () => libraryManager.songs);
+ipcMain.handle('library-scan', async (event, dirs) => libraryManager.scanDirectories(dirs));
+ipcMain.handle('library-get-playlists', async () => libraryManager.playlists);
+ipcMain.handle('library-create-playlist', async (event, title, desc) => libraryManager.createPlaylist(title, desc));
+ipcMain.handle('library-add-to-playlist', async (event, plId, songId) => libraryManager.addToPlaylist(plId, songId));
+ipcMain.handle('library-remove-from-playlist', async (event, plId, songId) => libraryManager.removeFromPlaylist(plId, songId));
+ipcMain.handle('library-delete-playlist', async (event, plId) => libraryManager.deletePlaylist(plId));
+ipcMain.handle('library-update-song', async (event, songId, updates) => libraryManager.updateSong(songId, updates));
+ipcMain.handle('library-find-duplicates', async () => libraryManager.findDuplicates());
 
-ipcMain.handle('library-get-songs', () => libraryManager.pruneMissingFiles());
-ipcMain.handle('library-scan', (e, dirs) => {
-  const targetDirs = dirs && dirs.length > 0 ? dirs : [
-    path.join(os.homedir(), 'Music'),
-    preferences.downloadFolder
-  ];
-  return libraryManager.scanDirectories(targetDirs);
-});
-ipcMain.handle('library-get-playlists', () => libraryManager.syncPlaylistsFromDisk());
-ipcMain.handle('library-create-playlist', (e, title) => libraryManager.createPlaylist(title));
-ipcMain.handle('library-add-to-playlist', (e, plId, songId) => libraryManager.addToPlaylist(plId, songId));
-ipcMain.handle('library-remove-from-playlist', (e, plId, songId) => libraryManager.removeFromPlaylist(plId, songId));
-ipcMain.handle('library-delete-playlist', (e, plId) => libraryManager.deletePlaylist(plId));
-ipcMain.handle('library-update-song', (e, id, updates) => libraryManager.updateSongMetadata(id, updates));
-ipcMain.handle('library-find-duplicates', () => libraryManager.findDuplicates());
-
-// Settings IPC
-ipcMain.handle('get-preferences', () => preferences);
-ipcMain.handle('save-preferences', (e, newPrefs) => {
+// Preferences IPC
+ipcMain.handle('get-preferences', async () => preferences);
+ipcMain.handle('save-preferences', async (event, newPrefs) => {
   preferences = { ...preferences, ...newPrefs };
   try {
     fs.writeFileSync(prefsFile, JSON.stringify(preferences, null, 2));
-  } catch (e) {}
-  return preferences;
+    return true;
+  } catch (e) {
+    return false;
+  }
 });
 
 ipcMain.handle('pick-folder', async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openDirectory', 'createDirectory'],
-    title: 'Select Download Folder'
+  const res = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory', 'createDirectory']
   });
-  if (!result.canceled && result.filePaths.length > 0) {
-    return result.filePaths[0];
+  if (!res.canceled && res.filePaths.length > 0) {
+    return res.filePaths[0];
   }
   return null;
 });
 
-ipcMain.handle('get-system-info', () => {
-  return {
-    platform: os.platform(),
-    arch: os.arch(),
-    release: os.release(),
-    totalMemory: os.totalmem(),
-    freeMemory: os.freemem(),
-    hostname: os.hostname(),
-    cpuCount: os.cpus().length
-  };
-});
+ipcMain.handle('get-system-info', async () => ({
+  platform: process.platform,
+  arch: process.arch,
+  homedir: os.homedir(),
+  totalMemory: os.totalmem(),
+  freeMemory: os.freemem()
+}));

@@ -17,11 +17,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cancelDownload: (id) => ipcRenderer.invoke('download-cancel', id),
   removeDownload: (id) => ipcRenderer.invoke('download-remove', id),
   getDownloadTasks: () => ipcRenderer.invoke('download-get-all'),
-  onDownloadUpdate: (callback) => {
+
+  // Event listeners with safe fallbacks
+  onDownloadProgress: (callback) => {
+    if (typeof callback !== 'function') return () => {};
     const handler = (event, data) => callback(data);
     ipcRenderer.on('download-progress', handler);
     return () => ipcRenderer.removeListener('download-progress', handler);
   },
+  onDownloadCompleted: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('download-completed', handler);
+    return () => ipcRenderer.removeListener('download-completed', handler);
+  },
+  onDownloadFailed: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('download-failed', handler);
+    return () => ipcRenderer.removeListener('download-failed', handler);
+  },
+  onDownloadUpdate: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('download-progress', handler);
+    return () => ipcRenderer.removeListener('download-progress', handler);
+  },
+
   openInFolder: (filePath) => ipcRenderer.invoke('open-in-folder', filePath),
   deleteFilePermanently: (filePath, songId) => ipcRenderer.invoke('delete-file-permanently', filePath, songId),
   moveToTrash: (filePath, songId) => ipcRenderer.invoke('move-to-trash', filePath, songId),
