@@ -39,70 +39,16 @@ ishant\\Music');
   const [installSuccess, setInstallSuccess] = useState('');
   const [extensionSearch, setExtensionSearch] = useState('');
 
-  // Built-in core engines (can be toggled)
-  const [plugins, setPlugins] = useState(() => {
-    try {
-      const saved = localStorage.getItem('luckyguy-plugins');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return {
-      youtube: true,
-      spotify: true,
-      jiosaavn: true,
-      soundcloud: true,
-      autoscan: true,
-      discord: false,
-    };
-  });
+  // Extension runtime settings
+  const [plugins, setPlugins] = useState({});
 
-  // Dynamically installed extensions
+  // Dynamically installed extensions (empty by default)
   const [customExtensions, setCustomExtensions] = useState(() => {
     try {
       const saved = localStorage.getItem('luckyguy-extensions');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return [
-      {
-        id: 'ext-youtube',
-        name: 'YouTube Stream Engine',
-        category: 'Media Resolver',
-        description: 'Resolves audio streams and master tracks via community extension.',
-        source: 'https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/youtube/manifest.json',
-        version: '1.0.0',
-        author: 'LuckyGuy Community',
-        enabled: true,
-      },
-      {
-        id: 'ext-spotify',
-        name: 'Spotify Metadata Scraper',
-        category: 'Tags & Artwork',
-        description: 'Extracts official album cover artwork and track metadata via community extension.',
-        source: 'https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/spotify/manifest.json',
-        version: '1.0.0',
-        author: 'LuckyGuy Community',
-        enabled: true,
-      },
-      {
-        id: 'ext-jiosaavn',
-        name: 'JioSaavn 320k Studio CDN',
-        category: 'Lossless CDN',
-        description: 'Direct pristine 320kbps MP3/AAC CDN media resolver with native decryption.',
-        source: 'https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/jiosaavn/manifest.json',
-        version: '1.0.0',
-        author: 'LuckyGuy Community',
-        enabled: true,
-      },
-      {
-        id: 'ext-soundcloud',
-        name: 'SoundCloud Stream Engine',
-        category: 'Streaming',
-        description: 'Resolves artist mixes, live sets, and indie streaming releases.',
-        source: 'https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/soundcloud/manifest.json',
-        version: '1.0.0',
-        author: 'LuckyGuy Community',
-        enabled: true,
-      }
-    ];
+    return [];
   });
 
   useEffect(() => {
@@ -141,7 +87,7 @@ ishant\\Music');
     });
   };
 
-  const handleInstallExtension = (e) => {
+    const handleInstallExtension = async (e) => {
     e.preventDefault();
     setInstallError('');
     setInstallSuccess('');
@@ -152,7 +98,6 @@ ishant\\Music');
       return;
     }
 
-    // Safe validation to never crash or break the application
     try {
       const parsed = new URL(trimmed);
       if (!parsed.protocol.startsWith('http')) {
@@ -160,17 +105,39 @@ ishant\\Music');
         return;
       }
 
-      // Extract a friendly name from URL
-      const pathParts = parsed.pathname.split('/').filter(Boolean);
-      const rawName = pathParts.length > 0 ? pathParts[pathParts.length - 1] : 'custom-plugin';
-      const cleanName = rawName.replace(/\.git$/i, '').replace(/[-_]/g, ' ');
-      const capitalized = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+      if (customExtensions.some((ext) => ext.source === trimmed)) {
+        setInstallError('This extension is already registered in your library.');
+        return;
+      }
+
+      let extName = 'Custom Extension';
+      let extDesc = 'Custom media resolver plugin loaded from extension URL.';
+      let extVersion = '1.0.0';
+      let extCategory = 'Extension Engine';
+
+      try {
+        const resp = await fetch(trimmed);
+        if (resp.ok) {
+          const manifest = await resp.json();
+          if (manifest.name) extName = manifest.name;
+          if (manifest.description) extDesc = manifest.description;
+          if (manifest.version) extVersion = manifest.version;
+          if (manifest.category) extCategory = manifest.category;
+        }
+      } catch (fetchErr) {
+        const pathParts = parsed.pathname.split('/').filter(Boolean);
+        const rawName = pathParts.length > 0 ? pathParts[pathParts.length - 1] : 'custom-plugin';
+        const cleanName = rawName.replace(/\.git$/i, '').replace(/\.json$/i, '').replace(/[-_]/g, ' ');
+        extName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+      }
 
       const newExt = {
         id: 'ext-' + Date.now(),
-        name: capitalized + ' Engine',
+        name: extName,
+        category: extCategory,
+        description: extDesc,
         source: trimmed,
-        version: '1.0.0',
+        version: extVersion,
         author: parsed.hostname,
         enabled: true,
       };
@@ -182,11 +149,11 @@ ishant\\Music');
       } catch (e) {}
 
       setExtensionUrl('');
-      setInstallSuccess(`Extension "${newExt.name}" registered successfully!`);
+      setInstallSuccess(`Extension "${newExt.name}" loaded successfully!`);
       flashSaved();
       setTimeout(() => setInstallSuccess(''), 3000);
     } catch (err) {
-      setInstallError('Invalid URL format. Example: https://github.com/user/plugin-name');
+      setInstallError('Invalid URL format. Example: https://raw.githubusercontent.com/.../manifest.json');
     }
   };
 
@@ -217,45 +184,6 @@ ishant\\Music');
       window.electronAPI.openInFolder(downloadFolder);
     }
   };
-
-  const corePluginsList = [
-    {
-      id: 'youtube',
-      name: 'YouTube Stream Engine',
-      category: 'Media Resolver',
-      description: 'Resolves YouTube streams and downloads high fidelity master audio files.',
-    },
-    {
-      id: 'spotify',
-      name: 'Spotify Metadata Scraper',
-      category: 'Tags & Artwork',
-      description: 'Extracts track metadata, album cover artwork, and official ID3 tags.',
-    },
-    {
-      id: 'jiosaavn',
-      name: 'JioSaavn 320k Studio Engine',
-      category: 'Lossless CDN',
-      description: 'Direct 320kbps pristine AAC/MP3 CDN streams with real-time DES decryption.',
-    },
-    {
-      id: 'soundcloud',
-      name: 'SoundCloud Stream Resolver',
-      category: 'Streaming',
-      description: 'Resolves artist mixes, live sets, and indie streaming releases.',
-    },
-    {
-      id: 'autoscan',
-      name: 'Local Library Auto-Sync',
-      category: 'System Watcher',
-      description: 'Automatically detects and indexes audio files placed in your music folder.',
-    },
-    {
-      id: 'discord',
-      name: 'Discord Rich Presence',
-      category: 'Integration',
-      description: 'Displays your current playing track on your Discord profile.',
-    },
-  ];
 
   return (
     <div
@@ -702,11 +630,43 @@ ishant\\Music');
               </div>
             )}
 
-            {/* Installed External Extensions */}
-            {customExtensions.length > 0 && (
+                        {/* Installed External Extensions */}
+            {customExtensions.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                  Installed User Extensions ({customExtensions.length})
+                {/* Search Extensions Bar */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                    Installed Extensions ({customExtensions.filter(e => !extensionSearch || e.name.toLowerCase().includes(extensionSearch.toLowerCase()) || (e.category && e.category.toLowerCase().includes(extensionSearch.toLowerCase()))).length})
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      height: '30px',
+                      padding: '0 8px',
+                      borderRadius: '6px',
+                      backgroundColor: 'var(--bg-main, #f8fafc)',
+                      border: '1px solid var(--border-medium, #e2e8f0)',
+                      minWidth: '200px'
+                    }}
+                  >
+                    <Search size={13} color="var(--text-muted)" />
+                    <input
+                      type="text"
+                      placeholder="Search installed extensions..."
+                      value={extensionSearch}
+                      onChange={(e) => setExtensionSearch(e.target.value)}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        fontSize: '11px',
+                        color: 'var(--text-primary)',
+                        outline: 'none',
+                        width: '100%'
+                      }}
+                    />
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -717,21 +677,29 @@ ishant\\Music');
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        padding: '10px 14px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-light, #f1f5f9)',
-                        backgroundColor: 'var(--bg-main, #fafafa)',
+                        padding: '12px 16px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-medium, #e2e8f0)',
+                        backgroundColor: 'var(--bg-card, #ffffff)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                        transition: 'all 0.15s ease',
                       }}
                     >
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
                             {ext.name}
                           </span>
-                          <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', backgroundColor: 'var(--bg-card)', padding: '1px 6px', borderRadius: '4px', border: '1px solid var(--border-light)' }}>
-                            v{ext.version}
+                          <span style={{ fontSize: '10px', color: 'var(--primary, #7c5cbf)', backgroundColor: 'rgba(124, 92, 191, 0.08)', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                            {ext.category || 'Extension Engine'}
+                          </span>
+                          <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                            v{ext.version || '1.0.0'}
                           </span>
                         </div>
+                        <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>
+                          {ext.description}
+                        </p>
                         <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                           {ext.source}
                         </span>
@@ -741,13 +709,14 @@ ishant\\Music');
                         <div
                           onClick={() => toggleExtension(ext.id)}
                           style={{
-                            width: '36px',
+                            width: '38px',
                             height: '20px',
                             borderRadius: '999px',
                             backgroundColor: ext.enabled ? 'var(--primary, #7c5cbf)' : '#cbd5e1',
                             position: 'relative',
                             cursor: 'pointer',
                             transition: 'background-color 0.2s ease',
+                            flexShrink: 0,
                           }}
                           title={ext.enabled ? 'Enabled' : 'Disabled'}
                         >
@@ -759,8 +728,9 @@ ishant\\Music');
                               backgroundColor: '#ffffff',
                               position: 'absolute',
                               top: '2px',
-                              left: ext.enabled ? '18px' : '2px',
+                              left: ext.enabled ? '20px' : '2px',
                               transition: 'left 0.2s ease',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
                             }}
                           />
                         </div>
@@ -776,7 +746,7 @@ ishant\\Music');
                             display: 'flex',
                             alignItems: 'center',
                           }}
-                          title="Remove Extension"
+                          title="Uninstall Extension"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -785,144 +755,30 @@ ishant\\Music');
                   ))}
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* SECTION 2: CORE STREAMING & RESOLVER ENGINES */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Cpu size={16} color="var(--primary, #7c5cbf)" />
-                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                  Built-in Streaming Engines
-                </h3>
+            ) : (
+              <div
+                style={{
+                  padding: '32px 20px',
+                  borderRadius: '10px',
+                  backgroundColor: 'var(--bg-main, #f8fafc)',
+                  border: '1px dashed var(--border-medium, #e2e8f0)',
+                  textAlign: 'center',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginTop: '6px'
+                }}
+              >
+                <DownloadCloud size={28} color="var(--primary, #7c5cbf)" style={{ opacity: 0.7 }} />
+                <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  No Extensions Installed
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '440px' }}>
+                  LuckyGuy is an offline-first player. Paste an extension manifest URL from <span style={{ color: 'var(--primary, #7c5cbf)', fontWeight: 500 }}>LuckyGuy--extensions</span> above to add media streaming or metadata engines.
+                </div>
               </div>
-              <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: 400 }}>
-                Toggle engines on or off
-              </span>
-            </div>
-
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                gap: '10px',
-              }}
-            >
-              {corePluginsList.map((plugin) => {
-                const isEnabled = plugins[plugin.id] ?? true;
-
-                return (
-                  <div
-                    key={plugin.id}
-                    style={{
-                      backgroundColor: 'var(--bg-card, #ffffff)',
-                      border: isEnabled ? '1px solid var(--border-medium, #e2e8f0)' : '1px solid var(--border-light, #f1f5f9)',
-                      borderRadius: '8px',
-                      padding: '12px 14px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      gap: '8px',
-                      opacity: isEnabled ? 1 : 0.6,
-                      transition: 'opacity 0.15s ease',
-                    }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          justifyContent: 'space-between',
-                          gap: '8px',
-                        }}
-                      >
-                        <div>
-                          <div
-                            style={{
-                              fontSize: '10px',
-                              fontWeight: 600,
-                              color: 'var(--text-secondary, #64748b)',
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.4px',
-                            }}
-                          >
-                            {plugin.category}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: '13px',
-                              fontWeight: 600,
-                              color: 'var(--text-primary, #0f172a)',
-                              marginTop: '2px',
-                            }}
-                          >
-                            {plugin.name}
-                          </div>
-                        </div>
-
-                        {/* LIVE TOGGLE SWITCH */}
-                        <div
-                          onClick={() => togglePlugin(plugin.id)}
-                          style={{
-                            width: '38px',
-                            height: '20px',
-                            borderRadius: '999px',
-                            backgroundColor: isEnabled ? 'var(--primary, #7c5cbf)' : '#cbd5e1',
-                            position: 'relative',
-                            cursor: 'pointer',
-                            transition: 'background-color 0.2s ease',
-                            flexShrink: 0,
-                          }}
-                          title={isEnabled ? 'Click to Disable' : 'Click to Enable'}
-                        >
-                          <div
-                            style={{
-                              width: '16px',
-                              height: '16px',
-                              borderRadius: '50%',
-                              backgroundColor: '#ffffff',
-                              position: 'absolute',
-                              top: '2px',
-                              left: isEnabled ? '20px' : '2px',
-                              transition: 'left 0.2s ease',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      <p
-                        style={{
-                          fontSize: '11.5px',
-                          color: 'var(--text-secondary, #64748b)',
-                          lineHeight: '1.4',
-                          margin: '6px 0 0 0',
-                          fontWeight: 400,
-                        }}
-                      >
-                        {plugin.description}
-                      </p>
-                    </div>
-
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        borderTop: '1px solid var(--border-light, #f8fafc)',
-                        paddingTop: '6px',
-                        fontSize: '11px',
-                        color: isEnabled ? 'var(--primary, #7c5cbf)' : 'var(--text-muted, #94a3b8)',
-                        fontWeight: 500,
-                      }}
-                    >
-                      <span>{isEnabled ? 'Enabled' : 'Disabled'}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            )}
           </div>
         </div>
       )}
