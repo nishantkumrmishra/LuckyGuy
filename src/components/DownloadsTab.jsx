@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
 import {
   Download,
-  Trash2,
-  Play,
-  FolderOpen,
-  X,
-  Pause,
-  ArrowDownToLine,
   Search,
-  Clipboard,
   SlidersHorizontal,
-  Clock
+  Clock,
+  Play,
+  Pause,
+  Trash2,
+  FolderOpen,
+  ArrowRight,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  ExternalLink,
+  Blocks
 } from 'lucide-react';
+import AppIcon from './AppIcon';
 import { CustomIcon } from './DuoIcons';
 
 export default function DownloadsTab({
@@ -25,7 +29,7 @@ export default function DownloadsTab({
   onDeleteDownload,
   onPlayTrack,
   onOpenFolder,
-  downloadFolder,
+  downloadFolder = 'C:\\Users\\nishant\\Music',
   onNavigateToHome,
   onNavigateToLibrary,
 }) {
@@ -34,6 +38,16 @@ export default function DownloadsTab({
   const [selectedFormat, setSelectedFormat] = useState('MP3 320k');
   const [selectedQuality, setSelectedQuality] = useState('320kbps');
   const [showConfig, setShowConfig] = useState(true);
+
+  // Read installed extensions from storage to match dynamic plugins
+  const [installedExtensions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('luckyguy-extensions');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
 
   const handlePaste = async () => {
     try {
@@ -45,22 +59,30 @@ export default function DownloadsTab({
   };
 
   const detectPlatform = (text) => {
-    if (!text || !text.trim()) return { name: 'URL', color: 'var(--text-secondary)', bg: 'var(--bg-main)' };
+    if (!text || !text.trim()) return { name: 'Stream', color: 'var(--text-secondary)', bg: 'var(--bg-main)' };
     const lower = text.toLowerCase().trim();
-    if (lower.includes('spotify.com')) {
-      return { name: 'Spotify', color: '#1db954', bg: 'rgba(29, 185, 84, 0.12)' };
+
+    // Check against installed extensions first
+    for (const ext of installedExtensions) {
+      if (ext.enabled) {
+        const extNameLower = (ext.name || '').toLowerCase();
+        if (extNameLower.includes('youtube') && (lower.includes('youtube.com') || lower.includes('youtu.be'))) {
+          return { name: ext.name || 'Extension', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)' };
+        }
+        if (extNameLower.includes('spotify') && lower.includes('spotify.com')) {
+          return { name: ext.name || 'Extension', color: '#1db954', bg: 'rgba(29, 185, 84, 0.12)' };
+        }
+        if (extNameLower.includes('jiosaavn') && lower.includes('jiosaavn.com')) {
+          return { name: ext.name || 'Extension', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.12)' };
+        }
+        if (extNameLower.includes('soundcloud') && lower.includes('soundcloud.com')) {
+          return { name: ext.name || 'Extension', color: '#f97316', bg: 'rgba(249, 115, 22, 0.12)' };
+        }
+      }
     }
-    if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
-      return { name: 'YouTube', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)' };
-    }
-    if (lower.includes('jiosaavn.com')) {
-      return { name: 'JioSaavn', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.12)' };
-    }
-    if (lower.includes('soundcloud.com')) {
-      return { name: 'SoundCloud', color: '#f97316', bg: 'rgba(249, 115, 22, 0.12)' };
-    }
+
     if (lower.startsWith('http://') || lower.startsWith('https://')) {
-      return { name: 'Direct URL', color: 'var(--primary, #7c5cbf)', bg: 'rgba(124, 92, 191, 0.12)' };
+      return { name: 'Extension URL', color: 'var(--primary, #7c5cbf)', bg: 'rgba(124, 92, 191, 0.12)' };
     }
     return { name: 'Search', color: 'var(--text-secondary)', bg: 'var(--bg-main)' };
   };
@@ -120,7 +142,7 @@ export default function DownloadsTab({
                 margin: 0,
               }}
             >
-              Music Downloader
+              Media Downloader
             </h2>
             <p
               style={{
@@ -184,7 +206,7 @@ export default function DownloadsTab({
               transition: 'all 0.2s ease',
               userSelect: 'none',
             }}
-            title={'Detected source: ' + platform.name}
+            title={'Detected engine: ' + platform.name}
           >
             <span>{platform.name}</span>
           </div>
@@ -218,40 +240,20 @@ export default function DownloadsTab({
               placeholder="Paste media stream URL, audio link, or search track title..."
               style={{
                 flex: 1,
-                height: '100%',
                 border: 'none',
-                outline: 'none',
                 background: 'transparent',
                 fontSize: '13px',
-                fontWeight: 400,
                 color: 'var(--text-primary)',
-                fontFamily: 'inherit',
+                outline: 'none',
+                height: '100%',
+                fontWeight: 500,
               }}
             />
 
-            {urlInput ? (
-              <button
-                onClick={() => setUrlInput('')}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  padding: '4px',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-                title="Clear input"
-              >
-                <X size={14} />
-              </button>
-            ) : (
+            {!hasInput && (
               <button
                 onClick={handlePaste}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
                   padding: '4px 10px',
                   borderRadius: '6px',
                   backgroundColor: 'var(--bg-card)',
@@ -260,17 +262,15 @@ export default function DownloadsTab({
                   fontSize: '11.5px',
                   fontWeight: 500,
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease',
+                  flexShrink: 0,
                 }}
-                title="Paste from clipboard"
               >
-                <Clipboard size={12} color="var(--primary, #7c5cbf)" />
-                <span>Paste</span>
+                Paste
               </button>
             )}
           </div>
 
-          {/* Download Button */}
+          {/* Download Action Button */}
           <button
             onClick={handleTriggerDownload}
             disabled={!hasInput}
@@ -278,18 +278,18 @@ export default function DownloadsTab({
               height: '42px',
               padding: '0 20px',
               borderRadius: '10px',
-              backgroundColor: hasInput ? 'var(--primary, #7c5cbf)' : 'var(--bg-main)',
-              color: hasInput ? '#ffffff' : 'var(--text-muted)',
-              border: hasInput ? 'none' : '1px solid var(--border-medium)',
-              cursor: hasInput ? 'pointer' : 'default',
+              backgroundColor: hasInput ? 'var(--primary, #7c5cbf)' : 'var(--border-medium)',
+              color: '#ffffff',
+              border: 'none',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: hasInput ? 'pointer' : 'not-allowed',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
+              transition: 'all 0.18s ease',
               flexShrink: 0,
-              fontSize: '13px',
-              fontWeight: 600,
-              boxShadow: hasInput ? '0 2px 10px rgba(124, 92, 191, 0.35)' : 'none',
-              transition: 'all 0.2s ease',
+              boxShadow: hasInput ? '0 2px 8px rgba(124, 92, 191, 0.25)' : 'none',
             }}
           >
             <Download size={15} />
@@ -297,220 +297,109 @@ export default function DownloadsTab({
           </button>
         </div>
 
-        {/* Configuration Bar */}
+        {/* Audio Quality Configuration Dropdown Box */}
         {showConfig && (
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingTop: '12px',
-              borderTop: '1px solid var(--border-medium)',
+              gap: '16px',
+              padding: '12px 16px',
+              borderRadius: '10px',
+              backgroundColor: 'var(--bg-main)',
+              border: '1px solid var(--border-medium)',
+              fontSize: '12px',
               flexWrap: 'wrap',
-              gap: '12px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-              {/* Format Selection */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                  Format:
-                </span>
-                {['MP3 320k', 'FLAC', 'M4A 256k'].map((fmt) => (
-                  <button
-                    key={fmt}
-                    onClick={() => setSelectedFormat(fmt)}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      fontSize: '11.5px',
-                      fontWeight: selectedFormat === fmt ? 600 : 400,
-                      backgroundColor: selectedFormat === fmt ? 'rgba(124, 92, 191, 0.15)' : 'var(--bg-main)',
-                      color: selectedFormat === fmt ? 'var(--primary, #7c5cbf)' : 'var(--text-secondary)',
-                      border: selectedFormat === fmt ? '1px solid var(--primary, #7c5cbf)' : '1px solid var(--border-medium)',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    {fmt}
-                  </button>
-                ))}
-              </div>
+            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Audio Config:</span>
 
-              {/* Quality Preset */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                  Bitrate:
-                </span>
-                {['320kbps', '256kbps', '192kbps'].map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => setSelectedQuality(q)}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '6px',
-                      fontSize: '11.5px',
-                      fontWeight: selectedQuality === q ? 600 : 400,
-                      backgroundColor: selectedQuality === q ? 'rgba(124, 92, 191, 0.15)' : 'var(--bg-main)',
-                      color: selectedQuality === q ? 'var(--primary, #7c5cbf)' : 'var(--text-secondary)',
-                      border: selectedQuality === q ? '1px solid var(--primary, #7c5cbf)' : '1px solid var(--border-medium)',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Format:</span>
+              <select
+                value={selectedFormat}
+                onChange={(e) => setSelectedFormat(e.target.value)}
+                style={{
+                  height: '28px',
+                  padding: '0 8px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-medium)',
+                  backgroundColor: 'var(--bg-card)',
+                  color: 'var(--text-primary)',
+                  fontSize: '12px',
+                  outline: 'none',
+                }}
+              >
+                <option value="MP3 320k">MP3 320k (Studio)</option>
+                <option value="FLAC Lossless">FLAC Lossless</option>
+                <option value="AAC 256k">AAC 256k</option>
+              </select>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
-              <Clock size={12} />
-              <span>Length: Auto-detected from source</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Parallel Chunks:</span>
+              <span
+                style={{
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--bg-card)',
+                  border: '1px solid var(--border-medium)',
+                  color: 'var(--primary, #7c5cbf)',
+                  fontWeight: 600,
+                  fontSize: '11px',
+                }}
+              >
+                8x Threads
+              </span>
+            </div>
+
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)' }}>
+              <FolderOpen size={13} />
+              <span style={{ fontSize: '11.5px', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {downloadFolder}
+              </span>
             </div>
           </div>
         )}
       </div>
 
-      {/* 2. Ongoing Active Downloads Header & Controls */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '1px solid var(--border-medium)',
-          paddingBottom: '12px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <h2
-            style={{
-              fontSize: '16px',
-              fontWeight: 700,
-              color: 'var(--text-primary)',
-              margin: 0,
-            }}
-          >
-            Tasks & History
-          </h2>
-          <span
-            style={{
-              fontSize: '11px',
-              fontWeight: 500,
-              padding: '2px 8px',
-              borderRadius: '999px',
-              backgroundColor: activeDownloads.length > 0 ? 'rgba(124, 92, 191, 0.12)' : 'var(--bg-card)',
-              color: activeDownloads.length > 0 ? 'var(--primary, #7c5cbf)' : 'var(--text-secondary)',
-              border: '1px solid var(--border-medium)',
-            }}
-          >
-            {activeDownloads.length > 0 ? (activeDownloads.length + ' downloading') : 'Idle'}
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {activeDownloads.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      {/* 2. Active Tasks Section */}
+      {activeDownloads.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+              Active Queue ({activeDownloads.length})
+            </h3>
+            <div style={{ display: 'flex', gap: '8px' }}>
               <button
                 onClick={onPauseAll}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '6px 12px',
+                  padding: '4px 10px',
                   borderRadius: '6px',
-                  backgroundColor: 'var(--bg-card)',
                   border: '1px solid var(--border-medium)',
+                  backgroundColor: 'var(--bg-card)',
                   color: 'var(--text-secondary)',
-                  fontSize: '12px',
-                  fontWeight: 500,
+                  fontSize: '11.5px',
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease',
                 }}
-                title="Pause all ongoing downloads"
               >
-                <Pause size={13} />
-                <span>Pause All</span>
+                Pause All
               </button>
-
               <button
                 onClick={onResumeAll}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '6px 12px',
+                  padding: '4px 10px',
                   borderRadius: '6px',
-                  backgroundColor: 'rgba(124, 92, 191, 0.1)',
-                  border: '1px solid var(--primary, #7c5cbf)',
-                  color: 'var(--primary, #7c5cbf)',
-                  fontSize: '12px',
-                  fontWeight: 500,
+                  border: '1px solid var(--border-medium)',
+                  backgroundColor: 'var(--bg-card)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '11.5px',
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease',
                 }}
-                title="Resume/continue all downloads"
               >
-                <Play size={13} fill="currentColor" />
-                <span>Resume All</span>
+                Resume All
               </button>
             </div>
-          )}
-
-          {onOpenFolder && (
-            <button
-              onClick={() => onOpenFolder(downloadFolder)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                backgroundColor: 'var(--bg-card)',
-                border: '1px solid var(--border-medium)',
-                color: 'var(--text-secondary)',
-                fontSize: '12px',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-              title="Open Music folder in Windows Explorer"
-            >
-              <FolderOpen size={13} />
-              <span>Open Music Folder</span>
-            </button>
-          )}
-
-          {completedDownloads.length > 0 && (
-            <button
-              onClick={onClearCompleted}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                backgroundColor: 'var(--bg-card)',
-                border: '1px solid var(--border-medium)',
-                color: 'var(--text-secondary)',
-                fontSize: '12px',
-                fontWeight: 500,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              title="Move completed downloads to Trash"
-            >
-              <Trash2 size={13} />
-              <span>Trash Completed</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* 3. ACTIVE DOWNLOAD TASKS */}
-      {activeDownloads.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {'Active Tasks (' + activeDownloads.length + ')'}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -522,67 +411,57 @@ export default function DownloadsTab({
                   border: '1px solid var(--border-medium)',
                   borderRadius: '10px',
                   padding: '12px 16px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '8px',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div
                       style={{
-                        width: '32px',
-                        height: '32px',
+                        width: '36px',
+                        height: '36px',
                         borderRadius: '6px',
-                        backgroundColor: 'rgba(124, 92, 191, 0.1)',
+                        backgroundColor: 'var(--bg-main)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        overflow: 'hidden',
                         flexShrink: 0,
                       }}
                     >
-                      <Download size={15} color="var(--primary, #7c5cbf)" />
+                      {task.artworkUrl ? (
+                        <img src={task.artworkUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <CustomIcon size={18} stroke="var(--primary)" />
+                      )}
                     </div>
-
-                    <div style={{ minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          color: 'var(--text-primary)',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                        }}
-                      >
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
                         {task.title}
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>
-                        {(task.artist || 'Downloading...') + ' • ' + (task.speed || 'Downloading') + ' • ' + (task.size || '')}
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                        {task.artist} • {task.format}
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--primary, #7c5cbf)' }}>
-                      {(task.progress || 0) + '%'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                      {task.speed || 'Downloading...'}
                     </span>
-
                     <button
-                      onClick={() => onCancelDownload?.(task.id)}
+                      onClick={() => onCancelDownload(task.id)}
                       style={{
                         background: 'transparent',
                         border: 'none',
-                        cursor: 'pointer',
                         color: 'var(--text-muted)',
+                        cursor: 'pointer',
                         padding: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
                       }}
-                      title="Cancel download"
                     >
-                      <X size={14} />
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
@@ -590,19 +469,19 @@ export default function DownloadsTab({
                 {/* Progress bar */}
                 <div
                   style={{
-                    width: '100%',
                     height: '4px',
-                    backgroundColor: 'var(--bg-main)',
-                    borderRadius: '999px',
+                    width: '100%',
+                    backgroundColor: 'var(--border-medium)',
+                    borderRadius: '2px',
                     overflow: 'hidden',
                   }}
                 >
                   <div
                     style={{
-                      width: (task.progress || 0) + '%',
                       height: '100%',
+                      width: `${task.progress || 10}%`,
                       backgroundColor: 'var(--primary, #7c5cbf)',
-                      borderRadius: '999px',
+                      borderRadius: '2px',
                       transition: 'width 0.2s ease',
                     }}
                   />
@@ -613,162 +492,141 @@ export default function DownloadsTab({
         </div>
       )}
 
-      {/* 4. COMPLETED DOWNLOADS LIST */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          {'Completed (' + completedDownloads.length + ')'}
+      {/* 3. Completed Downloads Section */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+            Saved Media ({completedDownloads.length})
+          </h3>
+          {completedDownloads.length > 0 && (
+            <button
+              onClick={onClearCompleted}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-muted)',
+                fontSize: '11.5px',
+                cursor: 'pointer',
+              }}
+            >
+              Clear Finished
+            </button>
+          )}
         </div>
 
-        {completedDownloads.length === 0 && activeDownloads.length === 0 ? (
+        {completedDownloads.length === 0 ? (
           <div
             style={{
-              padding: '60px 20px',
+              padding: '36px 20px',
+              borderRadius: '12px',
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-medium)',
               textAlign: 'center',
-              color: 'var(--text-muted)',
-              fontSize: '13px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: '10px',
-              backgroundColor: 'var(--bg-card)',
-              borderRadius: '12px',
-              border: '1px dashed var(--border-medium)',
+              gap: '8px',
             }}
           >
-            <ArrowDownToLine size={28} color="var(--primary, #7c5cbf)" />
-            <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '14px' }}>
-              No downloads yet
-            </span>
-            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '360px' }}>
-              Paste a link in the box above to download your first song directly to your computer.
-            </span>
-          </div>
-        ) : completedDownloads.length === 0 ? (
-          <div style={{ padding: '16px', color: 'var(--text-muted)', fontSize: '12px' }}>
-            Download in progress... Completed files will appear here and in your Library.
+            <Download size={28} color="var(--primary)" style={{ opacity: 0.6 }} />
+            <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              No completed downloads yet
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '360px' }}>
+              Paste a stream URL or music search query above to download high quality tracks directly to your device.
+            </div>
           </div>
         ) : (
           <div
             style={{
-              border: '1px solid var(--border-medium)',
-              borderRadius: '12px',
               backgroundColor: 'var(--bg-card)',
+              borderRadius: '12px',
+              border: '1px solid var(--border-medium)',
               overflow: 'hidden',
             }}
           >
-            {completedDownloads.map((item, idx) => (
-              <div
-                key={item.id || idx}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 16px',
-                  borderBottom: idx === completedDownloads.length - 1 ? 'none' : '1px solid var(--border-light, rgba(0,0,0,0.04))',
-                  transition: 'background-color 0.15s ease',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
-                  <div
-                    style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '6px',
-                      backgroundColor: 'var(--bg-main)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      overflow: 'hidden',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {item.artworkUrl ? (
-                      <img src={item.artworkUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <CustomIcon size={16} stroke="var(--primary, #7c5cbf)" />
-                    )}
-                  </div>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div
-                      style={{
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        color: 'var(--text-primary)',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      {item.title}
-                    </div>
-                    <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '1px' }}>
-                      {item.artist + ' • ' + (item.size || '8.5 MB') + ' • ' + (item.format || 'MP3 320k')}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                  <button
-                    onClick={() => onPlayTrack?.(item)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      padding: '5px 12px',
-                      borderRadius: '6px',
-                      backgroundColor: 'rgba(124, 92, 191, 0.1)',
-                      border: '1px solid var(--border-medium)',
-                      color: 'var(--primary, #7c5cbf)',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
-                    title="Play track"
-                  >
-                    <Play size={12} fill="currentColor" />
-                    <span>Play</span>
-                  </button>
-
-                  {onOpenFolder && (
-                    <button
-                      onClick={() => onOpenFolder(item.filePath)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--text-secondary)',
-                        cursor: 'pointer',
-                        padding: '5px',
-                        borderRadius: '4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                      }}
-                      title="Show file in Windows Explorer"
-                    >
-                      <FolderOpen size={14} />
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => onDeleteDownload?.(item.id)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'var(--text-muted)',
-                      cursor: 'pointer',
-                      padding: '5px',
-                      borderRadius: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                    }}
-                    title="Move to Trash"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
+            <table className="tracks-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '48px', textAlign: 'center' }}>#</th>
+                  <th>Title</th>
+                  <th>Artist</th>
+                  <th>Album</th>
+                  <th style={{ width: '90px', textAlign: 'center' }}>Format</th>
+                  <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {completedDownloads.map((item, idx) => (
+                  <tr key={item.id || idx}>
+                    <td style={{ textAlign: 'center', color: 'var(--text-muted)' }}>{idx + 1}</td>
+                    <td className="track-title-cell">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div
+                          style={{
+                            width: '34px',
+                            height: '34px',
+                            borderRadius: '6px',
+                            backgroundColor: 'var(--bg-main)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {item.artworkUrl ? (
+                            <img src={item.artworkUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <CustomIcon size={16} stroke="var(--primary)" />
+                          )}
+                        </div>
+                        <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>
+                          {item.title}
+                        </span>
+                      </div>
+                    </td>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{item.artist}</td>
+                    <td style={{ color: 'var(--text-muted)', fontSize: '12.5px' }}>{item.album}</td>
+                    <td style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                      <span style={{ padding: '2px 6px', borderRadius: '4px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-medium)', fontSize: '11px' }}>
+                        {item.format || 'MP3'}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                        <button
+                          onClick={() => onPlayTrack && onPlayTrack(item)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--primary)',
+                            cursor: 'pointer',
+                            padding: '4px',
+                          }}
+                          title="Play"
+                        >
+                          <Play size={14} />
+                        </button>
+                        <button
+                          onClick={() => onDeleteDownload && onDeleteDownload(item.id)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            padding: '4px',
+                          }}
+                          title="Delete"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
