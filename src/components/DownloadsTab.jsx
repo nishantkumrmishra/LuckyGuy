@@ -130,7 +130,7 @@ export default function DownloadsTab({
                 marginBottom: 0,
               }}
             >
-              Paste track or playlist links from Spotify, YouTube, or JioSaavn to download locally.
+              Download streams, audio tracks, and media playlists using installed extension engines.
             </p>
           </div>
 
@@ -215,7 +215,7 @@ export default function DownloadsTab({
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
               onKeyDown={(e) => e.key === 'Enter' && handleTriggerDownload()}
-              placeholder="Paste Spotify track/album/playlist, YouTube link, or search song title..."
+              placeholder="Paste media stream URL, audio link, or search track title..."
               style={{
                 flex: 1,
                 height: '100%',

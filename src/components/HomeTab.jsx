@@ -270,7 +270,7 @@ export default function HomeTab({
               Downloads
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-              Fetch from Spotify & YouTube
+              Extension & URL Streamer
             </div>
           </div>
         </div>
@@ -447,7 +447,7 @@ export default function HomeTab({
             No tracks in your library yet
           </div>
           <div style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '360px' }}>
-            Download tracks from Spotify or YouTube in the Downloads tab, or import local files.
+            Download tracks via installed extensions in the Downloads tab, or import local audio files.
           </div>
           {onNavigateToDownloads && (
             <button

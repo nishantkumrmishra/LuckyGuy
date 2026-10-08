@@ -37,6 +37,7 @@ ishant\\Music');
   const [extensionUrl, setExtensionUrl] = useState('');
   const [installError, setInstallError] = useState('');
   const [installSuccess, setInstallSuccess] = useState('');
+  const [extensionSearch, setExtensionSearch] = useState('');
 
   // Built-in core engines (can be toggled)
   const [plugins, setPlugins] = useState(() => {
@@ -62,19 +63,43 @@ ishant\\Music');
     } catch (e) {}
     return [
       {
-        id: 'ext-bandcamp-resolver',
-        name: 'Bandcamp Lossless Streamer',
-        source: 'https://github.com/luckyguy-plugins/bandcamp-resolver',
-        version: '1.2.0',
-        author: 'Community',
+        id: 'ext-youtube',
+        name: 'YouTube Stream Engine',
+        category: 'Media Resolver',
+        description: 'Resolves audio streams and master tracks via community extension.',
+        source: 'https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/youtube/manifest.json',
+        version: '1.0.0',
+        author: 'LuckyGuy Community',
         enabled: true,
       },
       {
-        id: 'ext-musixmatch-lyrics',
-        name: 'Musixmatch Synced Lyrics Indexer',
-        source: 'https://github.com/luckyguy-plugins/musixmatch-lyrics',
-        version: '0.9.4',
-        author: 'Community',
+        id: 'ext-spotify',
+        name: 'Spotify Metadata Scraper',
+        category: 'Tags & Artwork',
+        description: 'Extracts official album cover artwork and track metadata via community extension.',
+        source: 'https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/spotify/manifest.json',
+        version: '1.0.0',
+        author: 'LuckyGuy Community',
+        enabled: true,
+      },
+      {
+        id: 'ext-jiosaavn',
+        name: 'JioSaavn 320k Studio CDN',
+        category: 'Lossless CDN',
+        description: 'Direct pristine 320kbps MP3/AAC CDN media resolver with native decryption.',
+        source: 'https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/jiosaavn/manifest.json',
+        version: '1.0.0',
+        author: 'LuckyGuy Community',
+        enabled: true,
+      },
+      {
+        id: 'ext-soundcloud',
+        name: 'SoundCloud Stream Engine',
+        category: 'Streaming',
+        description: 'Resolves artist mixes, live sets, and indie streaming releases.',
+        source: 'https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/soundcloud/manifest.json',
+        version: '1.0.0',
+        author: 'LuckyGuy Community',
         enabled: true,
       }
     ];
@@ -621,7 +646,7 @@ ishant\\Music');
             <form onSubmit={handleInstallExtension} style={{ display: 'flex', gap: '8px' }}>
               <input
                 type="text"
-                placeholder="https://github.com/username/luckyguy-plugin-extension..."
+                placeholder="Paste extension repository or manifest URL (e.g. from LuckyGuy--extensions)..."
                 value={extensionUrl}
                 onChange={(e) => {
                   setExtensionUrl(e.target.value);
@@ -685,7 +710,7 @@ ishant\\Music');
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {customExtensions.map((ext) => (
+                  {customExtensions.filter(ext => !extensionSearch || ext.name.toLowerCase().includes(extensionSearch.toLowerCase()) || (ext.category && ext.category.toLowerCase().includes(extensionSearch.toLowerCase()))).map((ext) => (
                     <div
                       key={ext.id}
                       style={{
