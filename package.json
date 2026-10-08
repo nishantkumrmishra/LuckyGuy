@@ -1,0 +1,39 @@
+{
+  "name": "luckyguy",
+  "version": "1.0.0",
+  "description": "LuckyGuy - High Performance Media Downloader, Streamer & Music Manager for Windows",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite build && electron .",
+    "vite": "vite",
+    "build": "vite build",
+    "start": "vite build && electron .",
+    "electron": "electron ."
+  },
+  "keywords": [
+    "music",
+    "downloader",
+    "streamer",
+    "electron",
+    "windows",
+    "youtube",
+    "spotify",
+    "jiosaavn"
+  ],
+  "author": "Nishant",
+  "license": "MIT",
+  "dependencies": {
+    "lucide-react": "^1.16.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.1",
+    "tailwindcss": "^4.0.0",
+    "vite": "^6.0.7"
+  },
+  "productName": "LuckyGuy"
+}
