@@ -14,7 +14,8 @@ import {
   Trash2,
   RefreshCw,
   AlertCircle,
-  DownloadCloud
+  DownloadCloud,
+  Search
 } from 'lucide-react';
 import { CustomIcon } from './DuoIcons';
 
