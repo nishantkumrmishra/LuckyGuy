@@ -10,7 +10,12 @@ import {
   Clock,
   Trash2,
   FolderOpen,
-  Heart
+  Heart,
+  Music,
+  Disc3,
+  MoreVertical,
+  SlidersHorizontal,
+  RefreshCw
 } from 'lucide-react';
 import AppIcon from './AppIcon';
 import { CustomIcon } from './DuoIcons';
@@ -38,6 +43,7 @@ export default function LibraryTab({
   const [isScanning, setIsScanning] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
   const [editingTrack, setEditingTrack] = useState(null);
+  const [hoveredTrackId, setHoveredTrackId] = useState(null);
 
   const handleContextMenu = (e, track) => {
     e.preventDefault();
@@ -48,7 +54,6 @@ export default function LibraryTab({
       track,
     });
   };
-
 
   const handleScan = async () => {
     setIsScanning(true);
@@ -70,14 +75,15 @@ export default function LibraryTab({
     list.sort((a, b) => {
       if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
       if (sortBy === 'artist') return (a.artist || '').localeCompare(b.artist || '');
-      if (sortBy === 'duration') return (a.duration || 0) - (b.duration || 0);
+      if (sortBy === 'album') return (a.album || '').localeCompare(b.album || '');
+      if (sortBy === 'duration') return (a.durationSeconds || a.duration || 0) - (b.durationSeconds || b.duration || 0);
       return 0;
     });
     return list;
   }, [songs, searchQuery, sortBy]);
 
   const formatDuration = (secs) => {
-    if (!secs) return '3:30';
+    if (!secs || isNaN(secs)) return '3:30';
     const m = Math.floor(secs / 60);
     const s = Math.floor(secs % 60);
     return m + ':' + (s < 10 ? '0' : '') + s;
@@ -93,7 +99,7 @@ export default function LibraryTab({
         padding: '24px 32px 40px 32px',
         backgroundColor: 'var(--bg-main, #f5f5f5)',
         overflowY: 'auto',
-        gap: '20px',
+        gap: '24px',
         fontFamily: 'inherit',
       }}
     >
@@ -122,8 +128,8 @@ export default function LibraryTab({
           <span
             style={{
               fontSize: '11px',
-              fontWeight: 500,
-              padding: '2px 8px',
+              fontWeight: 600,
+              padding: '3px 10px',
               borderRadius: '999px',
               backgroundColor: 'var(--bg-card)',
               color: 'var(--text-secondary)',
@@ -150,6 +156,7 @@ export default function LibraryTab({
                 fontSize: '12.5px',
                 fontWeight: 500,
                 cursor: 'pointer',
+                transition: 'all 0.15s ease',
               }}
               title="Open Music folder in Windows Explorer"
             >
@@ -174,6 +181,7 @@ export default function LibraryTab({
               fontWeight: 500,
               cursor: isScanning ? 'wait' : 'pointer',
               boxShadow: '0 2px 8px rgba(124, 92, 191, 0.25)',
+              transition: 'all 0.15s ease',
             }}
           >
             <FolderSearch size={14} color="#ffffff" className={isScanning ? 'animate-spin' : ''} />
@@ -316,7 +324,7 @@ export default function LibraryTab({
         </div>
       )}
 
-      {/* Filter and Search Bar */}
+      {/* Filter and Search Bar Header */}
       {songs.length > 0 && (
         <div
           style={{
@@ -331,57 +339,77 @@ export default function LibraryTab({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
+              gap: '9px',
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-medium)',
-              borderRadius: '8px',
-              padding: '0 10px',
-              height: '34px',
-              width: '240px',
+              borderRadius: '9px',
+              padding: '0 12px',
+              height: '36px',
+              width: '280px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
             }}
           >
-            <Search size={14} color="#94a3b8" />
+            <Search size={14} color="var(--text-muted)" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filter tracks..."
+              placeholder="Filter tracks by title, artist, album..."
               style={{
                 border: 'none',
                 background: 'transparent',
                 outline: 'none',
                 fontSize: '12.5px',
-                fontWeight: 400,
+                fontWeight: 500,
                 color: 'var(--text-primary)',
                 width: '100%',
               }}
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: 0,
+                  fontSize: '11px',
+                }}
+              >
+                ✕
+              </button>
+            )}
           </div>
 
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            style={{
-              height: '34px',
-              padding: '0 10px',
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--border-medium)',
-              borderRadius: '8px',
-              fontSize: '12.5px',
-              fontWeight: 500,
-              color: 'var(--text-secondary)',
-              outline: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="title">Title (A-Z)</option>
-            <option value="artist">Artist (A-Z)</option>
-            <option value="duration">Duration</option>
-          </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Sort:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              style={{
+                height: '36px',
+                padding: '0 12px',
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border-medium)',
+                borderRadius: '8px',
+                fontSize: '12.5px',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="title">Title (A-Z)</option>
+              <option value="artist">Artist (A-Z)</option>
+              <option value="album">Album (A-Z)</option>
+              <option value="duration">Duration</option>
+            </select>
+          </div>
         </div>
       )}
 
-      {/* NorthTracks Exact Tracks Table */}
+      {/* Downside Area: Modernized Premium NorthTracks Songs Table */}
       {filteredSongs.length === 0 ? (
         <div
           style={{
@@ -427,119 +455,227 @@ export default function LibraryTab({
         <div
           style={{
             backgroundColor: 'var(--bg-card, #ffffff)',
-            borderRadius: '10px',
+            borderRadius: '12px',
             border: '1px solid var(--border-medium, rgba(0, 0, 0, 0.08))',
             overflow: 'hidden',
+            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.02)',
           }}
         >
-          <table className="tracks-table">
+          <table className="tracks-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr>
-                <th style={{ width: '48px', textAlign: 'center' }}>#</th>
-                <th>Title</th>
-                <th>Artist</th>
-                <th>Album</th>
-                <th style={{ width: '100px', textAlign: 'center' }}>
-                  <Clock size={13} style={{ display: 'inline', verticalAlign: 'middle' }} />
+              <tr
+                style={{
+                  borderBottom: '1px solid var(--border-medium)',
+                  backgroundColor: 'rgba(0, 0, 0, 0.02)',
+                }}
+              >
+                <th style={{ width: '56px', textAlign: 'center', padding: '12px 0', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>#</th>
+                <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>TITLE</th>
+                <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>ARTIST</th>
+                <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>ALBUM</th>
+                <th style={{ width: '90px', textAlign: 'center', padding: '12px 8px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  <Clock size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />
                 </th>
-                <th style={{ width: '100px', textAlign: 'center' }}>Actions</th>
+                <th style={{ width: '120px', textAlign: 'center', padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>ACTIONS</th>
               </tr>
             </thead>
             <tbody>
               {filteredSongs.map((track, idx) => {
+                const trackKey = track.id || track.filePath || idx;
                 const isCurrent =
                   currentTrack &&
                   (currentTrack.id === track.id || currentTrack.filePath === track.filePath);
                 const isTrackPlaying = isCurrent && isPlaying;
                 const isLiked = likedTracks.includes(track.id || track.filePath || track.title);
+                const isHovered = hoveredTrackId === trackKey;
                 const art = track.artworkUrl || track.coverArt;
 
                 return (
                   <tr
-                    key={track.id || track.filePath || idx}
+                    key={trackKey}
                     className={isCurrent ? 'playing-row' : ''}
-                    style={{ cursor: 'pointer' }}
+                    style={{
+                      cursor: 'pointer',
+                      borderBottom: '1px solid var(--border-light, rgba(0, 0, 0, 0.04))',
+                      backgroundColor: isCurrent ? 'rgba(124, 92, 191, 0.08)' : (isHovered ? 'var(--bg-card-hover, rgba(0,0,0,0.02))' : 'transparent'),
+                      transition: 'background-color 0.12s ease',
+                    }}
                     onClick={() => onPlaySong && onPlaySong(track, filteredSongs)}
+                    onMouseEnter={() => setHoveredTrackId(trackKey)}
+                    onMouseLeave={() => setHoveredTrackId(null)}
                     onContextMenu={(e) => handleContextMenu(e, track)}
                   >
-                    <td style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                    {/* Index / Playing Equalizer / Hover Play */}
+                    <td style={{ textAlign: 'center', color: isCurrent ? 'var(--primary)' : 'var(--text-muted)', padding: '10px 0', width: '56px' }}>
                       {isTrackPlaying ? (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                          <span style={{ width: '3px', height: '12px', backgroundColor: '#7c5cbf', borderRadius: '1px' }} />
-                          <span style={{ width: '3px', height: '16px', backgroundColor: '#7c5cbf', borderRadius: '1px' }} />
-                          <span style={{ width: '3px', height: '10px', backgroundColor: '#7c5cbf', borderRadius: '1px' }} />
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2.5px', height: '14px' }}>
+                          <span style={{ width: '3px', height: '14px', backgroundColor: 'var(--primary, #7c5cbf)', borderRadius: '2px', animation: 'bounce 0.8s infinite alternate' }} />
+                          <span style={{ width: '3px', height: '10px', backgroundColor: 'var(--primary, #7c5cbf)', borderRadius: '2px', animation: 'bounce 0.8s infinite alternate 0.2s' }} />
+                          <span style={{ width: '3px', height: '12px', backgroundColor: 'var(--primary, #7c5cbf)', borderRadius: '2px', animation: 'bounce 0.8s infinite alternate 0.4s' }} />
+                        </div>
+                      ) : isHovered ? (
+                        <div
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            color: isCurrent ? 'var(--primary)' : 'var(--text-primary)',
+                          }}
+                        >
+                          <Play size={13} fill="currentColor" style={{ marginLeft: '2px' }} />
                         </div>
                       ) : (
-                        idx + 1
+                        <span style={{ fontSize: '12.5px', fontWeight: 500 }}>{idx + 1}</span>
                       )}
                     </td>
 
-                    <td className="track-title-cell">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    {/* Title & Artwork Thumbnail */}
+                    <td style={{ padding: '10px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div
                           style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '6px',
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '8px',
                             backgroundColor: 'var(--bg-main)',
-                            border: '1px solid var(--border-light, rgba(0,0,0,0.05))',
+                            border: '1px solid var(--border-medium)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             overflow: 'hidden',
                             flexShrink: 0,
+                            position: 'relative',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
                           }}
                         >
                           {art ? (
-                            <img src={art} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img
+                              src={art}
+                              alt=""
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
                           ) : (
-                            <CustomIcon size={18} stroke="var(--primary, #7c5cbf)" />
+                            <div
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: 'rgba(124, 92, 191, 0.08)',
+                                color: 'var(--primary)',
+                              }}
+                            >
+                              <Music size={18} strokeWidth={2} />
+                            </div>
                           )}
                         </div>
 
-                        <span
-                          style={{
-                            fontWeight: 600,
-                            fontSize: '13px',
-                            color: isCurrent ? 'var(--primary, #7c5cbf)' : 'var(--text-primary)',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {track.title}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              fontSize: '13.5px',
+                              color: isCurrent ? 'var(--primary, #7c5cbf)' : 'var(--text-primary)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              letterSpacing: '-0.01em',
+                            }}
+                            title={track.title}
+                          >
+                            {track.title}
+                          </span>
+                          {track.formatType && (
+                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                              {track.formatType}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
 
-                    <td style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+                    {/* Artist */}
+                    <td
+                      style={{
+                        padding: '10px 16px',
+                        color: 'var(--text-secondary)',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        maxWidth: '220px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                      title={track.artist || 'Unknown Artist'}
+                    >
                       {track.artist || 'Unknown Artist'}
                     </td>
 
-                    <td style={{ color: 'var(--text-muted)', fontSize: '12.5px' }}>
+                    {/* Album */}
+                    <td
+                      style={{
+                        padding: '10px 16px',
+                        color: 'var(--text-muted)',
+                        fontSize: '12.5px',
+                        fontWeight: 400,
+                        maxWidth: '220px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                      title={track.album || 'Single / Master'}
+                    >
                       {track.album || 'Single / Master'}
                     </td>
 
-                    <td style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12.5px' }}>
-                      {formatDuration(track.duration)}
+                    {/* Duration */}
+                    <td
+                      style={{
+                        padding: '10px 8px',
+                        textAlign: 'center',
+                        color: 'var(--text-secondary)',
+                        fontSize: '12.5px',
+                        fontWeight: 500,
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    >
+                      {formatDuration(track.durationSeconds || track.duration)}
                     </td>
 
-                    <td style={{ textAlign: 'center' }}>
+                    {/* Actions */}
+                    <td style={{ padding: '10px 16px', textAlign: 'center' }}>
                       <div
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '8px',
+                          gap: '6px',
                           justifyContent: 'center',
                         }}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
                           onClick={() => onToggleLike && onToggleLike(track)}
-                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '6px',
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: isLiked ? '#a78bfa' : 'var(--text-muted)',
+                            transition: 'transform 0.1s ease',
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                           title={isLiked ? 'Unlike' : 'Like'}
                         >
-                          <Heart size={15} fill={isLiked ? '#a78bfa' : 'none'} color={isLiked ? '#a78bfa' : 'var(--text-muted)'} />
+                          <Heart size={15} fill={isLiked ? '#a78bfa' : 'none'} color={isLiked ? '#a78bfa' : 'currentColor'} />
                         </button>
 
                         <button
@@ -548,9 +684,16 @@ export default function LibraryTab({
                             background: 'transparent',
                             border: 'none',
                             cursor: 'pointer',
-                            padding: '4px',
+                            padding: '6px',
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                             color: isCurrent ? 'var(--primary)' : 'var(--text-muted)',
+                            transition: 'transform 0.1s ease',
                           }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                           title={isTrackPlaying ? 'Pause' : 'Play'}
                         >
                           {isTrackPlaying ? <Pause size={15} /> : <Play size={15} />}
@@ -563,14 +706,47 @@ export default function LibraryTab({
                               background: 'transparent',
                               border: 'none',
                               cursor: 'pointer',
-                              padding: '4px',
+                              padding: '6px',
+                              borderRadius: '6px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                               color: 'var(--text-muted)',
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                              e.currentTarget.style.color = '#ef4444';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.color = 'var(--text-muted)';
                             }}
                             title="Move to Trash"
                           >
                             <Trash2 size={14} />
                           </button>
                         )}
+
+                        <button
+                          onClick={(e) => handleContextMenu(e, track)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '6px',
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--text-muted)',
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          title="More Options"
+                        >
+                          <MoreVertical size={14} />
+                        </button>
                       </div>
                     </td>
                   </tr>

@@ -156,27 +156,46 @@ function extractId3Artwork(filePath) {
       fs.closeSync(fd);
       return null;
     }
+    const majorVer = headerBuf[3]; // 3 for v2.3, 4 for v2.4
     const tagSize = ((headerBuf[6] & 0x7f) << 21) | ((headerBuf[7] & 0x7f) << 14) | ((headerBuf[8] & 0x7f) << 7) | (headerBuf[9] & 0x7f);
-    const tagBuf = Buffer.alloc(Math.min(tagSize, 5 * 1024 * 1024));
+    const tagBuf = Buffer.alloc(Math.min(tagSize, 8 * 1024 * 1024));
     fs.readSync(fd, tagBuf, 0, tagBuf.length, 10);
     fs.closeSync(fd);
 
     let offset = 0;
     while (offset < tagBuf.length - 10) {
       const frameId = tagBuf.slice(offset, offset + 4).toString('ascii');
-      const frameSize = tagBuf.readUInt32BE(offset + 4);
+      let frameSize = 0;
+      if (majorVer === 4) {
+        frameSize = ((tagBuf[offset + 4] & 0x7f) << 21) | ((tagBuf[offset + 5] & 0x7f) << 14) | ((tagBuf[offset + 6] & 0x7f) << 7) | (tagBuf[offset + 7] & 0x7f);
+      } else {
+        frameSize = tagBuf.readUInt32BE(offset + 4);
+      }
       if (frameSize <= 0 || frameSize > tagBuf.length - offset) break;
       
       if (frameId === 'APIC') {
         const apicData = tagBuf.slice(offset + 10, offset + 10 + frameSize);
+        const encoding = apicData[0];
         let nullIdx = 1;
         while (nullIdx < apicData.length && apicData[nullIdx] !== 0) nullIdx++;
         const mime = apicData.slice(1, nullIdx).toString('ascii') || 'image/jpeg';
-        let descEnd = nullIdx + 2;
-        while (descEnd < apicData.length && apicData[descEnd] !== 0) descEnd++;
-        descEnd++;
-        const imgBytes = apicData.slice(descEnd);
-        return 'data:' + mime + ';base64,' + imgBytes.toString('base64');
+        let descEnd = nullIdx + 1;
+        if (descEnd < apicData.length) descEnd++; // skip picture type byte
+        if (encoding === 1 || encoding === 2) {
+          while (descEnd < apicData.length - 1 && !(apicData[descEnd] === 0 && apicData[descEnd + 1] === 0)) {
+            descEnd += 2;
+          }
+          descEnd += 2;
+        } else {
+          while (descEnd < apicData.length && apicData[descEnd] !== 0) {
+            descEnd++;
+          }
+          descEnd++;
+        }
+        if (descEnd < apicData.length) {
+          const imgBytes = apicData.slice(descEnd);
+          return 'data:' + mime + ';base64,' + imgBytes.toString('base64');
+        }
       }
       offset += 10 + frameSize;
     }

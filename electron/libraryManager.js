@@ -154,6 +154,20 @@ class LibraryManager {
     } catch (e) {}
   }
 
+  findDirectoryCover(filePath) {
+    try {
+      const dir = path.dirname(filePath);
+      const candidates = ['cover.jpg', 'cover.png', 'folder.jpg', 'folder.png', 'artwork.jpg', 'front.jpg'];
+      for (const c of candidates) {
+        const full = path.join(dir, c);
+        if (fs.existsSync(full)) {
+          return 'file:///' + full.replace(/\\/g, '/');
+        }
+      }
+    } catch (e) {}
+    return '';
+  }
+
   // --- Scan Local Directories ---
   scanDirectories(directories) {
     const validExts = new Set(['.mp3', '.m4a', '.flac', '.wav', '.aac', '.ogg', '.mp4', '.mkv', '.webm']);
@@ -179,6 +193,22 @@ class LibraryManager {
               const artist = parts.length > 1 ? parts[0].trim() : 'Local Artist';
               const title = parts.length > 1 ? parts.slice(1).join(' - ').trim() : basename;
 
+              // Check embedded artwork
+              let art = (ext === '.mp3' || ext === '.m4a' || ext === '.flac') ? (extractId3Artwork(fullPath) || '') : '';
+              
+              // Fallback to directory cover image
+              if (!art) {
+                art = this.findDirectoryCover(fullPath);
+              }
+
+              // Fallback to existing ledger entry only if it is not generic playlist cover
+              if (!art) {
+                const ledgerMatch = this.ledger.find(function(l) { return l.filePath === fullPath; });
+                if (ledgerMatch && ledgerMatch.artworkUrl && !ledgerMatch.artworkUrl.includes('ab67706c0000da846c0fc4889bee49b191d99388')) {
+                  art = ledgerMatch.artworkUrl;
+                }
+              }
+
               discovered.push({
                 id: Buffer.from(fullPath).toString('base64').replace(/=/g, ''),
                 title,
@@ -187,7 +217,7 @@ class LibraryManager {
                 durationSeconds: Math.round(stat.size / (160 * 128)), // estimate or placeholder
                 durationFormatted: '3:45',
                 fileSize: stat.size,
-                artworkUrl: (ext === '.mp3' ? (extractId3Artwork(fullPath) || '') : '') || (this.ledger.find(function(l) { return l.filePath === fullPath; })?.artworkUrl || ''),
+                artworkUrl: art || '',
                 filePath: fullPath,
                 ext,
                 mimeType: ext === '.mp4' || ext === '.mkv' ? 'video/mp4' : 'audio/mpeg',
@@ -214,7 +244,9 @@ class LibraryManager {
         this.songs.push(song);
       } else {
         const existing = existingMap.get(song.filePath);
-        if (!existing.artworkUrl && song.artworkUrl) {
+        // Only update artwork if current is empty or generic and song has a better one
+        const isExistingGeneric = !existing.artworkUrl || existing.artworkUrl.includes('ab67706c0000da846c0fc4889bee49b191d99388');
+        if (isExistingGeneric && song.artworkUrl && !song.artworkUrl.includes('ab67706c0000da846c0fc4889bee49b191d99388')) {
           existing.artworkUrl = song.artworkUrl;
         }
       }
@@ -224,8 +256,7 @@ class LibraryManager {
     return this.songs;
   }
 
-  // --- Duplicate Detection (matching Android findDuplicateSongIds) ---
-  findDuplicates() {
+  // --- Duplicate Detection (matching Android findDuplicateSongIds) ---\n  findDuplicates() {
     const duplicates = [];
     const seen = new Map();
 
@@ -298,148 +329,4 @@ class LibraryManager {
     const duplicates = this.findDuplicates();
     const reclaimableBytes = duplicates.reduce((acc, d) => acc + (d.reclaimableBytes || 0), 0);
 
-    return {
-      totalTransactions: this.ledger.length,
-      completedCount,
-      failedCount,
-      totalBytesDownloaded,
-      formatBreakdown,
-      platformBreakdown,
-      duplicateCount: duplicates.length,
-      reclaimableBytes
-    };
-  }
-
-  exportLedgerCsv() {
-    const headers = ['ID', 'Date', 'Title', 'Artist', 'Platform', 'Format', 'Quality', 'Bytes', 'File Path', 'Status'];
-    const rows = this.ledger.map(e => [
-      `"${e.id}"`,
-      `"${e.dateFormatted}"`,
-      `"${(e.title || '').replace(/"/g, '""')}"`,
-      `"${(e.artist || '').replace(/"/g, '""')}"`,
-      `"${e.platform || ''}"`,
-      `"${e.formatType || ''}"`,
-      `"${e.quality || ''}"`,
-      e.fileSize || 0,
-      `"${(e.filePath || '').replace(/"/g, '""')}"`,
-      `"${e.status || ''}"`
-    ]);
-
-    return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-  }
-
-  // --- Bookmarks / Saved links queue ---
-  addBookmark(bookmark) {
-    const item = {
-      id: `BM-${Date.now()}`,
-      url: bookmark.url,
-      title: bookmark.title || bookmark.url,
-      platform: bookmark.platform || 'Auto',
-      addedAt: Date.now()
-    };
-    this.bookmarks.unshift(item);
-    this.saveBookmarks();
-    return item;
-  }
-
-  removeBookmark(id) {
-    this.bookmarks = this.bookmarks.filter(b => b.id !== id);
-    this.saveBookmarks();
-    return this.bookmarks;
-  }
-
-  // --- Playlists ---
-  createPlaylist(title) {
-    const plDir = this.getPlaylistsDir();
-    const folderPath = path.join(plDir, title);
-    if (!fs.existsSync(folderPath)) {
-      try { fs.mkdirSync(folderPath, { recursive: true }); } catch(e) {}
-    }
-    const pl = {
-      id: 'pl-' + Buffer.from(title).toString('base64').replace(/=/g, ''),
-      name: title,
-      title,
-      folderPath,
-      tracks: [],
-      trackCount: 0,
-      createdAt: Date.now()
-    };
-    this.playlists = this.playlists.filter(p => p.name !== title && p.title !== title);
-    this.playlists.push(pl);
-    this.savePlaylists();
-    return pl;
-  }
-
-  addToPlaylist(playlistId, trackOrPath) {
-    const pl = this.playlists.find(p => p.id === playlistId || p.name === playlistId);
-    if (pl) {
-      let srcPath = typeof trackOrPath === 'string' ? trackOrPath : (trackOrPath.filePath || trackOrPath.id);
-      if (srcPath && fs.existsSync(srcPath) && pl.folderPath && fs.existsSync(pl.folderPath)) {
-        try {
-          const dest = path.join(pl.folderPath, path.basename(srcPath));
-          if (!fs.existsSync(dest)) {
-            fs.copyFileSync(srcPath, dest);
-          }
-          if (!pl.tracks) pl.tracks = [];
-          if (!pl.tracks.includes(dest)) pl.tracks.push(dest);
-          pl.trackCount = pl.tracks.length;
-          this.savePlaylists();
-        } catch(e) {}
-      }
-    }
-    return this.playlists;
-  }
-
-  removeFromPlaylist(playlistId, songId) {
-    const pl = this.playlists.find(p => p.id === playlistId);
-    if (pl) {
-      pl.songIds = pl.songIds.filter(id => id !== songId);
-      this.savePlaylists();
-    }
-    return this.playlists;
-  }
-
-  deletePlaylist(playlistId) {
-    const pl = this.playlists.find(p => p.id === playlistId || p.name === playlistId);
-    if (pl && pl.folderPath && fs.existsSync(pl.folderPath)) {
-      try { fs.rmSync(pl.folderPath, { recursive: true, force: true }); } catch(e) {}
-    }
-    this.playlists = this.playlists.filter(p => p.id !== playlistId && p.name !== playlistId);
-    this.savePlaylists();
-    return this.playlists;
-  }
-
-  // --- Song metadata edit ---
-  updateSongMetadata(songId, updates) {
-    const song = this.songs.find(s => s.id === songId);
-    if (song) {
-      Object.assign(song, updates);
-      this.saveLibrary();
-    }
-    return song;
-  }
-
-  removeSong(songId, filePath) {
-    const beforeCount = this.songs.length;
-    this.songs = this.songs.filter(s => {
-      if (songId && s.id === songId) return false;
-      if (filePath && s.filePath === filePath) return false;
-      return true;
-    });
-    if (this.songs.length !== beforeCount) {
-      this.saveLibrary();
-    }
-    return this.songs;
-  }
-
-  pruneMissingFiles() {
-    const beforeCount = this.songs.length;
-    this.songs = this.songs.filter(s => s.filePath && fs.existsSync(s.filePath));
-    if (this.songs.length !== beforeCount) {
-      this.saveLibrary();
-    }
-    return this.songs;
-  }
-}
-
-module.exports = LibraryManager;
+    return {\n      totalTransactions: this.ledger.length,\n      completedCount,\n      failedCount,\n      totalBytesDownloaded,\n      formatBreakdown,\n      platformBreakdown,\n      duplicateCount: duplicates.length,\n      reclaimableBytes\n    };\n  }\n\n  exportLedgerCsv() {\n    const headers = ['ID', 'Date', 'Title', 'Artist', 'Platform', 'Format', 'Quality', 'Bytes', 'File Path', 'Status'];\n    const rows = this.ledger.map(e => [\n      `\"${e.id}\"`,\n      `\"${e.dateFormatted}\"`,\n      `\"${(e.title || '').replace(/\"/g, '\"\"')}\"`,\n      `\"${(e.artist || '').replace(/\"/g, '\"\"')}\"`,\n      `\"${e.platform || ''}\"`,\n      `\"${e.formatType || ''}\"`,\n      `\"${e.quality || ''}\"`,\n      e.fileSize || 0,\n      `\"${(e.filePath || '').replace(/\"/g, '\"\"')}\"`,\n      `\"${e.status || ''}\"`\n    ]);\n\n    return [headers.join(','), ...rows.map(r => r.join(','))].join('\\n');\n  }\n\n  // --- Bookmarks / Saved links queue ---\n  addBookmark(bookmark) {\n    const item = {\n      id: `BM-${Date.now()}`,\n      url: bookmark.url,\n      title: bookmark.title || bookmark.url,\n      platform: bookmark.platform || 'Auto',\n      addedAt: Date.now()\n    };\n    this.bookmarks.unshift(item);\n    this.saveBookmarks();\n    return item;\n  }\n\n  removeBookmark(id) {\n    this.bookmarks = this.bookmarks.filter(b => b.id !== id);\n    this.saveBookmarks();\n    return this.bookmarks;\n  }\n\n  // --- Playlists ---\n  createPlaylist(title) {\n    const plDir = this.getPlaylistsDir();\n    const folderPath = path.join(plDir, title);\n    if (!fs.existsSync(folderPath)) {\n      try { fs.mkdirSync(folderPath, { recursive: true }); } catch(e) {}\n    }\n    const pl = {\n      id: 'pl-' + Buffer.from(title).toString('base64').replace(/=/g, ''),\n      name: title,\n      title,\n      folderPath,\n      tracks: [],\n      trackCount: 0,\n      createdAt: Date.now()\n    };\n    this.playlists = this.playlists.filter(p => p.name !== title && p.title !== title);\n    this.playlists.push(pl);\n    this.savePlaylists();\n    return pl;\n  }\n\n  addToPlaylist(playlistId, trackOrPath) {\n    const pl = this.playlists.find(p => p.id === playlistId || p.name === playlistId);\n    if (pl) {\n      let srcPath = typeof trackOrPath === 'string' ? trackOrPath : (trackOrPath.filePath || trackOrPath.id);\n      if (srcPath && fs.existsSync(srcPath) && pl.folderPath && fs.existsSync(pl.folderPath)) {\n        try {\n          const dest = path.join(pl.folderPath, path.basename(srcPath));\n          if (!fs.existsSync(dest)) {\n            fs.copyFileSync(srcPath, dest);\n          }\n          if (!pl.tracks) pl.tracks = [];\n          if (!pl.tracks.includes(dest)) pl.tracks.push(dest);\n          pl.trackCount = pl.tracks.length;\n          this.savePlaylists();\n        } catch(e) {}\n      }\n    }\n    return this.playlists;\n  }\n\n  removeFromPlaylist(playlistId, songId) {\n    const pl = this.playlists.find(p => p.id === playlistId);\n    if (pl) {\n      pl.songIds = pl.songIds.filter(id => id !== songId);\n      this.savePlaylists();\n    }\n    return this.playlists;\n  }\n\n  deletePlaylist(playlistId) {\n    const pl = this.playlists.find(p => p.id === playlistId || p.name === playlistId);\n    if (pl && pl.folderPath && fs.existsSync(pl.folderPath)) {\n      try { fs.rmSync(pl.folderPath, { recursive: true, force: true }); } catch(e) {}\n    }\n    this.playlists = this.playlists.filter(p => p.id !== playlistId && p.name !== playlistId);\n    this.savePlaylists();\n    return this.playlists;\n  }\n\n  // --- Song metadata edit ---\n  updateSongMetadata(songId, updates) {\n    const song = this.songs.find(s => s.id === songId);\n    if (song) {\n      Object.assign(song, updates);\n      this.saveLibrary();\n    }\n    return song;\n  }\n\n  removeSong(songId, filePath) {\n    const beforeCount = this.songs.length;\n    this.songs = this.songs.filter(s => {\n      if (songId && s.id === songId) return false;\n      if (filePath && s.filePath === filePath) return false;\n      return true;\n    });\n    if (this.songs.length !== beforeCount) {\n      this.saveLibrary();\n    }\n    return this.songs;\n  }\n\n  pruneMissingFiles() {\n    const beforeCount = this.songs.length;\n    this.songs = this.songs.filter(s => s.filePath && fs.existsSync(s.filePath));\n    if (this.songs.length !== beforeCount) {\n      this.saveLibrary();\n    }\n    return this.songs;\n  }\n}\n\nmodule.exports = LibraryManager;\n
