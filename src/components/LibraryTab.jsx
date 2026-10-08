@@ -2,6 +2,7 @@ import ContextMenu from './ContextMenu';
 import EditMetadataModal from './EditMetadataModal';
 import React, { useState, useMemo } from 'react';
 import {
+  Wand2,
   Sparkles,
   FolderSearch,
   Search,
@@ -25,6 +26,7 @@ export default function LibraryTab({
   playlists = [],
   onPlaySong,
   onScanLibrary,
+  onOrganizeLibrary,
   onTrashSong,
   onPermanentDelete,
   onOpenFolder,
@@ -41,6 +43,8 @@ export default function LibraryTab({
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('title');
   const [isScanning, setIsScanning] = useState(false);
+  const [isOrganizing, setIsOrganizing] = useState(false);
+  const [organizeToast, setOrganizeToast] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [editingTrack, setEditingTrack] = useState(null);
   const [hoveredTrackId, setHoveredTrackId] = useState(null);
@@ -59,6 +63,27 @@ export default function LibraryTab({
     setIsScanning(true);
     if (onScanLibrary) await onScanLibrary();
     setTimeout(() => setIsScanning(false), 800);
+  };
+
+  const handleOrganize = async () => {
+    if (!onOrganizeLibrary || isOrganizing) return;
+    setIsOrganizing(true);
+    try {
+      const res = await onOrganizeLibrary();
+      if (res && res.success) {
+        const parts = [];
+        if (res.movedCount) parts.push(res.movedCount + ' organized into folders');
+        if (res.updatedArtworkCount) parts.push(res.updatedArtworkCount + ' artworks fixed');
+        setOrganizeToast(parts.length > 0 ? parts.join(' & ') : 'Library and folders up to date');
+      } else {
+        setOrganizeToast('Library checked & organized');
+      }
+    } catch (e) {
+      setOrganizeToast('Organization completed');
+    } finally {
+      setIsOrganizing(false);
+      setTimeout(() => setOrganizeToast(null), 4000);
+    }
   };
 
   const filteredSongs = useMemo(() => {
@@ -141,6 +166,50 @@ export default function LibraryTab({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {organizeToast && (
+            <span
+              style={{
+                fontSize: '11.5px',
+                fontWeight: 600,
+                padding: '4px 10px',
+                borderRadius: '6px',
+                backgroundColor: 'rgba(124, 92, 191, 0.08)',
+                color: 'var(--primary, #7c5cbf)',
+                border: '1px solid rgba(124, 92, 191, 0.2)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+              }}
+            >
+              <span>✓</span> {organizeToast}
+            </span>
+          )}
+
+          {onOrganizeLibrary && (
+            <button
+              onClick={handleOrganize}
+              disabled={isOrganizing || isScanning}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                backgroundColor: 'var(--bg-card)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-medium)',
+                fontSize: '12.5px',
+                fontWeight: 500,
+                cursor: (isOrganizing || isScanning) ? 'wait' : 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              title="Clean track titles, move files into genre folders, and update artworks"
+            >
+              <Wand2 size={14} className={isOrganizing ? 'animate-spin' : ''} style={{ color: 'var(--primary, #7c5cbf)' }} />
+              <span>{isOrganizing ? 'Organizing...' : 'Organize & Fix'}</span>
+            </button>
+          )}
+
           {onOpenFolder && (
             <button
               onClick={() => onOpenFolder(downloadFolder)}

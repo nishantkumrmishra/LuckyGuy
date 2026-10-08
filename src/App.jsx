@@ -238,7 +238,18 @@ export default function App() {
     } catch (e) {}
   }, [preferences]);
 
-  // Load preferences from backend config.json on boot
+    // Load library songs from backend on boot
+  useEffect(() => {
+    if (window.electronAPI?.getSongs) {
+      window.electronAPI.getSongs().then((loadedSongs) => {
+        if (loadedSongs && Array.isArray(loadedSongs) && loadedSongs.length > 0) {
+          setSongs(loadedSongs);
+        }
+      }).catch(console.error);
+    }
+  }, []);
+
+// Load preferences from backend config.json on boot
   useEffect(() => {
     if (window.electronAPI?.getPreferences) {
       window.electronAPI.getPreferences().then((loadedPrefs) => {
@@ -825,6 +836,21 @@ export default function App() {
     }
   };
 
+  const handleOrganizeLibrary = async () => {
+    if (window.electronAPI?.organizeAndFixLibrary) {
+      const folder = preferences?.downloadFolder || 'C:\\Users\\nishant\\Music';
+      const res = await window.electronAPI.organizeAndFixLibrary(folder);
+      if (window.electronAPI?.getSongs) {
+        const refreshed = await window.electronAPI.getSongs();
+        if (refreshed && Array.isArray(refreshed) && refreshed.length > 0) {
+          setSongs(refreshed);
+        }
+      }
+      return res;
+    }
+    return { success: false, error: 'Not available' };
+  };
+
   // Global Spacebar Play / Pause Shortcut
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -945,6 +971,7 @@ export default function App() {
                 playlists={playlists}
                 onPlaySong={handlePlayTrack}
                 onScanLibrary={handleScanLibrary}
+                onOrganizeLibrary={handleOrganizeLibrary}
                 onTrashSong={handleTrashSong}
                 onPermanentDelete={handlePermanentDelete}
                 onOpenFolder={handleOpenFolder}

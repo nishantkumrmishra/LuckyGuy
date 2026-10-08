@@ -379,6 +379,7 @@ ipcMain.handle('library-remove-from-playlist', async (event, plId, songId) => li
 ipcMain.handle('library-delete-playlist', async (event, plId) => libraryManager.deletePlaylist(plId));
 ipcMain.handle('library-update-song', async (event, songId, updates) => libraryManager.updateSong(songId, updates));
 ipcMain.handle('library-find-duplicates', async () => libraryManager.findDuplicates());
+ipcMain.handle('library-organize-fix', async (event, musicDir) => libraryManager.organizeAndFixLibrary(musicDir));
 
 // Preferences IPC
 ipcMain.handle('get-preferences', async () => preferences);

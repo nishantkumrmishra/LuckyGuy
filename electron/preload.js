@@ -59,6 +59,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deletePlaylist: (plId) => ipcRenderer.invoke('library-delete-playlist', plId),
   updateSongMetadata: (songId, updates) => ipcRenderer.invoke('library-update-song', songId, updates),
   findDuplicates: () => ipcRenderer.invoke('library-find-duplicates'),
+  organizeAndFixLibrary: (musicDir) => ipcRenderer.invoke('library-organize-fix', musicDir),
 
   getPreferences: () => ipcRenderer.invoke('get-preferences'),
   savePreferences: (prefs) => ipcRenderer.invoke('save-preferences', prefs),
