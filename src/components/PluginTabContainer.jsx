@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import CustomVideoPlayer from './CustomVideoPlayer';
 import {
   Shield,
   ShieldAlert,
@@ -145,6 +146,11 @@ export default function PluginTabContainer({
   }, []);
 
   const handleWebBack = () => {
+    if (activePlayerVideo) {
+      setActivePlayerVideo(null);
+      setInputUrl(activeUrl);
+      return;
+    }
     try {
       if (webviewRef.current?.canGoBack?.()) webviewRef.current.goBack();
       else if (iframeRef.current?.contentWindow) iframeRef.current.contentWindow.history.back();
@@ -853,8 +859,7 @@ export default function PluginTabContainer({
       `}</style>
 
       {/* Sleek Top Navigation Toolbar inside Tab (Back, Forward, Refresh, URL, View Toggle) */}
-      {!activePlayerVideo && (
-        <div
+      <div
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -996,7 +1001,7 @@ export default function PluginTabContainer({
           >
             <button
               type="button"
-              onClick={() => { setViewMode('grid'); extractVideosFromWebview(); }}
+              onClick={() => { setActivePlayerVideo(null); setViewMode('grid'); extractVideosFromWebview(); }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -1016,7 +1021,7 @@ export default function PluginTabContainer({
             </button>
             <button
               type="button"
-              onClick={() => setViewMode('web')}
+              onClick={() => { setActivePlayerVideo(null); setViewMode('web'); }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -1036,7 +1041,6 @@ export default function PluginTabContainer({
             </button>
           </div>
         </div>
-      )}
 
       {/* Floating Batch Selection Bar */}
       {selectedIds.size > 0 && (
@@ -1133,139 +1137,8 @@ export default function PluginTabContainer({
 
       {/* ========================================================================= */}
       {/* 1. IN-PAGE WATCH VIEW (70%-80% Left, 20%-30% Right, More videos below) */}
-      {/* ========================================================================= */}
       {activePlayerVideo && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-main)' }}>
-          {/* Watch Top Navigation Bar */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '10px 24px',
-              backgroundColor: 'var(--bg-card)',
-              borderBottom: '1px solid var(--border-medium)',
-            }}
-          >
-            <button
-              onClick={() => setActivePlayerVideo(null)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 14px',
-                borderRadius: '6px',
-                border: '1px solid var(--border-medium)',
-                backgroundColor: 'var(--bg-main)',
-                color: 'var(--text-primary)',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              <ArrowLeft size={14} />
-              <span>Back to Browse</span>
-            </button>
-
-            <span style={{ fontSize: '13px', fontWeight: 600, maxWidth: '500px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {activePlayerVideo.title}
-            </span>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              {/* Quality Selector */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'var(--bg-main)', padding: '2px 8px', borderRadius: '6px', border: '1px solid var(--border-medium)' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>Quality:</span>
-                <select
-                  value={selectedQuality}
-                  onChange={(e) => setSelectedQuality(e.target.value)}
-                  style={{
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    color: 'var(--text-primary)',
-                    fontSize: '11.5px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    outline: 'none',
-                    padding: '4px 2px',
-                  }}
-                >
-                  <option value="1080p">1080p Full HD</option>
-                  <option value="720p">720p HD</option>
-                  <option value="480p">480p SD</option>
-                  <option value="Original">Original Source</option>
-                </select>
-              </div>
-
-              {/* Folder Selector / Badge */}
-              <button
-                type="button"
-                onClick={handlePickCustomFolder}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '6px 10px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-medium)',
-                  backgroundColor: 'var(--bg-main)',
-                  color: customDownloadFolder ? 'var(--primary, #7c5cbf)' : 'var(--text-secondary)',
-                  fontSize: '11.5px',
-                  cursor: 'pointer',
-                  maxWidth: '180px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-                title={customDownloadFolder ? 'Saving to: ' + customDownloadFolder : (plugin.id?.includes('telegram') ? 'Choose Telegram Save Location' : 'Default folder: Videos')}
-              >
-                <FolderOpen size={13} />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {customDownloadFolder ? customDownloadFolder.split(/[\\/]/).pop() : (plugin.id?.includes('telegram') ? 'Save to...' : 'Videos Folder')}
-                </span>
-              </button>
-
-              <button
-                onClick={() => handleCopyLink(activePlayerVideo)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-medium)',
-                  backgroundColor: 'var(--bg-main)',
-                  color: copiedId === activePlayerVideo.id ? '#10b981' : 'var(--text-secondary)',
-                  fontSize: '11.5px',
-                  cursor: 'pointer',
-                }}
-              >
-                {copiedId === activePlayerVideo.id ? <Check size={12} /> : <Copy size={12} />}
-                <span>{copiedId === activePlayerVideo.id ? 'Copied' : 'Copy Link'}</span>
-              </button>
-
-              <button
-                onClick={() => handleDownloadSingle(activePlayerVideo, selectedQuality)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 16px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: 'var(--primary, #7c5cbf)',
-                  color: '#ffffff',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(124, 92, 191, 0.25)',
-                }}
-              >
-                <Download size={14} />
-                <span>Download {selectedQuality}</span>
-              </button>
-            </div>
-          </div>
-
           {/* Watch Layout: 75% Left Column, 25% Right Column */}
           <div
             style={{
@@ -1279,49 +1152,16 @@ export default function PluginTabContainer({
               boxSizing: 'border-box',
             }}
           >
-            {/* Left Area (72% - 75% width): Video Player + Details + More Related Videos */}
+            {/* Left Area (72% - 75% width): Custom Video Player + Details + More Related Videos */}
             <div style={{ flex: '0 0 73%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* Cinema 16:9 Video Player */}
-              <div
-                style={{
-                  width: '100%',
-                  aspectRatio: '16/9',
-                  backgroundColor: '#000000',
-                  borderRadius: '12px',
-                  overflow: 'hidden',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
-                }}
-              >
-                {(() => {
-                  const vkey = activePlayerVideo.url?.match(/viewkey=([a-zA-Z0-9_-]+)/)?.[1];
-                  if (vkey) {
-                    return (
-                      <webview
-                        src={"https://www.pornhub.org/embed/" + vkey}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          border: "none",
-                        }}
-                        allowpopups="false"
-                      />
-                    );
-                  }
-                  return (
-                    <video
-                      src={activePlayerVideo.streamUrl}
-                      controls
-                      autoPlay
-                      poster={activePlayerVideo.thumbnail}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "contain",
-                      }}
-                    />
-                  );
-                })()}
-              </div>
+              {/* Custom Native Video Player with In-Player Quality & Download */}
+              <CustomVideoPlayer
+                video={activePlayerVideo}
+                onBack={() => { setActivePlayerVideo(null); setInputUrl(activeUrl); }}
+                onDownload={(quality) => handleDownloadSingle(activePlayerVideo, quality)}
+                onQualityChange={(q) => setSelectedQuality(q)}
+                initialQuality={selectedQuality || '1080p'}
+              />
 
               {/* Video Title & Primary Metadata */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1329,7 +1169,7 @@ export default function PluginTabContainer({
                   {activePlayerVideo.title}
                 </h1>
 
-                {/* Creator row & Action Buttons */}
+                {/* Clean Creator / Channel Row */}
                 <div
                   style={{
                     display: 'flex',
@@ -1360,68 +1200,13 @@ export default function PluginTabContainer({
                     </div>
                     <div>
                       <div style={{ fontSize: '13.5px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <span>{activePlayerVideo.author}</span>
+                        <span>{activePlayerVideo.author || 'Verified Creator'}</span>
                         <CheckCircle2 size={13} color="var(--primary, #7c5cbf)" />
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                        Verified Stream Channel &bull; {activePlayerVideo.views}
+                        Verified Stream Channel &bull; {activePlayerVideo.views || 'HQ Stream'}
                       </div>
                     </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '6px 12px',
-                        borderRadius: '999px',
-                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                        color: '#10b981',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                      }}
-                    >
-                      <ThumbsUp size={13} />
-                      <span>{activePlayerVideo.rating || '96%'} Rating</span>
-                    </span>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span
-                        style={{
-                          padding: '6px 10px',
-                          borderRadius: '6px',
-                          backgroundColor: 'var(--bg-card)',
-                          border: '1px solid var(--border-medium)',
-                          fontSize: '11.5px',
-                          fontWeight: 600,
-                          color: '#f59e0b',
-                        }}
-                      >
-                        {selectedQuality} Full HD Stream
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Collapsible Info Card */}
-                <div
-                  style={{
-                    padding: '12px 16px',
-                    borderRadius: '8px',
-                    backgroundColor: 'var(--bg-card)',
-                    border: '1px solid var(--border-medium)',
-                    fontSize: '12px',
-                    color: 'var(--text-secondary)',
-                    lineHeight: '1.5',
-                  }}
-                >
-                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                    Full High Definition Stream &bull; Direct Unblocked Media
-                  </div>
-                  <div>
-                    Category: <strong>{selectedCategory}</strong> &bull; Length: <strong>{activePlayerVideo.duration}</strong> &bull; Size: <strong>{activePlayerVideo.size || '~220 MB'}</strong>
                   </div>
                 </div>
               </div>

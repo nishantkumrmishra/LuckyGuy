@@ -36,9 +36,10 @@ async function extractPornhubVideo(url) {
     const artworkUrl = fv.image_url || '';
     const uploader = fv.video_uploader || 'Pornhub Creator';
 
-    // Find direct MP4 stream from get_media endpoint
+    // Find direct MP4 streams from get_media endpoint
     let streamUrl = null;
     let quality = '1080p';
+    const streams = {};
 
     const mp4Def = (fv.mediaDefinitions || []).find(x => x.format === 'mp4' && x.videoUrl);
     if (mp4Def && mp4Def.videoUrl) {
@@ -51,8 +52,16 @@ async function extractPornhubVideo(url) {
         });
         if (mResp.ok) {
           const mediaList = await mResp.json();
+          if (Array.isArray(mediaList)) {
+            for (const item of mediaList) {
+              if (item.videoUrl && item.quality) {
+                const qKey = String(item.quality).endsWith('p') ? String(item.quality) : `${item.quality}p`;
+                streams[qKey] = item.videoUrl;
+              }
+            }
+          }
           // Pick highest quality available: 1080 -> 720 -> 480 -> 240
-          const sorted = mediaList.sort((a, b) => (parseInt(b.quality || '0', 10) - parseInt(a.quality || '0', 10)));
+          const sorted = (mediaList || []).sort((a, b) => (parseInt(b.quality || '0', 10) - parseInt(a.quality || '0', 10)));
           if (sorted.length > 0 && sorted[0].videoUrl) {
             streamUrl = sorted[0].videoUrl;
             quality = (sorted[0].quality || '1080') + 'p';
@@ -68,6 +77,7 @@ async function extractPornhubVideo(url) {
       const hlsDef = (fv.mediaDefinitions || []).find(x => x.format === 'hls' && x.videoUrl);
       if (hlsDef) {
         streamUrl = hlsDef.videoUrl;
+        streams['Auto'] = hlsDef.videoUrl;
       }
     }
 
@@ -85,6 +95,7 @@ async function extractPornhubVideo(url) {
       durationSeconds,
       streamUrl,
       directStreamUrl: streamUrl,
+      streams,
       qualityLabel: quality,
       ext: '.mp4',
       headers: {
