@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Home, Search, X, Music2 } from 'lucide-react';
+import { Home, Search, X, Music2, ChevronLeft, ChevronRight, RefreshCw, Globe, LayoutGrid, ExternalLink } from 'lucide-react';
 import WindowControls from './WindowControls';
 
 export default function TitleBar({
@@ -8,8 +8,17 @@ export default function TitleBar({
   libraryTracks = [],
   onPlayTrack,
   onNavigateHome,
-  activeTab = 'home'
+  activeTab = 'home',
+  isPluginTab = false,
+  pluginNav = null
 }) {
+  const [webInputUrl, setWebInputUrl] = useState('');
+
+  useEffect(() => {
+    if (pluginNav?.url) {
+      setWebInputUrl(pluginNav.url);
+    }
+  }, [pluginNav?.url]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState([]);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -167,7 +176,237 @@ export default function TitleBar({
       </button>
 
       {/* Central Search pill container */}
-      <div className="titlebar-search-wrapper" ref={searchContainerRef}>
+      {isPluginTab && pluginNav ? (
+        /* Web Navigation & Address Bar for Plugins / Portals */
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            flex: 1,
+            maxWidth: '860px',
+            justifyContent: 'center',
+          }}
+        >
+          {/* Back, Forward, Reload */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', WebkitAppRegion: 'no-drag' }}>
+            <button
+              type="button"
+              onClick={() => pluginNav.onBack?.()}
+              title="Go Back"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-medium, rgba(0,0,0,0.08))',
+                backgroundColor: 'var(--bg-card, #ffffff)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
+              }}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => pluginNav.onForward?.()}
+              title="Go Forward"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-medium, rgba(0,0,0,0.08))',
+                backgroundColor: 'var(--bg-card, #ffffff)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
+              }}
+            >
+              <ChevronRight size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => pluginNav.onReload?.()}
+              title="Reload"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-medium, rgba(0,0,0,0.08))',
+                backgroundColor: 'var(--bg-card, #ffffff)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
+              }}
+            >
+              <RefreshCw size={13} />
+            </button>
+          </div>
+
+          {/* Central URL Address / Search input */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              pluginNav.onNavigate?.(webInputUrl);
+            }}
+            style={{
+              flex: 1,
+              maxWidth: '460px',
+              minWidth: '220px',
+              WebkitAppRegion: 'no-drag',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: isFocused ? 'rgba(0, 0, 0, 0.07)' : 'rgba(0, 0, 0, 0.04)',
+                height: '34px',
+                borderRadius: '17px',
+                padding: '0 12px',
+                gap: '8px',
+                border: isFocused ? '1px solid var(--primary, #7c5cbf)' : '1px solid var(--border-medium, rgba(0,0,0,0.06))',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Globe size={13} color="var(--text-muted)" />
+              <input
+                type="text"
+                value={webInputUrl}
+                onChange={(e) => setWebInputUrl(e.target.value)}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                placeholder="Enter URL or search..."
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  background: 'transparent',
+                  outline: 'none',
+                  fontSize: '12px',
+                  color: 'var(--text-primary)',
+                  fontFamily: 'inherit',
+                }}
+              />
+              {webInputUrl && (
+                <button
+                  type="button"
+                  onClick={() => setWebInputUrl('')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    color: 'var(--text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                  title="Clear"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </form>
+
+          {/* Segmented View Mode Toggle: Media Grid | Web Frame */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              backgroundColor: 'rgba(0, 0, 0, 0.05)',
+              borderRadius: '7px',
+              padding: '2px',
+              border: '1px solid var(--border-medium, rgba(0,0,0,0.06))',
+              WebkitAppRegion: 'no-drag',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => pluginNav.onToggleViewMode?.('grid')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 11px',
+                borderRadius: '5px',
+                border: 'none',
+                backgroundColor: pluginNav.viewMode === 'grid' ? 'var(--primary, #7c5cbf)' : 'transparent',
+                color: pluginNav.viewMode === 'grid' ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <LayoutGrid size={12} />
+              <span>Media Grid</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => pluginNav.onToggleViewMode?.('web')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 11px',
+                borderRadius: '5px',
+                border: 'none',
+                backgroundColor: pluginNav.viewMode === 'web' ? 'var(--primary, #7c5cbf)' : 'transparent',
+                color: pluginNav.viewMode === 'web' ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <Globe size={12} />
+              <span>Web Frame</span>
+            </button>
+          </div>
+
+          {/* External browser shortcut */}
+          <button
+            type="button"
+            onClick={() => {
+              const url = pluginNav.url || webInputUrl;
+              if (url) {
+                if (window.electronAPI?.openExternal) {
+                  window.electronAPI.openExternal(url);
+                } else {
+                  window.open(url, '_blank');
+                }
+              }
+            }}
+            title="Open in External Browser"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-medium, rgba(0,0,0,0.08))',
+              backgroundColor: 'var(--bg-card, #ffffff)',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              WebkitAppRegion: 'no-drag',
+            }}
+          >
+            <ExternalLink size={13} />
+          </button>
+        </div>
+      ) : (
+        /* Central Search pill container */
+        <div className="titlebar-search-wrapper" ref={searchContainerRef}>
         <div
           className="titlebar-search-container"
           style={{
@@ -287,6 +526,8 @@ export default function TitleBar({
           </div>
         )}
       </div>
+
+      )}
 
       {/* Windows window controls on top right */}
       <WindowControls />

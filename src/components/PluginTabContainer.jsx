@@ -43,7 +43,8 @@ export default function PluginTabContainer({
   preferences = {},
   onOpenFolder,
   onOpenSettings,
-  onVideoPlay
+  onVideoPlay,
+  onNavRegister
 }) {
   // Helper: Domain Aliases Unblocking (learned from Pornhub / regional blocking)
   const resolveDomainAlias = useCallback((url) => {
@@ -61,6 +62,36 @@ export default function PluginTabContainer({
     }
     return resolved;
   }, [plugin.domainAliases]);
+
+  // Register navigation controls with mainframe TitleBar
+  useEffect(() => {
+    if (onNavRegister) {
+      onNavRegister({
+        url: activeUrl,
+        viewMode: viewMode,
+        onBack: handleWebBack,
+        onForward: handleWebForward,
+        onReload: handleWebReload,
+        onNavigate: (newUrl) => {
+          let resolved = resolveDomainAlias(newUrl);
+          if (!resolved.startsWith('http://') && !resolved.startsWith('https://')) {
+            resolved = 'https://www.pornhub.org/video/search?search=' + encodeURIComponent(resolved);
+          }
+          setActiveUrl(resolved);
+          setInputUrl(resolved);
+          if (webviewRef.current) {
+            try { webviewRef.current.loadURL(resolved); } catch(e) {}
+          }
+        },
+        onToggleViewMode: (mode) => {
+          setViewMode(mode);
+          if (mode === 'grid') {
+            extractVideosFromWebview();
+          }
+        }
+      });
+    }
+  }, [activeUrl, viewMode, onNavRegister, resolveDomainAlias, handleWebBack, handleWebForward, handleWebReload]);
 
   const [activeUrl, setActiveUrl] = useState(() => {
     let url = plugin.tab?.url || plugin.tab?.defaultUrl || '';
@@ -791,269 +822,6 @@ export default function PluginTabContainer({
         }
       `}</style>
 
-      {/* Top Header / Plugin Bar */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '12px 24px',
-          borderBottom: '1px solid var(--border-medium)',
-          backgroundColor: 'var(--bg-card)',
-          gap: '12px',
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <h2 style={{ fontSize: '15px', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>{plugin.tab?.title || plugin.name}</span>
-          </h2>
-          {plugin.rating && (
-            <span
-              style={{
-                fontSize: '10.5px',
-                fontWeight: 700,
-                padding: '2px 7px',
-                borderRadius: '4px',
-                backgroundColor: plugin.rating === '18+' || plugin.rating === 'mature' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(124, 92, 191, 0.15)',
-                color: plugin.rating === '18+' || plugin.rating === 'mature' ? '#ef4444' : 'var(--primary, #7c5cbf)',
-              }}
-            >
-              {plugin.rating.toUpperCase()}
-            </span>
-          )}
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            v{plugin.version || '1.0.0'} &bull; by {plugin.author || 'Community Contributor'}
-          </span>
-        </div>
-
-        {/* Action Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          {isPornhub && (
-            <button
-              onClick={handleBypassAgeVerification}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '5px 11px',
-                borderRadius: '6px',
-                border: '1px solid rgba(239, 68, 68, 0.35)',
-                backgroundColor: 'rgba(239, 68, 68, 0.08)',
-                color: '#ef4444',
-                fontSize: '11px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-              title="18+ disclaimer bypassed for direct streaming"
-            >
-              <Unlock size={12} />
-              <span>18+ Unlocked ✓</span>
-            </button>
-          )}
-
-          {/* Dedicated Plugin Setup Link (Major SDK Upgrade) */}
-          {plugin.settings && (
-            <button
-              onClick={() => onOpenSettings?.('plugin-' + plugin.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '5px 11px',
-                borderRadius: '6px',
-                border: '1px solid var(--border-medium)',
-                backgroundColor: 'var(--bg-main)',
-                color: 'var(--text-secondary)',
-                fontSize: '11px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-              title="Open dedicated settings tab for API credentials & folders"
-            >
-              <SlidersHorizontal size={12} />
-              <span>Settings</span>
-            </button>
-          )}
-
-          {/* View mode toggle */}
-          <div
-            style={{
-              display: 'flex',
-              backgroundColor: 'var(--bg-main)',
-              borderRadius: '6px',
-              border: '1px solid var(--border-medium)',
-              padding: '2px',
-            }}
-          >
-            <button
-              onClick={() => { setViewMode('grid'); extractVideosFromWebview(); }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '4px 10px',
-                borderRadius: '4px',
-                border: 'none',
-                backgroundColor: viewMode === 'grid' ? 'var(--primary, #7c5cbf)' : 'transparent',
-                color: viewMode === 'grid' ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '11px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              <LayoutGrid size={12} />
-              <span>Media Grid</span>
-            </button>
-            <button
-              onClick={() => setViewMode('web')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '4px 10px',
-                borderRadius: '4px',
-                border: 'none',
-                backgroundColor: viewMode === 'web' ? 'var(--primary, #7c5cbf)' : 'transparent',
-                color: viewMode === 'web' ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '11px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              <Globe size={12} />
-              <span>Web Frame</span>
-            </button>
-          </div>
-
-          {/* Multi-Select Toggle */}
-          <button
-            onClick={() => {
-              setIsSelectMode(prev => !prev);
-              if (isSelectMode) setSelectedIds(new Set());
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '5px 12px',
-              borderRadius: '6px',
-              border: `1px solid ${isSelectMode ? 'var(--primary, #7c5cbf)' : 'var(--border-medium)'}`,
-              backgroundColor: isSelectMode ? 'rgba(124, 92, 191, 0.12)' : 'var(--bg-main)',
-              color: isSelectMode ? 'var(--primary, #7c5cbf)' : 'var(--text-secondary)',
-              fontSize: '11px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            <CheckSquare size={13} />
-            <span>{isSelectMode ? 'Exit Selection' : 'Multi-Select'}</span>
-          </button>
-
-          {/* Ad Blocker pill */}
-          <button
-            onClick={toggleAdBlock}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '5px 12px',
-              borderRadius: '999px',
-              border: `1px solid ${isAdBlockEnabled ? '#10b981' : 'var(--border-medium)'}`,
-              backgroundColor: isAdBlockEnabled ? 'rgba(16, 185, 129, 0.1)' : 'var(--bg-main)',
-              color: isAdBlockEnabled ? '#10b981' : 'var(--text-secondary)',
-              fontSize: '11px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            {isAdBlockEnabled ? <Shield size={13} color="#10b981" /> : <ShieldAlert size={13} color="var(--text-secondary)" />}
-            <span>AdBlock: {isAdBlockEnabled ? 'Active' : 'Off'}</span>
-            {isAdBlockEnabled && blockedAdsCount > 0 && (
-              <span style={{ fontSize: '9.5px', backgroundColor: '#10b981', color: '#fff', padding: '1px 6px', borderRadius: '10px' }}>
-                {blockedAdsCount}
-              </span>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* URL Navigation & Category Filtering Toolbar (When in Grid Mode & Not in Watch Page) */}
-      {!activePlayerVideo && viewMode === 'grid' && (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            padding: '12px 24px',
-            backgroundColor: 'var(--bg-card)',
-            borderBottom: '1px solid var(--border-medium)',
-          }}
-        >
-          <form onSubmit={handleNavigate} style={{ display: 'flex', gap: '8px' }}>
-            <input
-              type="text"
-              placeholder={isTelegram ? "Enter Telegram channel or post URL (e.g. https://t.me/s/telegram or @channel)..." : "Search videos or enter portal link..."}
-              value={inputUrl}
-              onChange={(e) => setInputUrl(e.target.value)}
-              style={{
-                flex: 1,
-                height: '34px',
-                padding: '0 12px',
-                borderRadius: '6px',
-                border: '1px solid var(--border-medium)',
-                backgroundColor: 'var(--bg-main)',
-                fontSize: '12px',
-                color: 'var(--text-primary)',
-              }}
-            />
-            <button
-              type="submit"
-              style={{
-                padding: '0 16px',
-                borderRadius: '6px',
-                border: 'none',
-                backgroundColor: 'var(--primary, #7c5cbf)',
-                color: '#fff',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              Browse
-            </button>
-          </form>
-
-          {/* Categories Pill Bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginRight: '4px' }}>
-              Categories:
-            </span>
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => handleSelectCategory(cat)}
-                style={{
-                  padding: '4px 12px',
-                  borderRadius: '999px',
-                  fontSize: '11px',
-                  fontWeight: selectedCategory === cat ? 600 : 500,
-                  border: '1px solid',
-                  borderColor: selectedCategory === cat ? 'var(--primary, #7c5cbf)' : 'var(--border-medium)',
-                  backgroundColor: selectedCategory === cat ? 'rgba(124, 92, 191, 0.12)' : 'var(--bg-main)',
-                  color: selectedCategory === cat ? 'var(--primary, #7c5cbf)' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Floating Batch Selection Bar */}
       {selectedIds.size > 0 && (
         <div
@@ -1735,99 +1503,8 @@ export default function PluginTabContainer({
       {/* 3. DIRECT WEB FRAME (when ViewMode is 'web') */}
       {/* ========================================================================= */}
       {!activePlayerVideo && viewMode === 'web' && (
-        <div style={{ flex: 1, minHeight: '520px', display: 'flex', flexDirection: 'column', backgroundColor: '#09090b' }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '8px 18px',
-              backgroundColor: 'var(--bg-card)',
-              borderBottom: '1px solid var(--border-medium)',
-              gap: '10px',
-              flexWrap: 'wrap',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button
-                type="button"
-                onClick={handleWebBack}
-                style={{ padding: '4px 8px', borderRadius: '5px', border: '1px solid var(--border-medium)', backgroundColor: 'var(--bg-main)', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                title="Go Back"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              <button
-                type="button"
-                onClick={handleWebForward}
-                style={{ padding: '4px 8px', borderRadius: '5px', border: '1px solid var(--border-medium)', backgroundColor: 'var(--bg-main)', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                title="Go Forward"
-              >
-                <ChevronRight size={14} />
-              </button>
-              <button
-                type="button"
-                onClick={handleWebReload}
-                style={{ padding: '4px 8px', borderRadius: '5px', border: '1px solid var(--border-medium)', backgroundColor: 'var(--bg-main)', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                title="Reload"
-              >
-                <RefreshCw size={13} />
-              </button>
-              <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginLeft: '6px', maxWidth: '380px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {activeUrl}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => setViewMode('grid')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '4px 11px',
-                  borderRadius: '5px',
-                  border: '1px solid var(--border-medium)',
-                  backgroundColor: 'var(--bg-main)',
-                  color: 'var(--primary, #7c5cbf)',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                <LayoutGrid size={12} />
-                <span>Switch to Media Grid</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.electronAPI?.openExternal) {
-                    window.electronAPI.openExternal(activeUrl);
-                  } else {
-                    window.open(activeUrl, '_blank');
-                  }
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  padding: '4px 10px',
-                  borderRadius: '5px',
-                  border: '1px solid var(--border-medium)',
-                  backgroundColor: 'var(--bg-main)',
-                  color: 'var(--text-secondary)',
-                  fontSize: '11px',
-                  cursor: 'pointer',
-                }}
-              >
-                <ExternalLink size={12} />
-                <span>Open in Browser</span>
-              </button>
-            </div>
-          </div>
-
-          <div style={{ flex: 1, minHeight: '480px', position: 'relative', backgroundColor: '#ffffff' }}>
+        <div style={{ flex: 1, height: '100%', minHeight: '520px', display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
+          <div style={{ flex: 1, height: '100%', minHeight: '480px', position: 'relative', backgroundColor: '#ffffff' }}>
             {activeUrl ? (
               typeof window !== 'undefined' && window.electronAPI ? (
                 <webview
@@ -1855,21 +1532,6 @@ export default function PluginTabContainer({
       {/* ========================================================================= */}
       {!activePlayerVideo && viewMode === 'grid' && (
         <div style={{ flex: 1, padding: '20px 24px' }}>
-          {/* Header count info */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={16} color="var(--primary, #7c5cbf)" />
-              <h3 style={{ fontSize: '14px', fontWeight: 700, margin: 0 }}>
-                {isIndexing ? 'Indexing Media Stream Feed...' : `Discovered Media (${crawledMedia.length} items)`}
-              </h3>
-            </div>
-            {!isIndexing && (
-              <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                {isTelegram ? 'Click to play / preview • Press Ctrl to multi-select' : 'Click to play • Press Ctrl to multi-select'}
-              </span>
-            )}
-          </div>
-
           {/* YouTube Shimmer Skeleton (when indexing initial feed) */}
           {isIndexing ? (
             <div

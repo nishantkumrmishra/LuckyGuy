@@ -193,6 +193,13 @@ export default function App() {
   const pluginTabs = installedExtensions.filter((ext) => ext.enabled !== false && ext.tab);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [pluginNavState, setPluginNavState] = useState(null);
+
+  useEffect(() => {
+    if (!activeTab.startsWith('plugin-')) {
+      setPluginNavState(null);
+    }
+  }, [activeTab]);
 
   // 1. Library Songs: ONLY downloaded music or scanned files
   const [songs, setSongs] = useState(() => {
@@ -1161,7 +1168,16 @@ export default function App() {
         fontFamily: 'inherit',
       }}
     >
-      <TitleBar />
+      <TitleBar
+        searchQuery={searchQuery}
+        onSearch={setSearchQuery}
+        libraryTracks={songs}
+        onPlayTrack={handlePlayTrack}
+        onNavigateHome={() => setActiveTab('home')}
+        activeTab={activeTab}
+        isPluginTab={activeTab.startsWith('plugin-')}
+        pluginNav={pluginNavState}
+      />
 
       <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <Sidebar
@@ -1367,8 +1383,9 @@ export default function App() {
             )}
           </div>
 
-          {/* Persistent Player Bar at Bottom (Always shown when track is active or music tab) */}
-          <PlayerBar
+          {/* Persistent Player Bar at Bottom (Never on video/plugin/telegram tabs, only when track is active) */}
+          {!activeTab.startsWith('plugin-') && activeTab !== 'telegram' && currentTrack && (
+            <PlayerBar
             currentTrack={currentTrack}
             isPlaying={isPlaying}
             onPlay={handleResume}
@@ -1394,6 +1411,7 @@ export default function App() {
             onOpenSleepTimer={() => setShowSleepTimerModal(true)}
             sleepTimerRemaining={sleepTimerRemaining}
           />
+          )}
         </main>
       </div>
 
