@@ -390,24 +390,45 @@ ipcMain.handle('library-delete-playlist', async (event, plId) => libraryManager.
 ipcMain.handle('library-update-song', async (event, songId, updates) => libraryManager.updateSong(songId, updates));
 ipcMain.handle('library-find-duplicates', async () => libraryManager.findDuplicates());
 ipcMain.handle('library-organize-fix', async (event, musicDir) => libraryManager.organizeAndFixLibrary(musicDir));
+function hasRealAudioData(targetPath) {
+  try {
+    if (!targetPath || !fs.existsSync(targetPath)) return false;
+    const stat = fs.statSync(targetPath);
+    if (stat.size < 50000) return false;
+    const fd = fs.openSync(targetPath, String.fromCharCode(114));
+    const header = Buffer.alloc(10);
+    fs.readSync(fd, header, 0, 10, 0);
+    fs.closeSync(fd);
+    if (header.slice(0, 3).toString(String.fromCharCode(97, 115, 99, 105, 105)) === String.fromCharCode(73, 68, 51)) {
+      const tagSize = ((header[6] & 0x7f) << 21) | ((header[7] & 0x7f) << 14) | ((header[8] & 0x7f) << 7) | (header[9] & 0x7f);
+      const audioBytes = stat.size - (10 + tagSize);
+      return audioBytes > 102400;
+    }
+    return stat.size > 200000;
+  } catch (e) {
+    return false;
+  }
+}
+
 ipcMain.handle('resolve-audio-path', async (event, filePath, title, artist) => {
-  if (filePath && fs.existsSync(filePath)) return filePath;
+  // If local file exists and actually has valid playable audio data, return it immediately
+  if (filePath && fs.existsSync(filePath) && hasRealAudioData(filePath)) return filePath;
 
   function cleanFuzzy(s) {
     return (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   }
 
-  // 1. Check in libraryManager.songs
-  const matchInSongs = libraryManager.songs.find(s => 
+  // 1. Check in libraryManager.songs for a valid local copy
+  const matchInSongs = libraryManager.songs.find(s =>
     (filePath && s.filePath === filePath) ||
     (title && s.title && s.title.toLowerCase() === title.toLowerCase()) ||
     (s.id && filePath && filePath.includes(s.id))
   );
-  if (matchInSongs && matchInSongs.filePath && fs.existsSync(matchInSongs.filePath)) {
+  if (matchInSongs && matchInSongs.filePath && fs.existsSync(matchInSongs.filePath) && hasRealAudioData(matchInSongs.filePath)) {
     return matchInSongs.filePath;
   }
 
-  // 2. Search Music directory recursively
+  // 2. Search Music directory recursively for a matching valid audio file
   const musicDir = preferences.downloadFolder || path.join(os.homedir(), 'Music');
   if (fs.existsSync(musicDir)) {
     const cTitle = cleanFuzzy(title);
@@ -424,9 +445,9 @@ ipcMain.handle('resolve-audio-path', async (event, filePath, title, artist) => {
             if (found) return found;
           } else if (e.isFile() && e.name.toLowerCase().endsWith('.mp3')) {
             const cName = cleanFuzzy(e.name);
-            if (cBase && cName.includes(cBase)) return full;
-            if (cTitle && cName.includes(cTitle)) return full;
-            if (cArtist && cName.includes(cArtist)) return full;
+            if ((cBase && cName.includes(cBase)) || (cTitle && cName.includes(cTitle)) || (cArtist && cName.includes(cArtist))) {
+              if (hasRealAudioData(full)) return full;
+            }
           }
         }
       } catch (err) {}
@@ -434,6 +455,17 @@ ipcMain.handle('resolve-audio-path', async (event, filePath, title, artist) => {
     };
     const found = searchFile(musicDir);
     if (found) return found;
+  }
+
+  // 3. Fallback: If local file is a corrupted stub (<200KB without audio), dynamically resolve 320k stream online!
+  const query = [title || '', (artist && artist !== 'Unknown Artist') ? artist : ''].join(' ').trim();
+  if (query) {
+    try {
+      const jioMatch = await jiosaavnExtractor.searchTrack(query);
+      if (jioMatch && jioMatch.streamUrl) {
+        return jioMatch.streamUrl;
+      }
+    } catch (e) {}
   }
 
   return filePath;

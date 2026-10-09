@@ -1,3 +1,6 @@
+const https = require('https');
+const http = require('http');
+const jiosaavnExtractor = require('./extractors/jiosaavn');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -472,7 +475,7 @@ class LibraryManager {
     return this.songs;
   }
 
-  async organizeAndFixLibrary(baseMusicDir) {
+    async organizeAndFixLibrary(baseMusicDir) {
     const musicDir = baseMusicDir || path.join(os.homedir(), 'Music');
     if (!fs.existsSync(musicDir)) return { success: false, error: 'Music directory not found' };
 
@@ -480,40 +483,74 @@ class LibraryManager {
     let renamedCount = 0;
     let taggedCount = 0;
     let updatedArtworkCount = 0;
+    let repairedAudioCount = 0;
 
-    // Helper: Recursively get all audio files
-    const getAllAudioFiles = (dir) => {
-      let results = [];
-      if (!fs.existsSync(dir)) return results;
+    const downloadStream = (url, dest) => {
+      return new Promise((resolve, reject) => {
+        const fileStream = fs.createWriteStream(dest);
+        const client = url.startsWith('https') ? https : http;
+        client.get(url, (response) => {
+          if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+            return downloadStream(response.headers.location, dest).then(resolve).catch(reject);
+          }
+          if (response.statusCode !== 200) {
+            return reject(new Error('HTTP ' + response.statusCode));
+          }
+          response.pipe(fileStream);
+          fileStream.on('finish', () => fileStream.close(() => resolve(true)));
+        }).on('error', (err) => {
+          try { fs.unlinkSync(dest); } catch(e) {}
+          reject(err);
+        });
+      });
+    };
+
+    const isStubFile = (filePath) => {
+      try {
+        if (!fs.existsSync(filePath)) return true;
+        const stat = fs.statSync(filePath);
+        if (stat.size < 50000) return true;
+        const fd = fs.openSync(filePath, 'r');
+        const header = Buffer.alloc(10);
+        fs.readSync(fd, header, 0, 10, 0);
+        fs.closeSync(fd);
+        if (header.slice(0, 3).toString('ascii') === 'ID3') {
+          const tagSize = ((header[6] & 0x7f) << 21) | ((header[7] & 0x7f) << 14) | ((header[8] & 0x7f) << 7) | (header[9] & 0x7f);
+          const audioBytes = stat.size - (10 + tagSize);
+          return audioBytes <= 102400;
+        }
+        return stat.size < 200000;
+      } catch(e) {
+        return true;
+      }
+    };
+
+    // Scan all audio files across library
+    const allFiles = [];
+    const scanRecursive = (dir) => {
       try {
         const entries = fs.readdirSync(dir, { withFileTypes: true });
         for (const entry of entries) {
-          const fullPath = path.join(dir, entry.name);
-          if (entry.isDirectory()) {
-            if (entry.name.toLowerCase() !== 'playlists') {
-              results.push(...getAllAudioFiles(fullPath));
-            }
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory() && entry.name !== 'Playlists') {
+            scanRecursive(full);
           } else if (entry.isFile()) {
             const ext = path.extname(entry.name).toLowerCase();
-            if (['.mp3', '.m4a', '.flac', '.wav', '.aac', '.ogg'].includes(ext)) {
-              results.push(fullPath);
+            if (['.mp3', '.m4a', '.flac'].includes(ext)) {
+              allFiles.push({ full, name: entry.name, dir });
             }
           }
         }
-      } catch (e) {}
-      return results;
+      } catch(e) {}
     };
+    scanRecursive(musicDir);
 
-    const allFiles = getAllAudioFiles(musicDir);
+    for (const fileItem of allFiles) {
+      let workingPath = fileItem.full;
+      const ext = path.extname(fileItem.name).toLowerCase();
 
-    for (const filePath of allFiles) {
-      const ext = path.extname(filePath).toLowerCase();
-      let currentPath = filePath;
-      const originalFileName = path.basename(filePath);
-
-      // 1. Clean filename formatting artifacts
-      let cleanBase = originalFileName.replace(/\u00A0/g, ' ');
-      cleanBase = cleanBase
+      // 1. Clean filename
+      let cleanName = fileItem.name.replace(/\u00A0/g, ' ')
         .replace(/Intro_\s*/g, 'Intro - ')
         .replace(/_Dhurandhar The Revenge_/g, 'Dhurandhar The Revenge')
         .replace(/_Dhurandhar_/g, 'Dhurandhar')
@@ -522,19 +559,19 @@ class LibraryManager {
         .replace(/Spider-Man_\s*/g, 'Spider-Man - ')
         .replace(/5_30/g, '5.30');
 
-      if (cleanBase !== originalFileName) {
-        const renamedPath = path.join(path.dirname(filePath), cleanBase);
+      if (cleanName !== fileItem.name) {
+        const renamedPath = path.join(fileItem.dir, cleanName);
         try {
-          fs.renameSync(filePath, renamedPath);
-          currentPath = renamedPath;
+          fs.renameSync(workingPath, renamedPath);
+          workingPath = renamedPath;
           renamedCount++;
-        } catch (e) {}
+        } catch(e) {}
       }
 
-      // 2. Read existing ID3 tags
+      // 2. Read ID3 tags
       let title = '', artist = '', album = '', genre = '';
       try {
-        const fd = fs.openSync(currentPath, 'r');
+        const fd = fs.openSync(workingPath, 'r');
         const header = Buffer.alloc(10);
         fs.readSync(fd, header, 0, 10, 0);
         if (header.slice(0, 3).toString('ascii') === 'ID3') {
@@ -558,102 +595,89 @@ class LibraryManager {
         } else {
           fs.closeSync(fd);
         }
-      } catch (e) {}
+      } catch(e) {}
 
-      // Fallback title / artist from filename
-      const baseNoExt = path.basename(currentPath, ext);
-      const parts = baseNoExt.split(' - ');
-      if (parts.length > 1) {
-        artist = artist || parts[0].trim();
-        title = title || parts.slice(1).join(' - ').trim();
-      } else {
-        title = title || baseNoExt;
-        artist = artist || 'Unknown Artist';
-      }
-
-      // Check current artwork (dummy avatar is 49779 bytes)
-      const currentArt = extractId3Artwork(currentPath);
-      const isDummyOrMissingArt = !currentArt || currentArt.length === 49779 || currentArt.length < 5000;
-
-      // 3. iTunes API Search & JioSaavn Fallback
-      let enriched = null;
-      try {
-        enriched = await fetchEnrichedMetadata(title, artist);
-      } catch (e) {}
-
-      let artworkBuffer = null;
-      let artworkMime = 'image/jpeg';
-
-      if (enriched) {
-        if (enriched.title && enriched.title !== title) title = enriched.title;
-        if (enriched.artist && enriched.artist !== artist && artist === 'Unknown Artist') artist = enriched.artist;
-        if (enriched.album) album = enriched.album;
-        if (enriched.genre && enriched.genre !== 'Music') genre = enriched.genre;
-
-        if (enriched.artworkUrl) {
-          try {
-            const imgRes = await fetchBuffer(enriched.artworkUrl);
-            if (imgRes && imgRes.buffer) {
-              artworkBuffer = imgRes.buffer;
-              if (imgRes.contentType) artworkMime = imgRes.contentType;
-            }
-          } catch (e) {}
+      // Fallback title/artist from file name
+      if (!title || !artist) {
+        const base = path.basename(workingPath, ext);
+        const parts = base.split(' - ');
+        if (parts.length > 1) {
+          artist = artist || parts[0].trim();
+          title = title || parts.slice(1).join(' - ').trim();
+        } else {
+          title = title || base;
+          artist = artist || 'Unknown Artist';
         }
       }
 
-      // If we couldn't get iTunes artwork but existing artwork was NOT dummy, preserve existing
-      if (!artworkBuffer && !isDummyOrMissingArt && currentArt) {
+      // 3. Metadata enrichment if genre is missing
+      let artworkUrl = null;
+      if (!genre || genre === 'Music' || !album) {
         try {
-          const artParts = currentArt.split(',');
-          const mimeMatch = artParts[0].match(/:(.*?);/);
-          artworkMime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-          artworkBuffer = Buffer.from(artParts[1], 'base64');
-        } catch (e) {}
+          const enriched = await fetchEnrichedMetadata(title, artist);
+          if (enriched) {
+            genre = (genre && genre !== 'Music') ? genre : (enriched.genre || 'Other');
+            album = album || enriched.album;
+            artworkUrl = enriched.artworkUrl;
+          }
+        } catch(e) {}
       }
-
       if (!genre || genre === 'Music') genre = 'Pop';
 
-      // 4. Update ID3 tags and embed genuine artwork into audio file
-      if (ext === '.mp3') {
+      // 4. Download audio payload if file is a 0-audio stub
+      if (isStubFile(workingPath)) {
+        const query = [title || '', (artist && artist !== 'Unknown Artist') ? artist : ''].join(' ').trim();
+        if (query) {
+          try {
+            const jioMatch = await jiosaavnExtractor.searchTrack(query);
+            if (jioMatch && jioMatch.streamUrl) {
+              const tmpDest = workingPath + '.repair.tmp';
+              await downloadStream(jioMatch.streamUrl, tmpDest);
+              await embedId3Metadata(tmpDest, {
+                title: jioMatch.title || title,
+                artist: jioMatch.artist || artist,
+                album: jioMatch.album || album || 'Single Master',
+                genre,
+                artworkUrl: jioMatch.cover || artworkUrl || undefined
+              });
+              try { fs.unlinkSync(workingPath); } catch(e) {}
+              fs.renameSync(tmpDest, workingPath);
+              repairedAudioCount++;
+            }
+          } catch(e) {}
+        }
+      }
+
+      // 5. Move root-level files into their genre directory
+      if (path.dirname(workingPath) === musicDir) {
+        const safeGenre = genre.replace(/[\/\\?%*:|<>]/g, '_');
+        const targetFolder = path.join(musicDir, safeGenre);
+        if (!fs.existsSync(targetFolder)) {
+          try { fs.mkdirSync(targetFolder, { recursive: true }); } catch(e) {}
+        }
+        const finalPath = path.join(targetFolder, path.basename(workingPath));
         try {
-          await embedId3Metadata(currentPath, {
-            title,
-            artist,
-            album: album || 'Single Master',
-            genre,
-            artworkBuffer: artworkBuffer || undefined,
-            mimeType: artworkMime
-          });
-          taggedCount++;
-          if (artworkBuffer) updatedArtworkCount++;
-        } catch (e) {}
-      }
-
-      // 5. Organize into target Genre folder
-      const safeGenre = genre.replace(/[\/\\?%*:|<>]/g, '_');
-      const targetFolder = path.join(musicDir, safeGenre);
-      if (!fs.existsSync(targetFolder)) {
-        try { fs.mkdirSync(targetFolder, { recursive: true }); } catch (e) {}
-      }
-
-      let properName = '';
-      if (artist && artist !== 'Unknown Artist') {
-        properName = `${artist} - ${title}${ext}`;
-      } else {
-        properName = `${title}${ext}`;
-      }
-      properName = properName.replace(/[\/\\?%*:|"<>]/g, '_');
-
-      const finalPath = path.join(targetFolder, properName);
-      if (currentPath !== finalPath) {
-        try {
-          fs.renameSync(currentPath, finalPath);
+          fs.renameSync(workingPath, finalPath);
+          workingPath = finalPath;
           movedCount++;
-        } catch (e) {}
+        } catch(e) {}
       }
+
+      // 6. Ensure ID3 tags updated
+      try {
+        await embedId3Metadata(workingPath, {
+          title,
+          artist,
+          album: album || 'Single Master',
+          genre,
+          artworkUrl: artworkUrl || undefined
+        });
+        taggedCount++;
+        if (artworkUrl) updatedArtworkCount++;
+      } catch(e) {}
     }
 
-    // Refresh entire library scan and save cache
+    // Refresh library scan
     this.scanDirectories([musicDir]);
 
     return {
@@ -662,11 +686,12 @@ class LibraryManager {
       renamedCount,
       taggedCount,
       updatedArtworkCount,
+      repairedAudioCount,
       totalSongs: this.songs.length
     };
   }
 
-    pruneMissingFiles() {
+  pruneMissingFiles() {
     const beforeCount = this.songs.length;
     this.songs = this.songs.filter(s => s.filePath && fs.existsSync(s.filePath));
     if (this.songs.length !== beforeCount) {
