@@ -11,6 +11,8 @@ import {
   MoreVertical,
   Folder,
   ArrowLeft,
+  LayoutList,
+  LayoutGrid,
 } from 'lucide-react';
 import { CustomIcon } from './DuoIcons';
 
@@ -36,6 +38,20 @@ export default function LibraryTab({
   const [contextMenu, setContextMenu] = useState(null);
   const [editingTrack, setEditingTrack] = useState(null);
   const [hoveredTrackId, setHoveredTrackId] = useState(null);
+  const [folderViewMode, setFolderViewMode] = useState(() => {
+    try {
+      return localStorage.getItem('luckyguy-folder-view-mode') || 'list';
+    } catch {
+      return 'list';
+    }
+  });
+
+  const handleToggleFolderViewMode = (mode) => {
+    setFolderViewMode(mode);
+    try {
+      localStorage.setItem('luckyguy-folder-view-mode', mode);
+    } catch (e) {}
+  };
 
   // Group songs into folders based on category/directory/album
   const folders = useMemo(() => {
@@ -171,7 +187,6 @@ export default function LibraryTab({
             {selectedFolder ? selectedFolder : 'Music Library'}
           </h1>
 
-          {/* Simple Clean Text - No Rounded Capsule/Pill */}
           <span
             style={{
               fontSize: '13px',
@@ -287,52 +302,119 @@ export default function LibraryTab({
           </div>
         )
       ) : (
-        /* VIEW 2: INSIDE FOLDER SONGS LIST */
+        /* VIEW 2: INSIDE FOLDER SONGS (TOGGLE LIST VS GRID) */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {/* Search bar inside folder */}
+          {/* Toolbar: Search input + View mode toggle */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--border-medium)',
-              borderRadius: '8px',
-              padding: '0 12px',
-              height: '36px',
-              maxWidth: '320px',
+              justifyContent: 'space-between',
+              gap: '12px',
+              flexWrap: 'wrap',
             }}
           >
-            <Search size={14} color="var(--text-muted)" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search tracks in folder..."
+            <div
               style={{
-                border: 'none',
-                background: 'transparent',
-                outline: 'none',
-                fontSize: '12.5px',
-                color: 'var(--text-primary)',
-                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border-medium)',
+                borderRadius: '8px',
+                padding: '0 12px',
+                height: '36px',
+                maxWidth: '320px',
+                flex: 1,
               }}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
+            >
+              <Search size={14} color="var(--text-muted)" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search tracks in folder..."
                 style={{
                   border: 'none',
                   background: 'transparent',
-                  color: 'var(--text-muted)',
+                  outline: 'none',
+                  fontSize: '12.5px',
+                  color: 'var(--text-primary)',
+                  width: '100%',
+                }}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    padding: 0,
+                    fontSize: '11px',
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* List vs Grid View Toggle */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border-medium)',
+                borderRadius: '8px',
+                padding: '2px',
+                gap: '2px',
+              }}
+            >
+              <button
+                onClick={() => handleToggleFolderViewMode('list')}
+                title="List View"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '5px 10px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: folderViewMode === 'list' ? 'var(--primary, #7c5cbf)' : 'transparent',
+                  color: folderViewMode === 'list' ? '#ffffff' : 'var(--text-secondary)',
                   cursor: 'pointer',
-                  padding: 0,
-                  fontSize: '11px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  transition: 'background-color 0.15s ease',
                 }}
               >
-                ✕
+                <LayoutList size={14} />
+                <span>List</span>
               </button>
-            )}
+              <button
+                onClick={() => handleToggleFolderViewMode('grid')}
+                title="Grid View"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '5px 10px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: folderViewMode === 'grid' ? 'var(--primary, #7c5cbf)' : 'transparent',
+                  color: folderViewMode === 'grid' ? '#ffffff' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  transition: 'background-color 0.15s ease',
+                }}
+              >
+                <LayoutGrid size={14} />
+                <span>Grid</span>
+              </button>
+            </div>
           </div>
 
           {filteredSongs.length === 0 ? (
@@ -349,7 +431,236 @@ export default function LibraryTab({
             >
               No songs found in this folder.
             </div>
+          ) : folderViewMode === 'grid' ? (
+            /* ========================================================================= */
+            /* GRID VIEW: Responsive Album Art Cards */
+            /* ========================================================================= */
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(175px, 1fr))',
+                gap: '16px',
+              }}
+            >
+              {filteredSongs.map((track, idx) => {
+                const trackKey = track.id || track.filePath || idx;
+                const isCurrent = currentTrack && (currentTrack.id === track.id || currentTrack.filePath === track.filePath);
+                const isTrackPlaying = isCurrent && isPlaying;
+                const isLiked = likedTracks.includes(track.id || track.filePath || track.title);
+                const art = track.artworkUrl || track.coverArt;
+
+                return (
+                  <div
+                    key={trackKey}
+                    onContextMenu={(e) => handleContextMenu(e, track)}
+                    onDoubleClick={() => onPlaySong && onPlaySong(track, filteredSongs)}
+                    style={{
+                      padding: '12px',
+                      backgroundColor: isCurrent ? 'rgba(124, 92, 191, 0.08)' : 'var(--bg-card)',
+                      borderRadius: '12px',
+                      border: `1px solid ${isCurrent ? 'var(--primary, #7c5cbf)' : 'var(--border-medium)'}`,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px',
+                      transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                      position: 'relative',
+                    }}
+                    onMouseEnter={(e) => {
+                      setHoveredTrackId(trackKey);
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.08)';
+                    }}
+                    onMouseLeave={(e) => {
+                      setHoveredTrackId(null);
+                      e.currentTarget.style.transform = 'none';
+                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)';
+                    }}
+                  >
+                    {/* Cover Art + Hover Play Overlay */}
+                    <div
+                      style={{
+                        position: 'relative',
+                        width: '100%',
+                        aspectRatio: '1 / 1',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        backgroundColor: 'var(--bg-main)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {art ? (
+                        <img src={art} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <CustomIcon name="music" size={32} color="var(--primary, #7c5cbf)" />
+                      )}
+
+                      {/* Play/Pause Overlay */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          backgroundColor: 'rgba(0,0,0,0.35)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          opacity: hoveredTrackId === trackKey || isTrackPlaying ? 1 : 0,
+                          transition: 'opacity 0.15s ease',
+                        }}
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isCurrent && onTogglePlay) onTogglePlay();
+                            else if (onPlaySong) onPlaySong(track, filteredSongs);
+                          }}
+                          style={{
+                            width: '42px',
+                            height: '42px',
+                            borderRadius: '50%',
+                            backgroundColor: 'var(--primary, #7c5cbf)',
+                            border: 'none',
+                            color: '#ffffff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+                          }}
+                        >
+                          {isTrackPlaying ? (
+                            <Pause size={18} fill="currentColor" />
+                          ) : (
+                            <Play size={18} fill="currentColor" style={{ marginLeft: '2px' }} />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Duration Badge */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          bottom: '6px',
+                          right: '6px',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: 'rgba(0,0,0,0.7)',
+                          color: '#ffffff',
+                          fontSize: '10px',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {formatDuration(track.durationSeconds || track.duration)}
+                      </div>
+                    </div>
+
+                    {/* Info */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          color: isCurrent ? 'var(--primary, #7c5cbf)' : 'var(--text-primary)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                        title={track.title}
+                      >
+                        {track.title}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '11.5px',
+                          color: 'var(--text-secondary)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                        title={track.artist}
+                      >
+                        {track.artist || 'Unknown Artist'}
+                      </div>
+                    </div>
+
+                    {/* Quick action buttons row */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginTop: 'auto',
+                        paddingTop: '4px',
+                        borderTop: '1px solid var(--border-light, rgba(0,0,0,0.04))',
+                      }}
+                    >
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleLike && onToggleLike(track.id || track.filePath || track.title);
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: isLiked ? '#ef4444' : 'var(--text-muted)',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                        }}
+                        title={isLiked ? 'Unlike' : 'Like'}
+                      >
+                        <Heart size={14} fill={isLiked ? '#ef4444' : 'none'} />
+                      </button>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onPermanentDelete) onPermanentDelete(track);
+                            else if (onTrashSong) onTrashSong(track);
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--text-muted)',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
+                          title="Delete track"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                        <button
+                          onClick={(e) => handleContextMenu(e, track)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--text-muted)',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
+                          title="More Options"
+                        >
+                          <MoreVertical size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
+            /* ========================================================================= */
+            /* LIST VIEW: Classic Table View */
+            /* ========================================================================= */
             <div
               style={{
                 backgroundColor: 'var(--bg-card)',
@@ -575,8 +886,9 @@ export default function LibraryTab({
         <EditMetadataModal
           track={editingTrack}
           onClose={() => setEditingTrack(null)}
-          onSave={(trackId, updates) => {
-            if (onUpdateSong) onUpdateSong(trackId, updates);
+          onSave={(updates) => {
+            onUpdateSong && onUpdateSong(editingTrack.id || editingTrack.filePath, updates);
+            setEditingTrack(null);
           }}
         />
       )}

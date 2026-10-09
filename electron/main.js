@@ -6,6 +6,7 @@ const fs = require('fs');
 const youtubeExtractor = require('./extractors/youtube');
 const spotifyExtractor = require('./extractors/spotify');
 const jiosaavnExtractor = require('./extractors/jiosaavn');
+const pornhubExtractor = require('./extractors/pornhub');
 const { DownloadManager } = require('./downloader');
 const { embedId3Metadata, repairCorruptedMusicDirectory } = require('./id3Tagger');
 const LibraryManager = require('./libraryManager');
@@ -239,7 +240,17 @@ ipcMain.handle('extract-url', async (event, url) => {
     return { error: 'Could not extract audio metadata from YouTube link.' };
   }
 
-  // 3. Direct Audio Search / JioSaavn
+  
+  // 3. Pornhub Video Extractor
+  if (pornhubExtractor.isPornhubUrl(trimmed)) {
+    const phVideo = await pornhubExtractor.extractPornhubVideo(trimmed);
+    if (phVideo) {
+      return phVideo;
+    }
+    return { error: "Could not extract direct video stream from Pornhub link." };
+  }
+
+  // 4. Direct Audio Search / JioSaavn
   const jioResult = await jiosaavnExtractor.searchTrack(trimmed);
   if (jioResult) {
     return {
@@ -465,7 +476,7 @@ ipcMain.handle('resolve-track-stream', async (event, title, artist) => {
 
 // Download Manager IPC
 ipcMain.handle('download-start', async (event, taskConfig) => {
-  if (historyManager.isDownloaded(taskConfig.title, taskConfig.artist, taskConfig.destinationPath)) {
+  if (historyManager.isDownloaded(taskConfig.title, taskConfig.artist, taskConfig.destinationPath, preferences.downloadFolder)) {
     return {
       ...taskConfig,
       status: 'SKIPPED_EXISTING',
@@ -501,7 +512,14 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
   let targetDir = preferences.downloadFolder;
   // Auto-organize into genre subfolder when enabled
   const shouldOrganize = preferences.autoOrganizeByGenre !== false;
-  if (shouldOrganize) {
+  
+  if (taskConfig.formatType === "VIDEO") {
+    ext = ".mp4";
+    targetDir = path.join(preferences.downloadFolder, "Videos");
+    if (!fs.existsSync(targetDir)) {
+      try { fs.mkdirSync(targetDir, { recursive: true }); } catch (e) {}
+    }
+  } else if (shouldOrganize) {
     const cleanGenre = (genre && genre !== 'Music') ? genre.replace(/[\/\\?%*:|"<>]/g, '_') : 'Pop';
     targetDir = path.join(preferences.downloadFolder, cleanGenre);
   }
@@ -636,8 +654,8 @@ downloadManager.on('completed', async (snap) => {
     status: 'COMPLETED'
   });
 
-  if (targetDir) {
-    libraryManager.scanDirectories([preferences.downloadFolder, targetDir]);
+  if (preferences.downloadFolder) {
+    libraryManager.scanDirectories([preferences.downloadFolder]);
   }
 
   if (mainWindow && !mainWindow.isDestroyed()) {

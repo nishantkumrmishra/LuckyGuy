@@ -36,11 +36,44 @@ class HistoryManager {
     }
   }
 
-  isDownloaded(title, artist, targetPath) {
-    // Only consider downloaded if the file physically exists on disk
-    if (targetPath && typeof targetPath === 'string') {
-      return fs.existsSync(targetPath);
+  isDownloaded(title, artist, targetPath, musicDir = null) {
+    // 1. Direct targetPath physical existence
+    if (targetPath && typeof targetPath === 'string' && fs.existsSync(targetPath)) {
+      return true;
     }
+
+    if (!title) return false;
+    const cleanT = (title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (cleanT.length < 2) return false;
+
+    const cleanA = (artist && artist !== 'Unknown Artist' && artist !== 'Various Artists')
+      ? (artist || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+      : '';
+
+    // 2. Check music directory files (including genre subfolders)
+    if (musicDir && fs.existsSync(musicDir)) {
+      try {
+        const checkDir = (dir, depth = 0) => {
+          if (depth > 3) return false;
+          const entries = fs.readdirSync(dir, { withFileTypes: true });
+          for (const ent of entries) {
+            if (ent.isDirectory() && !ent.name.startsWith('.')) {
+              if (checkDir(path.join(dir, ent.name), depth + 1)) return true;
+            } else if (ent.isFile()) {
+              const fname = ent.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (fname.includes(cleanT)) {
+                if (!cleanA || fname.includes(cleanA) || cleanA.includes(fname)) {
+                  return true;
+                }
+              }
+            }
+          }
+          return false;
+        };
+        if (checkDir(musicDir)) return true;
+      } catch (e) {}
+    }
+
     return false;
   }
 

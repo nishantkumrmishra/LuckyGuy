@@ -23,7 +23,6 @@ class LibraryManager {
     this.loadState();
   }
 
-  
   getPlaylistsDir() {
     const musicDir = path.join(os.homedir(), 'Music');
     const plDir = path.join(musicDir, 'Playlists');
@@ -31,6 +30,36 @@ class LibraryManager {
       try { fs.mkdirSync(plDir, { recursive: true }); } catch(e) {}
     }
     return plDir;
+  }
+
+  normalizeSongKey(title, artist) {
+    const t = (title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const a = (artist && artist !== 'Unknown Artist' && artist !== 'Various Artists')
+      ? (artist || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+      : '';
+    return `${t}__${a}`;
+  }
+
+  deduplicateSongs() {
+    const seenPaths = new Set();
+    const seenKeys = new Set();
+    const deduped = [];
+
+    for (const song of this.songs) {
+      if (!song.filePath || !fs.existsSync(song.filePath)) continue;
+      const normPath = path.resolve(song.filePath).toLowerCase();
+      const songKey = this.normalizeSongKey(song.title, song.artist);
+
+      if (!seenPaths.has(normPath) && !seenKeys.has(songKey)) {
+        seenPaths.add(normPath);
+        seenKeys.add(songKey);
+        deduped.push(song);
+      }
+    }
+
+    this.songs = deduped;
+    this.saveLibrary();
+    return this.songs;
   }
 
   syncPlaylistsFromDisk() {
@@ -71,11 +100,9 @@ class LibraryManager {
       } catch(e) {}
     }
 
-    // Keep any non-disk playlists if present, but prioritize disk folders
     const diskNames = new Set(discoveredPlaylists.map(p => p.name));
     for (const pl of (this.playlists || [])) {
       if (!diskNames.has(pl.name || pl.title)) {
-        // Create folder on disk for it
         try {
           const folder = path.join(plDir, pl.name || pl.title || pl.id);
           if (!fs.existsSync(folder)) fs.mkdirSync(folder, { recursive: true });
@@ -101,7 +128,7 @@ class LibraryManager {
       if (fs.existsSync(this.libraryFile)) {
         const raw = JSON.parse(fs.readFileSync(this.libraryFile, 'utf8'));
         this.songs = (Array.isArray(raw) ? raw : []).filter(s => s.filePath && fs.existsSync(s.filePath));
-        if (raw.length !== this.songs.length) { this.saveLibrary(); } // persist prune
+        this.deduplicateSongs();
       }
     } catch (e) { this.songs = []; }
 
@@ -111,7 +138,8 @@ class LibraryManager {
       } else {
         this.playlists = [];
         this.savePlaylists();
-      }} catch (e) { this.playlists = []; }
+      }
+    } catch (e) { this.playlists = []; }
 
     try {
       if (fs.existsSync(this.ledgerFile)) {
@@ -170,6 +198,10 @@ class LibraryManager {
 
   organizeRootFiles(musicDir) {
     if (!musicDir || !fs.existsSync(musicDir)) return;
+    const base = path.basename(musicDir).toLowerCase();
+    // Only organize loose files located directly in the root Music folder, NEVER subfolders!
+    if (base !== 'music') return;
+
     const validExts = new Set(['.mp3', '.m4a', '.flac', '.wav', '.aac', '.ogg']);
     try {
       const entries = fs.readdirSync(musicDir, { withFileTypes: true });
@@ -219,10 +251,15 @@ class LibraryManager {
     const validExts = new Set(['.mp3', '.m4a', '.flac', '.wav', '.aac', '.ogg', '.mp4', '.mkv', '.webm']);
     const discovered = [];
 
-    for (const d of directories) {
+    // Deduplicate directory paths and prevent redundant scans of child folders
+    const normDirs = [...new Set((directories || []).map(d => path.resolve(d)))].filter(d => fs.existsSync(d));
+    const uniqueDirs = normDirs.filter(d => !normDirs.some(other => other !== d && d.startsWith(other + path.sep)));
+
+    for (const d of uniqueDirs) {
       this.organizeRootFiles(d);
     }
 
+    const seenPathsInWalk = new Set();
     const walk = (dir) => {
       if (!fs.existsSync(dir)) return;
       try {
@@ -230,28 +267,26 @@ class LibraryManager {
         for (const entry of entries) {
           const fullPath = path.join(dir, entry.name);
           if (entry.isDirectory()) {
-            // Avoid deep hidden / node_modules folders
             if (!entry.name.startsWith('.') && entry.name !== 'node_modules') {
               walk(fullPath);
             }
           } else if (entry.isFile()) {
             const ext = path.extname(entry.name).toLowerCase();
             if (validExts.has(ext)) {
+              const normFilePath = path.resolve(fullPath).toLowerCase();
+              if (seenPathsInWalk.has(normFilePath)) continue;
+              seenPathsInWalk.add(normFilePath);
+
               const stat = fs.statSync(fullPath);
               const basename = path.basename(entry.name, ext);
               const parts = basename.split(' - ');
               const artist = parts.length > 1 ? parts[0].trim() : 'Local Artist';
               const title = parts.length > 1 ? parts.slice(1).join(' - ').trim() : basename;
 
-              // Check embedded artwork
               let art = (ext === '.mp3' || ext === '.m4a' || ext === '.flac') ? (extractId3Artwork(fullPath) || '') : '';
-              
-              // Fallback to directory cover image
               if (!art) {
                 art = this.findDirectoryCover(fullPath);
               }
-
-              // Fallback to existing ledger entry only if it is not generic playlist cover
               if (!art) {
                 const ledgerMatch = this.ledger.find(function(l) { return l.filePath === fullPath; });
                 if (ledgerMatch && ledgerMatch.artworkUrl && !ledgerMatch.artworkUrl.includes('ab67706c0000da846c0fc4889bee49b191d99388')) {
@@ -270,7 +305,7 @@ class LibraryManager {
                 album: parentFolder,
                 genre: genreName,
                 folder: genreName,
-                durationSeconds: Math.round(stat.size / (160 * 128)), // estimate or placeholder
+                durationSeconds: Math.round(stat.size / (160 * 128)),
                 durationFormatted: '3:45',
                 fileSize: stat.size,
                 artworkUrl: art || '',
@@ -286,36 +321,56 @@ class LibraryManager {
       } catch (err) {}
     };
 
-    for (const d of directories) {
+    for (const d of uniqueDirs) {
       walk(d);
     }
 
     // Prune non-existent files first
     this.songs = this.songs.filter(s => s.filePath && fs.existsSync(s.filePath));
 
+    // Existing songs map
+    const existingMap = new Map();
+    const seenSongKeys = new Set();
+    const dedupedCurrent = [];
+
+    for (const s of this.songs) {
+      const normP = path.resolve(s.filePath).toLowerCase();
+      const sKey = this.normalizeSongKey(s.title, s.artist);
+      if (!existingMap.has(normP) && !seenSongKeys.has(sKey)) {
+        existingMap.set(normP, s);
+        seenSongKeys.add(sKey);
+        dedupedCurrent.push(s);
+      }
+    }
+    this.songs = dedupedCurrent;
+
     // Merge discovered files
-    const existingMap = new Map(this.songs.map(s => [s.filePath, s]));
     for (const song of discovered) {
-      if (!existingMap.has(song.filePath)) {
+      const normP = path.resolve(song.filePath).toLowerCase();
+      const sKey = this.normalizeSongKey(song.title, song.artist);
+      if (!existingMap.has(normP) && !seenSongKeys.has(sKey)) {
+        existingMap.set(normP, song);
+        seenSongKeys.add(sKey);
         this.songs.push(song);
       } else {
-        const existing = existingMap.get(song.filePath);
-        existing.genre = song.genre || existing.genre || 'Pop';
-        existing.folder = song.folder || existing.folder || 'Music';
-        existing.album = song.album || existing.album || 'Single';
-        // Only update artwork if current is empty or generic and song has a better one
-        const isExistingGeneric = !existing.artworkUrl || existing.artworkUrl.includes('ab67706c0000da846c0fc4889bee49b191d99388');
-        if (isExistingGeneric && song.artworkUrl && !song.artworkUrl.includes('ab67706c0000da846c0fc4889bee49b191d99388')) {
-          existing.artworkUrl = song.artworkUrl;
+        const existing = existingMap.get(normP);
+        if (existing) {
+          existing.genre = song.genre || existing.genre || 'Pop';
+          existing.folder = song.folder || existing.folder || 'Music';
+          existing.album = song.album || existing.album || 'Single';
+          const isExistingGeneric = !existing.artworkUrl || existing.artworkUrl.includes('ab67706c0000da846c0fc4889bee49b191d99388');
+          if (isExistingGeneric && song.artworkUrl && !song.artworkUrl.includes('ab67706c0000da846c0fc4889bee49b191d99388')) {
+            existing.artworkUrl = song.artworkUrl;
+          }
         }
       }
     }
 
-    this.saveLibrary();
+    this.deduplicateSongs();
     return this.songs;
   }
 
-  // --- Duplicate Detection (matching Android findDuplicateSongIds) ---
+  // --- Duplicate Detection
   findDuplicates() {
     const duplicates = [];
     const seen = new Map();
@@ -419,7 +474,7 @@ class LibraryManager {
     return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   }
 
-  // --- Bookmarks / Saved links queue ---
+  // --- Bookmarks
   addBookmark(bookmark) {
     const item = {
       id: `BM-${Date.now()}`,
@@ -439,7 +494,7 @@ class LibraryManager {
     return this.bookmarks;
   }
 
-  // --- Playlists ---
+  // --- Playlists
   createPlaylist(title) {
     const plDir = this.getPlaylistsDir();
     const folderPath = path.join(plDir, title);
@@ -484,7 +539,7 @@ class LibraryManager {
   removeFromPlaylist(playlistId, songId) {
     const pl = this.playlists.find(p => p.id === playlistId);
     if (pl) {
-      pl.songIds = pl.songIds.filter(id => id !== songId);
+      pl.songIds = (pl.songIds || []).filter(id => id !== songId);
       this.savePlaylists();
     }
     return this.playlists;

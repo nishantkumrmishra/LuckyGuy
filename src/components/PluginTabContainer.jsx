@@ -1163,17 +1163,35 @@ export default function PluginTabContainer({
                   boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
                 }}
               >
-                <video
-                  src={activePlayerVideo.streamUrl}
-                  controls
-                  autoPlay
-                  poster={activePlayerVideo.thumbnail}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain',
-                  }}
-                />
+                {(() => {
+                  const vkey = activePlayerVideo.url?.match(/viewkey=([a-zA-Z0-9_-]+)/)?.[1];
+                  if (vkey) {
+                    return (
+                      <webview
+                        src={"https://www.pornhub.org/embed/" + vkey}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          border: "none",
+                        }}
+                        allowpopups="false"
+                      />
+                    );
+                  }
+                  return (
+                    <video
+                      src={activePlayerVideo.streamUrl}
+                      controls
+                      autoPlay
+                      poster={activePlayerVideo.thumbnail}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "contain",
+                      }}
+                    />
+                  );
+                })()}
               </div>
 
               {/* Video Title & Primary Metadata */}

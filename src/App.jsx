@@ -13,6 +13,36 @@ import PlaylistsTab from './components/PlaylistsTab';
 import SleepTimerModal from './components/SleepTimerModal';
 import SetupWizard from './components/SetupWizard';
 import QueueDrawer from './components/QueueDrawer';
+import { Play, Pause, SkipForward, Maximize2 } from 'lucide-react';
+import { CustomIcon } from './components/DuoIcons';
+
+
+// Helper: Universal track deduplication (by path and normalized title+artist)
+const deduplicateTracks = (trackList) => {
+  if (!Array.isArray(trackList)) return [];
+  const seenPaths = new Set();
+  const seenKeys = new Set();
+  const result = [];
+  for (const t of trackList) {
+    if (!t) continue;
+    if (t.title === "4tHJc5agHg9LVsijAwtooy" || /^[a-zA-Z0-9]{20,}$/.test(t.title)) continue;
+
+    const pathKey = (t.filePath || t.destinationPath || "").toLowerCase().trim();
+    const titleKey = (t.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const artistKey = (t.artist && t.artist !== "Unknown Artist" && t.artist !== "Various Artists")
+      ? (t.artist || "").toLowerCase().replace(/[^a-z0-9]/g, "")
+      : "";
+    const songKey = `${titleKey}__${artistKey}`;
+
+    if (pathKey && seenPaths.has(pathKey)) continue;
+    if (titleKey.length >= 2 && seenKeys.has(songKey)) continue;
+
+    if (pathKey) seenPaths.add(pathKey);
+    if (titleKey.length >= 2) seenKeys.add(songKey);
+    result.push(t);
+  }
+  return result;
+};
 
 export default function App() {
   const downloadCompletionMap = useRef(new Map()).current;
@@ -45,12 +75,8 @@ export default function App() {
   // 1. Library Songs: ONLY downloaded music or scanned files
   const [songs, setSongs] = useState(() => {
     try {
-      const saved = localStorage.getItem('localguy-songs');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.filter((t) => t.title !== '4tHJc5agHg9LVsijAwtooy' && !/^[a-zA-Z0-9]{20,}$/.test(t.title) && !t.title.toLowerCase().includes('3 drags'));
-      }
-      return [];
+      const saved = localStorage.getItem("localguy-songs");
+      return saved ? deduplicateTracks(JSON.parse(saved)) : [];
     } catch {
       return [];
     }
@@ -60,11 +86,11 @@ export default function App() {
   const [activeDownloads, setActiveDownloads] = useState([]);
   const [completedDownloads, setCompletedDownloads] = useState(() => {
     try {
-      const saved = localStorage.getItem('localguy-downloads');
+      const saved = localStorage.getItem("localguy-downloads");
       if (saved) {
         const parsed = JSON.parse(saved);
         return Array.isArray(parsed)
-          ? parsed.filter((t) => (t.filePath || t.destinationPath) && t.status !== 'Skipped (Already on Device)' && t.title !== '4tHJc5agHg9LVsijAwtooy' && !/^[a-zA-Z0-9]{20,}$/.test(t.title) && !t.title.toLowerCase().includes('3 drags'))
+          ? deduplicateTracks(parsed.filter((t) => (t.filePath || t.destinationPath) && t.status !== "Skipped (Already on Device)"))
           : [];
       }
       return [];
@@ -271,6 +297,7 @@ export default function App() {
   });
 
   const audioRef = useRef(null);
+  const isMusicTab = ['home', 'library', 'playlists', 'liked'].includes(activeTab);
 
   useEffect(() => {
     try {
@@ -313,7 +340,7 @@ export default function App() {
         if (validList.length > 0 && window.electronAPI.verifyFilesExist) {
           const existMap = await window.electronAPI.verifyFilesExist(validList.map(s => s.filePath).filter(Boolean));
           const actualSongs = validList.filter(s => s.filePath && existMap[s.filePath] === true);
-          setSongs(actualSongs);
+          setSongs(deduplicateTracks(actualSongs));
         } else {
           setSongs([]);
         }
