@@ -154,7 +154,7 @@ app.whenReady().then(() => {
     // Auto-inject 18+ age verification disclaimer cookies into outbound requests
     session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
       const requestHeaders = Object.assign({}, details.requestHeaders);
-      if (details.url.includes('pornhub.com') || details.url.includes('phncdn.com')) {
+      if (details.url.includes('pornhub.org') || details.url.includes('pornhub.com') || details.url.includes('phncdn.com')) {
         let existingCookie = requestHeaders['Cookie'] || requestHeaders['cookie'] || '';
         if (!existingCookie.includes('accessAgeDisclaimerPH')) {
           existingCookie = (existingCookie ? existingCookie + '; ' : '') + 'accessAgeDisclaimerPH=1; age_verified=1; hasVisited=1; accessPH=1; cookieConsent=1; platform=pc';
@@ -279,6 +279,12 @@ ipcMain.handle('extract-url', async (event, url) => {
 ipcMain.handle('bypass-age-verification', async () => {
   try {
     const phCookies = [
+      { url: 'https://www.pornhub.org', name: 'accessAgeDisclaimerPH', value: '1' },
+      { url: 'https://www.pornhub.org', name: 'age_verified', value: '1' },
+      { url: 'https://www.pornhub.org', name: 'hasVisited', value: '1' },
+      { url: 'https://www.pornhub.org', name: 'accessPH', value: '1' },
+      { url: 'https://www.pornhub.org', name: 'cookieConsent', value: '1' },
+      { url: 'https://www.pornhub.org', name: 'platform', value: 'pc' },
       { url: 'https://www.pornhub.com', name: 'accessAgeDisclaimerPH', value: '1' },
       { url: 'https://www.pornhub.com', name: 'age_verified', value: '1' },
       { url: 'https://www.pornhub.com', name: 'hasVisited', value: '1' },
@@ -371,7 +377,7 @@ ipcMain.handle('crawl-portal', async (event, targetUrl) => {
                     views,
                     rating,
                     author: uploader,
-                    url: 'https://www.pornhub.com/view_video.php?viewkey=' + finalVkey,
+                    url: 'https://www.pornhub.org/view_video.php?viewkey=' + finalVkey,
                     streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
                   });
                 }

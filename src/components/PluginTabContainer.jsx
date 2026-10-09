@@ -35,8 +35,16 @@ export default function PluginTabContainer({
   preferences = {},
   onOpenFolder
 }) {
-  const [activeUrl, setActiveUrl] = useState(plugin.tab?.url || plugin.tab?.defaultUrl || '');
-  const [inputUrl, setInputUrl] = useState(plugin.tab?.url || plugin.tab?.defaultUrl || '');
+  const [activeUrl, setActiveUrl] = useState(() => {
+    let url = plugin.tab?.url || plugin.tab?.defaultUrl || '';
+    if (url.includes('pornhub.com')) url = url.replace('pornhub.com', 'pornhub.org');
+    return url;
+  });
+  const [inputUrl, setInputUrl] = useState(() => {
+    let url = plugin.tab?.url || plugin.tab?.defaultUrl || '';
+    if (url.includes('pornhub.com')) url = url.replace('pornhub.com', 'pornhub.org');
+    return url;
+  });
   const [viewMode, setViewMode] = useState('grid'); // 'grid' (native media index) | 'web' (raw web frame)
   const [isAdBlockEnabled, setIsAdBlockEnabled] = useState(() => {
     try {
@@ -172,7 +180,7 @@ export default function PluginTabContainer({
           size: `${(280 + i * 45).toFixed(0)} MB`,
           thumbnail: thumbUrl,
           thumbnailFallback: matureThumbnails[(i + 1) % matureThumbnails.length],
-          url: `${queryUrl || 'https://www.pornhub.com'}/view_video.php?viewkey=ph${10000000 + i * 3721}`,
+          url: `${queryUrl || 'https://www.pornhub.org'}/view_video.php?viewkey=ph${10000000 + i * 3721}`,
           streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
         };
       });
@@ -364,7 +372,7 @@ export default function PluginTabContainer({
               views,
               rating,
               author,
-              url: 'https://www.pornhub.com/view_video.php?viewkey=' + vkey,
+              url: 'https://www.pornhub.org/view_video.php?viewkey=' + vkey,
               streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
             });
           });
@@ -463,12 +471,12 @@ export default function PluginTabContainer({
     setIsIndexing(true);
 
     if (isPornhub) {
-      let targetCatUrl = 'https://www.pornhub.com/video';
-      if (cat === 'Trending HD') targetCatUrl = 'https://www.pornhub.com/video?o=ht';
-      else if (cat === 'Top Rated') targetCatUrl = 'https://www.pornhub.com/video?o=tr';
-      else if (cat === '4K Ultra') targetCatUrl = 'https://www.pornhub.com/video?c=105';
-      else if (cat === 'Verified Amateurs') targetCatUrl = 'https://www.pornhub.com/video?c=102';
-      else if (cat === 'VR / 60fps') targetCatUrl = 'https://www.pornhub.com/vr';
+      let targetCatUrl = 'https://www.pornhub.org/video';
+      if (cat === 'Trending HD') targetCatUrl = 'https://www.pornhub.org/video?o=ht';
+      else if (cat === 'Top Rated') targetCatUrl = 'https://www.pornhub.org/video?o=tr';
+      else if (cat === '4K Ultra') targetCatUrl = 'https://www.pornhub.org/video?c=105';
+      else if (cat === 'Verified Amateurs') targetCatUrl = 'https://www.pornhub.org/video?c=102';
+      else if (cat === 'VR / 60fps') targetCatUrl = 'https://www.pornhub.org/vr';
 
       setActiveUrl(targetCatUrl);
       setInputUrl(targetCatUrl);
