@@ -565,13 +565,14 @@ export default function App() {
     }
   };
 
-  const handleDeleteDownload = (id) => {
-    const item = completedDownloads.find((d) => d.id === id);
-    if (item) {
-      const filePath = item.destinationPath || item.filePath;
-      setCompletedDownloads((prev) => prev.filter((d) => d.id !== id));
-      setSongs((prev) => prev.filter((s) => s.id !== id && (!filePath || s.filePath !== filePath)));
-      setTrash((prev) => [item, ...prev]);
+  const handleDeleteDownload = (idOrIds) => {
+    const ids = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
+    const itemsToDelete = completedDownloads.filter((d) => ids.includes(d.id));
+    if (itemsToDelete.length > 0) {
+      const deletedPaths = new Set(itemsToDelete.map((item) => item.destinationPath || item.filePath).filter(Boolean));
+      setCompletedDownloads((prev) => prev.filter((d) => !ids.includes(d.id)));
+      setSongs((prev) => prev.filter((s) => !ids.includes(s.id) && !deletedPaths.has(s.filePath)));
+      setTrash((prev) => [...itemsToDelete, ...prev]);
     }
   };
 
