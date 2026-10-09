@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, globalShortcut, session } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -127,6 +127,17 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Intercept headers to prevent frame-blocking / flickering on media portal embeds
+  try {
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      const responseHeaders = Object.assign({}, details.responseHeaders);
+      delete responseHeaders['x-frame-options'];
+      delete responseHeaders['X-Frame-Options'];
+      delete responseHeaders['content-security-policy'];
+      delete responseHeaders['Content-Security-Policy'];
+      callback({ cancel: false, responseHeaders });
+    });
+  } catch (err) {}
   createWindow();
   setTimeout(() => checkAppUpdates(true), 4000);
 
