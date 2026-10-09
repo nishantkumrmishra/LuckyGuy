@@ -13,6 +13,9 @@ import SleepTimerModal from './components/SleepTimerModal';
 import QueueDrawer from './components/QueueDrawer';
 
 export default function App() {
+  const downloadCompletionMap = useRef(new Map()).current;
+  const isQueueCancelledRef = useRef(false);
+  const cancelledTaskIdsRef = useRef(new Set());
   const [activeTab, setActiveTab] = useState(() => {
     try {
       return localStorage.getItem('localguy-active-tab') || 'home';
@@ -332,6 +335,11 @@ export default function App() {
     });
 
     window.electronAPI.onDownloadCompleted((payload) => {
+      if (downloadCompletionMap.has(payload.id)) {
+        const resolve = downloadCompletionMap.get(payload.id);
+        downloadCompletionMap.delete(payload.id);
+        resolve(true);
+      }
       setActiveDownloads((prev) => prev.filter((item) => item.id !== payload.id));
       const finalBytes = payload.fileSize || payload.downloadedBytes;
       let formattedSize = payload.size || 'Saved';
@@ -361,6 +369,11 @@ export default function App() {
     });
 
     window.electronAPI.onDownloadFailed((payload) => {
+      if (downloadCompletionMap.has(payload.id)) {
+        const resolve = downloadCompletionMap.get(payload.id);
+        downloadCompletionMap.delete(payload.id);
+        resolve(false);
+      }
       setActiveDownloads((prev) =>
         prev.map((item) =>
           item.id === payload.id ? { ...item, status: 'failed', error: payload.error } : item
@@ -453,15 +466,22 @@ export default function App() {
       // Instantly populate the Downloads Manager UI table so user sees all items in queue!
       setActiveDownloads((prev) => [...tasksToQueue, ...prev]);
 
-      // Controlled queue worker: 2 tracks processed in parallel with individual artwork scanning and polite pacing
+      // Controlled queue worker: 2 tracks processed in parallel with true completion waiting
+      isQueueCancelledRef.current = false;
+      cancelledTaskIdsRef.current.clear();
+
       (async () => {
         const CONCURRENCY = 2;
         let queueIndex = 0;
 
         const worker = async () => {
           while (queueIndex < tasksToQueue.length) {
+            if (isQueueCancelledRef.current) break;
+
             const task = tasksToQueue[queueIndex++];
             if (!task) break;
+
+            if (cancelledTaskIdsRef.current.has(task.id)) continue;
 
             try {
               // Check if file is already on device
@@ -480,8 +500,8 @@ export default function App() {
                     ? {
                         ...item,
                         status: 'downloading',
-                        speed: 'Scanning & resolving artwork...',
-                        progress: 2,
+                        speed: 'Scanning artwork & audio...',
+                        progress: 0,
                       }
                     : item
                 )
@@ -505,6 +525,10 @@ export default function App() {
                 } catch (e) {}
               }
 
+              if (isQueueCancelledRef.current || cancelledTaskIdsRef.current.has(task.id)) {
+                continue;
+              }
+
               // Update task with the real individual artwork and album
               setActiveDownloads((prev) =>
                 prev.map((item) =>
@@ -513,8 +537,8 @@ export default function App() {
                         ...item,
                         artworkUrl: tArtwork || item.artworkUrl,
                         album: tAlbum || item.album,
-                        speed: tStreamUrl ? 'Starting download...' : 'Stream not found',
-                        progress: tStreamUrl ? 5 : 0,
+                        speed: tStreamUrl ? 'Connecting...' : 'Stream not found',
+                        progress: 0,
                         status: tStreamUrl ? 'downloading' : 'failed',
                       }
                     : item
@@ -522,6 +546,16 @@ export default function App() {
               );
 
               if (tStreamUrl && window.electronAPI?.startDownload) {
+                const completionPromise = new Promise((resolve) => {
+                  downloadCompletionMap.set(task.id, resolve);
+                  setTimeout(() => {
+                    if (downloadCompletionMap.has(task.id)) {
+                      downloadCompletionMap.delete(task.id);
+                      resolve(false);
+                    }
+                  }, 120000); // 2 minute per-track safety timeout
+                });
+
                 await window.electronAPI.startDownload({
                   id: task.id,
                   url: tStreamUrl,
@@ -534,10 +568,13 @@ export default function App() {
                   formatType: 'AUDIO',
                   qualityLabel: tBitrate,
                 });
+
+                // Wait for this specific download to finish before this worker takes the next track!
+                await completionPromise;
               }
 
-              // Polite pacing before next track to avoid rate limits
-              await new Promise((r) => setTimeout(r, 600));
+              // Polite pause before next track
+              await new Promise((r) => setTimeout(r, 400));
             } catch (err) {
               console.error('Track queue error:', err);
             }
@@ -662,10 +699,32 @@ export default function App() {
   };
 
   const handleCancelDownload = (id) => {
+    cancelledTaskIdsRef.current.add(id);
+    if (downloadCompletionMap.has(id)) {
+      const resolve = downloadCompletionMap.get(id);
+      downloadCompletionMap.delete(id);
+      resolve(false);
+    }
     setActiveDownloads((prev) => prev.filter((d) => d.id !== id));
     if (window.electronAPI?.cancelDownload) {
       window.electronAPI.cancelDownload(id);
     }
+  };
+
+  const handleCancelAll = () => {
+    isQueueCancelledRef.current = true;
+    activeDownloads.forEach((d) => {
+      cancelledTaskIdsRef.current.add(d.id);
+      if (downloadCompletionMap.has(d.id)) {
+        const resolve = downloadCompletionMap.get(d.id);
+        downloadCompletionMap.delete(d.id);
+        resolve(false);
+      }
+      if (window.electronAPI?.cancelDownload) {
+        window.electronAPI.cancelDownload(d.id);
+      }
+    });
+    setActiveDownloads([]);
   };
 
   const handleDeleteDownload = (idOrIds) => {
@@ -1090,8 +1149,10 @@ export default function App() {
           <main
             style={{
               flex: 1,
-              overflowY: 'auto',
+              overflow: 'hidden',
               minWidth: 0,
+              minHeight: 0,
+              height: '100%',
               display: 'flex',
               flexDirection: 'column',
             }}
@@ -1188,6 +1249,7 @@ export default function App() {
                 onPauseAll={handlePauseAll}
                 onResumeAll={handleResumeAll}
                 onCancelDownload={handleCancelDownload}
+                onCancelAll={handleCancelAll}
                 onClearCompleted={handleClearCompleted}
                 onDeleteDownload={handleDeleteDownload}
                 onPlayTrack={handlePlayTrack}
@@ -1195,6 +1257,13 @@ export default function App() {
                 downloadFolder={preferences?.downloadFolder || 'C:\\Users\\nishant\\Music'}
                 onNavigateToHome={() => setActiveTab('home')}
                 onNavigateToLibrary={() => setActiveTab('library')}
+                preferences={preferences}
+                onSavePreferences={(newPrefs) => {
+                  setPreferences((prev) => ({ ...prev, ...newPrefs }));
+                  if (window.electronAPI?.savePreferences) {
+                    window.electronAPI.savePreferences(newPrefs);
+                  }
+                }}
               />
             )}
 

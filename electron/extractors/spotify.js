@@ -16,6 +16,26 @@ function parseSpotifyUrl(url) {
   return { type, id };
 }
 
+async function getSpotifyCookieToken(cookie) {
+  if (!cookie || !cookie.trim()) return null;
+  try {
+    const resp = await fetch('https://open.spotify.com/get_access_token?reason=transport&productType=web_player', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'App-Platform': 'WebPlayer',
+        'Cookie': `sp_dc=${cookie.trim()}`
+      }
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      return data.accessToken;
+    }
+  } catch (e) {
+    console.warn('[Spotify] Cookie token error:', e.message);
+  }
+  return null;
+}
+
 async function getSpotifyApiToken(clientId, clientSecret) {
   if (!clientId || !clientSecret) return null;
   try {
@@ -124,12 +144,20 @@ async function extractSpotifyEntity(url, preferences = {}) {
   const parsed = parseSpotifyUrl(url);
   if (!parsed) return null;
 
-  // 1. If Spotify Developer credentials exist in preferences, use official API with full pagination (>100 tracks)!
+  // 1. If Spotify Developer credentials or sp_dc cookie exist, use official API with full pagination (>100 tracks)!
   const clientId = preferences.spotifyClientId || preferences.plugins?.spotifyClientId;
   const clientSecret = preferences.spotifyClientSecret || preferences.plugins?.spotifyClientSecret;
+  const spDcCookie = preferences.spotifyCookie || preferences.plugins?.spotifyCookie;
+
+  let token = null;
   if (clientId && clientSecret) {
+    token = await getSpotifyApiToken(clientId, clientSecret);
+  } else if (spDcCookie) {
+    token = await getSpotifyCookieToken(spDcCookie);
+  }
+
+  if (token) {
     try {
-      const token = await getSpotifyApiToken(clientId, clientSecret);
       if (token) {
         if (parsed.type === 'playlist') {
           return await fetchFullSpotifyPlaylist(parsed.id, token);

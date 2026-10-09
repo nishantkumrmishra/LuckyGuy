@@ -30,6 +30,7 @@ export default function DownloadsTab({
   onPauseAll,
   onResumeAll,
   onCancelDownload,
+  onCancelAll,
   onClearCompleted,
   onDeleteDownload,
   onPlayTrack,
@@ -47,17 +48,20 @@ export default function DownloadsTab({
   const [showConfig, setShowConfig] = useState(false);
   const [spotifyClientId, setSpotifyClientId] = useState(preferences?.spotifyClientId || '');
   const [spotifyClientSecret, setSpotifyClientSecret] = useState(preferences?.spotifyClientSecret || '');
+  const [spotifyCookie, setSpotifyCookie] = useState(preferences?.spotifyCookie || '');
 
   useEffect(() => {
     setSpotifyClientId(preferences?.spotifyClientId || '');
     setSpotifyClientSecret(preferences?.spotifyClientSecret || '');
-  }, [preferences?.spotifyClientId, preferences?.spotifyClientSecret]);
+    setSpotifyCookie(preferences?.spotifyCookie || '');
+  }, [preferences?.spotifyClientId, preferences?.spotifyClientSecret, preferences?.spotifyCookie]);
 
   const handleSaveSpotifyCreds = () => {
     if (onSavePreferences) {
       onSavePreferences({
         spotifyClientId: spotifyClientId.trim(),
         spotifyClientSecret: spotifyClientSecret.trim(),
+        spotifyCookie: spotifyCookie.trim(),
       });
     }
   };
@@ -294,9 +298,10 @@ export default function DownloadsTab({
         padding: '24px 32px 40px 32px',
         backgroundColor: 'var(--bg-main, #f5f5f5)',
         overflowY: 'auto',
+        height: '100%',
+        minHeight: 0,
         gap: '20px',
         fontFamily: 'inherit',
-        userSelect: 'none',
       }}
     >
       {/* 1. Downloader Header & URL Bar */}
@@ -605,7 +610,7 @@ export default function DownloadsTab({
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#1db954', fontWeight: 600 }}>
                 <Key size={13} />
-                <span>Spotify API (for 200+ track playlists):</span>
+                <span>Spotify Credentials (to load over 100 tracks):</span>
               </div>
               <input
                 type="text"
@@ -619,7 +624,7 @@ export default function DownloadsTab({
                   backgroundColor: 'var(--bg-main)',
                   color: 'var(--text-primary)',
                   fontSize: '11px',
-                  width: '140px',
+                  width: '120px',
                 }}
               />
               <input
@@ -634,7 +639,24 @@ export default function DownloadsTab({
                   backgroundColor: 'var(--bg-main)',
                   color: 'var(--text-primary)',
                   fontSize: '11px',
-                  width: '140px',
+                  width: '120px',
+                }}
+              />
+              <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>or</span>
+              <input
+                type="password"
+                placeholder="sp_dc Cookie"
+                value={spotifyCookie}
+                onChange={(e) => setSpotifyCookie(e.target.value)}
+                title="Browser sp_dc cookie from open.spotify.com"
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-medium)',
+                  backgroundColor: 'var(--bg-main)',
+                  color: 'var(--text-primary)',
+                  fontSize: '11px',
+                  width: '130px',
                 }}
               />
               <button
@@ -642,9 +664,9 @@ export default function DownloadsTab({
                 style={{
                   padding: '4px 10px',
                   borderRadius: '6px',
-                  backgroundColor: 'var(--bg-main)',
-                  border: '1px solid var(--border-medium)',
-                  color: 'var(--text-primary)',
+                  backgroundColor: 'var(--primary, #7c5cbf)',
+                  border: 'none',
+                  color: '#ffffff',
                   fontSize: '11px',
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -653,7 +675,7 @@ export default function DownloadsTab({
                 Save
               </button>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                Optional: developer.spotify.com credentials to fetch over 100 tracks
+                Unlocks full 200+ tracks playlist pagination
               </span>
             </div>
           </div>
@@ -729,55 +751,59 @@ export default function DownloadsTab({
 
         {/* Batch Operations */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {activeDownloads.length > 0 && (
-            <>
-              {onPauseAll && (
-                <button
-                  onClick={onPauseAll}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '6px 12px',
-                    borderRadius: '7px',
-                    backgroundColor: 'var(--bg-card)',
-                    border: '1px solid var(--border-medium)',
-                    color: 'var(--text-secondary)',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                  }}
-                  title="Pause all downloading tasks"
-                >
-                  <Pause size={13} />
-                  <span>Pause All</span>
-                </button>
-              )}
-              {onResumeAll && (
-                <button
-                  onClick={onResumeAll}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '6px 12px',
-                    borderRadius: '7px',
-                    backgroundColor: 'rgba(124, 92, 191, 0.1)',
-                    border: '1px solid var(--primary, #7c5cbf)',
-                    color: 'var(--primary, #7c5cbf)',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                  title="Resume all tasks"
-                >
-                  <Play size={13} fill="currentColor" />
-                  <span>Resume All</span>
-                </button>
-              )}
-            </>
-          )}
+          {/* 1. Single Toggle Button for Pause / Resume All */}
+          {activeDownloads.length > 0 && (() => {
+            const isAnyActiveRunning = activeDownloads.some(
+              (d) => d.status === 'downloading' || d.status === 'queued'
+            );
+            return isAnyActiveRunning ? (
+              <button
+                onClick={onPauseAll}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: 'var(--bg-card)',
+                  border: '1px solid var(--border-medium)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                title="Pause all active tasks"
+              >
+                <Pause size={13} />
+                <span>Pause All</span>
+              </button>
+            ) : (
+              <button
+                onClick={onResumeAll}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(124, 92, 191, 0.12)',
+                  border: '1px solid var(--primary, #7c5cbf)',
+                  color: 'var(--primary, #7c5cbf)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                title="Resume all tasks"
+              >
+                <Play size={13} fill="currentColor" />
+                <span>Resume All</span>
+              </button>
+            );
+          })()}
 
+          {/* 2. Cancel Button: Cancel Selected or Cancel All */}
           {selectedIds.size > 0 ? (
             <>
               <button
@@ -787,7 +813,7 @@ export default function DownloadsTab({
                   alignItems: 'center',
                   gap: '5px',
                   padding: '6px 12px',
-                  borderRadius: '7px',
+                  borderRadius: '8px',
                   backgroundColor: '#fee2e2',
                   border: '1px solid #fecaca',
                   color: '#dc2626',
@@ -796,17 +822,17 @@ export default function DownloadsTab({
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                 }}
-                title="Delete selected items (or press Delete key)"
+                title="Cancel or delete selected items"
               >
-                <Trash2 size={13} />
-                <span>{'Delete Selected (' + selectedIds.size + ')'}</span>
+                <X size={13} />
+                <span>Cancel Selected ({selectedIds.size})</span>
               </button>
 
               <button
                 onClick={() => setSelectedIds(new Set())}
                 style={{
                   padding: '6px 10px',
-                  borderRadius: '7px',
+                  borderRadius: '8px',
                   backgroundColor: 'var(--bg-card)',
                   border: '1px solid var(--border-medium)',
                   color: 'var(--text-secondary)',
@@ -818,27 +844,51 @@ export default function DownloadsTab({
               </button>
             </>
           ) : (
-            completedDownloads.length > 0 && (
+            activeDownloads.length > 0 && onCancelAll ? (
               <button
-                onClick={onClearCompleted}
+                onClick={onCancelAll}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '5px',
                   padding: '6px 12px',
-                  borderRadius: '7px',
+                  borderRadius: '8px',
                   backgroundColor: 'var(--bg-card)',
                   border: '1px solid var(--border-medium)',
-                  color: 'var(--text-secondary)',
+                  color: '#dc2626',
                   fontSize: '12px',
                   fontWeight: 500,
                   cursor: 'pointer',
+                  transition: 'all 0.15s ease',
                 }}
-                title="Delete all completed downloads"
+                title="Cancel all downloading and queued tasks"
               >
-                <Trash2 size={13} />
-                <span>Delete All</span>
+                <X size={13} />
+                <span>Cancel All</span>
               </button>
+            ) : (
+              completedDownloads.length > 0 && (
+                <button
+                  onClick={onClearCompleted}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-medium)',
+                    color: 'var(--text-secondary)',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
+                  title="Clear all completed download history"
+                >
+                  <Trash2 size={13} />
+                  <span>Clear History</span>
+                </button>
+              )
             )
           )}
         </div>
@@ -1064,11 +1114,15 @@ export default function DownloadsTab({
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
-                              maxWidth: '340px',
+                              maxWidth: '380px',
                             }}
                           >
                             {isTaskActive
-                              ? (isPaused ? 'Paused' : (item.speed ? 'Speed: ' + item.speed : 'Transferring data...'))
+                              ? (isPaused
+                                  ? 'Paused'
+                                  : (item.speed
+                                      ? `${item.speed} • ${item.destinationPath ? 'Folder: ' + item.destinationPath.split(/\\|\//).slice(-2, -1)[0] : 'Processing...'}`
+                                      : 'Transferring data...'))
                               : (item.filePath || item.destinationPath || 'Downloaded to Library')}
                           </div>
                         </div>

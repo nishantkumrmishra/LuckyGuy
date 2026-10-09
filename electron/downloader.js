@@ -304,6 +304,18 @@ class DownloadManager extends EventEmitter {
 
     downloader.on('update', (snap) => {
       this.tasks.set(taskConfig.id, snap);
+      this.emit('update', snap);
+    });
+
+    downloader.on('completed', (snap) => {
+      this.tasks.delete(taskConfig.id);
+      this.activeDownloaders.delete(taskConfig.id);
+      this.emit('completed', snap);
+    });
+
+    downloader.on('error', (err) => {
+      this.emit('error', { id: taskConfig.id, error: err.message });
+      this.emit('failed', { id: taskConfig.id, error: err.message });
     });
 
     downloader.start();
