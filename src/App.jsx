@@ -6,6 +6,7 @@ import HomeTab from './components/HomeTab';
 import LibraryTab from './components/LibraryTab';
 import DownloadsTab from './components/DownloadsTab';
 import PluginTabContainer from './components/PluginTabContainer';
+import TelegramTab from './components/TelegramTab';
 import TrashTab from './components/TrashTab';
 import SettingsTab from './components/SettingsTab';
 import LikedSongsTab from './components/LikedSongsTab';
@@ -157,7 +158,9 @@ export default function App() {
   const cancelledTaskIdsRef = useRef(new Set());
   const [activeTab, setActiveTab] = useState(() => {
     try {
-      return localStorage.getItem('localguy-active-tab') || 'home';
+      const saved = localStorage.getItem('localguy-active-tab') || 'home';
+      if (saved === 'plugin-luckyguy-ext-telegraph') return 'plugin-luckyguy-ext-telegram';
+      return saved;
     } catch {
       return 'home';
     }
@@ -168,7 +171,19 @@ export default function App() {
   const [installedExtensions, setInstalledExtensions] = useState(() => {
     try {
       const saved = localStorage.getItem('luckyguy-extensions');
-      return saved ? JSON.parse(saved) : [];
+      let list = saved ? JSON.parse(saved) : [];
+      if (!Array.isArray(list)) list = [];
+      const hadTelegraph = list.some(e => e.id === 'luckyguy-ext-telegraph');
+      if (hadTelegraph) {
+        list = list.filter(e => e.id !== 'luckyguy-ext-telegraph');
+        if (!list.some(e => e.id === 'luckyguy-ext-telegram')) {
+          list.push(defaultTelegramExtension);
+        }
+        try {
+          localStorage.setItem('luckyguy-extensions', JSON.stringify(list));
+        } catch (e) {}
+      }
+      return list;
     } catch {
       return [];
     }
@@ -225,14 +240,15 @@ export default function App() {
   });
 
   const handleCreatePlaylist = (name, description, icon = '🎵') => {
-    const newPl = {
+    const newPlaylist = {
       id: 'pl-' + Date.now(),
-      name: name || 'New Playlist',
-      description: description || 'Custom user playlist',
+      name,
+      description: description || '',
       icon: icon || '🎵',
       tracks: [],
+      createdAt: new Date().toISOString(),
     };
-    const updated = [newPl, ...playlists];
+    const updated = [newPlaylist, ...playlists];
     setPlaylists(updated);
     try {
       localStorage.setItem('localguy-playlists', JSON.stringify(updated));
@@ -240,17 +256,17 @@ export default function App() {
     if (window.electronAPI?.createPlaylist) {
       window.electronAPI.createPlaylist(name, description);
     }
+    return newPlaylist;
   };
 
   const handleDeletePlaylist = (playlistId) => {
-    const target = playlists.find((p) => p.id === playlistId);
     const updated = playlists.filter((p) => p.id !== playlistId);
     setPlaylists(updated);
     try {
       localStorage.setItem('localguy-playlists', JSON.stringify(updated));
     } catch (e) {}
-    if (window.electronAPI?.deletePlaylist && target) {
-      window.electronAPI.deletePlaylist(target.name || playlistId);
+    if (window.electronAPI?.deletePlaylist) {
+      window.electronAPI.deletePlaylist(playlistId);
     }
   };
 
@@ -355,45 +371,29 @@ export default function App() {
       else if (appearance.fontFamily === 'Comic / Playful') fontStack = "'Comic Sans MS', 'Chalkboard SE', cursive, sans-serif";
       else fontStack = `'${appearance.fontFamily}', -apple-system, sans-serif`;
       root.style.setProperty('--font-sans', fontStack);
-      document.body.style.fontFamily = fontStack;
     }
     if (appearance.borderRadius) {
-      root.style.setProperty('--app-radius', appearance.borderRadius);
+      root.style.setProperty('--radius-md', appearance.borderRadius);
     }
-    try {
-      localStorage.setItem('luckyguy-appearance', JSON.stringify(appearance));
-    } catch {}
   }, [appearance]);
 
-  const handleToggleTheme = () => {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
-  };
-
-  // 4. Player State
+  // Player & Queue State
   const [currentTrack, setCurrentTrack] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.85);
-  const [isMuted, setIsMuted] = useState(false);
+  const [playQueue, setPlayQueue] = useState([]);
+  const [queueIndex, setQueueIndex] = useState(-1);
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState('off');
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [queue, setQueue] = useState([]);
-  const [queueIndex, setQueueIndex] = useState(0);
-  const [isQueueOpen, setIsQueueOpen] = useState(false);
-  const [isSleepTimerOpen, setIsSleepTimerOpen] = useState(false);
+  const [volume, setVolume] = useState(0.8);
+  const [isMuted, setIsMuted] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [showQueueDrawer, setShowQueueDrawer] = useState(false);
+  const [showSleepTimerModal, setShowSleepTimerModal] = useState(false);
   const [sleepTimerRemaining, setSleepTimerRemaining] = useState(null);
-
-  const [isSetupWizardOpen, setIsSetupWizardOpen] = useState(() => {
-    try {
-      return !localStorage.getItem('luckyguy-setup-completed');
-    } catch {
-      return false;
-    }
-  });
   const [updateNotification, setUpdateNotification] = useState(null);
 
+  // Liked Tracks
   const [likedTracks, setLikedTracks] = useState(() => {
     try {
       const saved = localStorage.getItem('localguy-liked-tracks');
@@ -403,7 +403,6 @@ export default function App() {
     }
   });
 
-  const audioRef = useRef(null);
   const isMusicTab = ['home', 'library', 'playlists', 'liked'].includes(activeTab);
 
   useEffect(() => {
@@ -431,12 +430,13 @@ export default function App() {
   }, [trash]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('localguy-preferences', JSON.stringify(preferences));
-    } catch (e) {}
+    if (!window.electronAPI) return;
+    if (window.electronAPI.savePreferences) {
+      window.electronAPI.savePreferences(preferences);
+    }
   }, [preferences]);
 
-    // Real-time disk verification: Ensure library, downloads & trash only contain actual existing files
+  // Real-time disk verification: Ensure library, downloads & trash only contain actual existing files
   useEffect(() => {
     if (!window.electronAPI) return;
 
@@ -467,21 +467,31 @@ export default function App() {
       } else if (completedDownloads.length > 0) {
         setCompletedDownloads([]);
       }
+    }
 
-      // 3. Verify trash items against disk
-      const trashPaths = trash.map(t => t.filePath || t.destinationPath).filter(Boolean);
+    // 3. Verify trash items
+    if (window.electronAPI.verifyFilesExist) {
+      const trashPaths = trash.map(t => t.filePath).filter(Boolean);
       if (trashPaths.length > 0) {
         window.electronAPI.verifyFilesExist(trashPaths).then((existMap) => {
-          setTrash((prev) => prev.filter(t => {
-            const fp = t.filePath || t.destinationPath;
-            return fp && existMap[fp] === true;
-          }));
+          setTrash((prev) => prev.filter(t => t.filePath && existMap[t.filePath] === true));
         }).catch(console.error);
+      } else if (trash.length > 0) {
+        setTrash([]);
       }
+    }
+
+    // 4. Initial sync of playlists from disk
+    if (window.electronAPI.getPlaylists) {
+      window.electronAPI.getPlaylists().then((loadedPlaylists) => {
+        if (Array.isArray(loadedPlaylists) && loadedPlaylists.length > 0) {
+          setPlaylists(loadedPlaylists);
+        }
+      }).catch(console.error);
     }
   }, []);
 
-// Load preferences from backend config.json on boot
+  // Preferences sync
   useEffect(() => {
     if (window.electronAPI?.getPreferences) {
       window.electronAPI.getPreferences().then((loadedPrefs) => {
@@ -538,17 +548,15 @@ export default function App() {
         resolve(true);
       }
       setActiveDownloads((prev) => prev.filter((item) => item.id !== payload.id));
-      const finalBytes = payload.fileSize || payload.downloadedBytes;
-      let formattedSize = payload.size || 'Saved';
-      if (finalBytes && !isNaN(finalBytes) && finalBytes > 0) {
-        const mb = finalBytes / (1024 * 1024);
-        formattedSize = mb >= 1000 ? (mb / 1024).toFixed(2) + ' GB' : mb.toFixed(1) + ' MB';
-      }
+
+      const finalBytes = payload.totalBytes || payload.fileSize || 8.5 * 1024 * 1024;
+      const formattedSize = (finalBytes / (1024 * 1024)).toFixed(1) + ' MB';
+
       const completed = {
-        id: payload.id,
-        title: payload.title,
-        artist: payload.artist,
-        album: payload.album,
+        id: payload.id || 'completed-' + Date.now(),
+        title: payload.title || 'Downloaded Audio',
+        artist: payload.artist || 'Unknown Artist',
+        album: payload.album || 'Downloaded Master',
         duration: payload.duration,
         artworkUrl: payload.artworkUrl,
         streamUrl: payload.streamUrl,
@@ -586,9 +594,68 @@ export default function App() {
   }, []);
 
   // Handlers for downloads
-  const handleStartDownload = async (queryOrUrl) => {
-    const trimmed = queryOrUrl.trim();
+  const handleStartDownload = async (queryOrUrl, options = {}) => {
+    const trimmed = (queryOrUrl || "").trim();
     if (!trimmed) return;
+
+    // Direct routing for Video and Image downloads from plugins
+    const isVideo = options.formatType === "VIDEO" || options.mediaType === "video" || (options.format && options.format.includes("MP4"));
+    const isImage = options.formatType === "IMAGE" || options.mediaType === "image" || (options.format && options.format.includes("JPG"));
+    const isFile = options.formatType === "FILE" || options.mediaType === "file";
+
+    if (isVideo || isImage || isFile) {
+      const taskId = options.id || ("dl-" + Date.now());
+      const cleanTitle = (options.title || "media").replace(/[\/\\?%*:|"<>]/g, "_");
+      const ext = isVideo ? ".mp4" : (isImage ? ".jpg" : ".bin");
+      const quality = options.quality || options.qualityLabel || (isVideo ? "1080p HD" : "Original");
+
+      // Custom folder (e.g. for Telegram) or user Videos/Pictures folder
+      let targetFolder = isVideo ? "C:\\Users\\nishant\\Videos" : (isImage ? "C:\\Users\\nishant\\Pictures" : "C:\\Users\\nishant\\Downloads");
+      if (options.customFolder && typeof options.customFolder === "string" && options.customFolder.trim()) {
+        targetFolder = options.customFolder.trim();
+      }
+
+      const destinationPath = targetFolder + "\\" + cleanTitle + ext;
+
+      const newTask = {
+        id: taskId,
+        title: options.title || cleanTitle,
+        artist: options.author || (isVideo ? "Video Stream" : (isImage ? "Image Gallery" : "Telegram File")),
+        album: quality,
+        artworkUrl: options.thumbnail || "",
+        duration: isVideo ? 180 : 0,
+        format: isVideo ? `MP4 ${quality}` : (isImage ? `JPG ${quality}` : `File`),
+        size: isVideo ? "75 MB" : (isImage ? "3.8 MB" : "15 MB"),
+        speed: "Connecting...",
+        progress: 10,
+        status: "downloading",
+        streamUrl: trimmed,
+        destinationPath,
+      };
+
+      setActiveDownloads((prev) => [newTask, ...prev]);
+
+      if (window.electronAPI?.startDownload) {
+        try {
+          await window.electronAPI.startDownload({
+            id: taskId,
+            url: trimmed,
+            title: newTask.title,
+            artist: newTask.artist,
+            album: newTask.album,
+            artworkUrl: newTask.artworkUrl,
+            duration: newTask.duration,
+            destinationPath,
+            customFolder: options.customFolder || null,
+            formatType: isVideo ? "VIDEO" : (isImage ? "IMAGE" : "FILE"),
+            qualityLabel: quality,
+          });
+        } catch (e) {
+          console.error("Plugin media download error:", e);
+        }
+      }
+      return;
+    }
 
     const taskId = 'dl-' + Date.now();
     let resolvedTrack = null;
@@ -849,396 +916,188 @@ export default function App() {
           duration,
           destinationPath: null, // Auto-organizes into genre subfolder!
           formatType: 'AUDIO',
-          qualityLabel: resolvedTrack.bitrate || '320kbps',
+          qualityLabel: '320kbps',
         });
       } catch (err) {
-        console.error('Download start error:', err);
+        console.error('startDownload error:', err);
       }
-    } else {
-      let p = 10;
-      const interval = setInterval(() => {
-        p += 25;
-        if (p >= 100) {
-          clearInterval(interval);
-          const completed = {
-            id: 'song-' + Date.now(),
-            title,
-            artist,
-            album,
-            duration,
-            artworkUrl,
-            streamUrl,
-            filePath: destinationPath,
-            format: 'MP3 320k',
-            size: '8.8 MB',
-            downloadedAt: new Date().toLocaleDateString(),
-          };
-          setActiveDownloads((prev) => prev.filter((t) => t.id !== taskId));
-          setCompletedDownloads((prev) => [completed, ...prev]);
-          setSongs((prev) => [completed, ...prev]);
-        } else {
-          setActiveDownloads((prev) =>
-            prev.map((t) => (t.id === taskId ? { ...t, progress: p, speed: '4.8 MB/s' } : t))
-          );
-        }
-      }, 350);
     }
   };
 
-  const handlePauseDownload = async (id) => {
+  const handlePauseDownload = (taskId) => {
     setActiveDownloads((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, status: 'paused' } : d))
+      prev.map((item) => (item.id === taskId ? { ...item, status: 'paused' } : item))
     );
     if (window.electronAPI?.pauseDownload) {
-      await window.electronAPI.pauseDownload(id);
+      window.electronAPI.pauseDownload(taskId);
     }
   };
 
-  const handleResumeDownload = async (id) => {
+  const handleResumeDownload = (taskId) => {
     setActiveDownloads((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, status: 'downloading' } : d))
+      prev.map((item) => (item.id === taskId ? { ...item, status: 'downloading' } : item))
     );
     if (window.electronAPI?.resumeDownload) {
-      await window.electronAPI.resumeDownload(id);
+      window.electronAPI.resumeDownload(taskId);
     }
   };
 
-  const handlePauseAll = async () => {
-    setActiveDownloads((prev) => prev.map((d) => ({ ...d, status: 'paused' })));
+  const handlePauseAll = () => {
+    setActiveDownloads((prev) => prev.map((item) => ({ ...item, status: 'paused' })));
     if (window.electronAPI?.pauseAllDownloads) {
-      await window.electronAPI.pauseAllDownloads();
+      window.electronAPI.pauseAllDownloads();
     }
   };
 
-  const handleResumeAll = async () => {
-    setActiveDownloads((prev) => prev.map((d) => ({ ...d, status: 'downloading' })));
+  const handleResumeAll = () => {
+    setActiveDownloads((prev) => prev.map((item) => ({ ...item, status: 'downloading' })));
     if (window.electronAPI?.resumeAllDownloads) {
-      await window.electronAPI.resumeAllDownloads();
+      window.electronAPI.resumeAllDownloads();
     }
   };
 
-  const handleCancelDownload = (id) => {
-    cancelledTaskIdsRef.current.add(id);
-    if (downloadCompletionMap.has(id)) {
-      const resolve = downloadCompletionMap.get(id);
-      downloadCompletionMap.delete(id);
+  const handleCancelDownload = (taskId) => {
+    cancelledTaskIdsRef.current.add(taskId);
+    if (downloadCompletionMap.has(taskId)) {
+      const resolve = downloadCompletionMap.get(taskId);
+      downloadCompletionMap.delete(taskId);
       resolve(false);
     }
-    setActiveDownloads((prev) => prev.filter((d) => d.id !== id));
+    setActiveDownloads((prev) => prev.filter((item) => item.id !== taskId));
     if (window.electronAPI?.cancelDownload) {
-      window.electronAPI.cancelDownload(id);
+      window.electronAPI.cancelDownload(taskId);
     }
   };
 
   const handleCancelAll = () => {
     isQueueCancelledRef.current = true;
-    activeDownloads.forEach((d) => {
-      cancelledTaskIdsRef.current.add(d.id);
-      if (downloadCompletionMap.has(d.id)) {
-        const resolve = downloadCompletionMap.get(d.id);
-        downloadCompletionMap.delete(d.id);
-        resolve(false);
-      }
-      if (window.electronAPI?.cancelDownload) {
-        window.electronAPI.cancelDownload(d.id);
-      }
-    });
+    for (const [id, resolve] of downloadCompletionMap.entries()) {
+      resolve(false);
+    }
+    downloadCompletionMap.clear();
     setActiveDownloads([]);
-  };
-
-  const handleDeleteDownload = (idOrIds) => {
-    const ids = Array.isArray(idOrIds) ? idOrIds : [idOrIds];
-    const itemsToDelete = completedDownloads.filter((d) => ids.includes(d.id));
-    if (itemsToDelete.length > 0) {
-      const deletedPaths = new Set(itemsToDelete.map((item) => item.destinationPath || item.filePath).filter(Boolean));
-      setCompletedDownloads((prev) => prev.filter((d) => !ids.includes(d.id)));
-      setSongs((prev) => prev.filter((s) => !ids.includes(s.id) && !deletedPaths.has(s.filePath)));
-      for (const item of itemsToDelete) {
-        const fp = item.destinationPath || item.filePath;
-        if (window.electronAPI?.deleteFilePermanently) {
-          window.electronAPI.deleteFilePermanently(fp, item.id);
-        }
-      }
+    if (window.electronAPI?.cancelAllDownloads) {
+      window.electronAPI.cancelAllDownloads();
     }
   };
 
   const handleClearCompleted = () => {
-    for (const item of completedDownloads) {
-      const fp = item.destinationPath || item.filePath;
-      if (window.electronAPI?.deleteFilePermanently) {
-        window.electronAPI.deleteFilePermanently(fp, item.id);
-      }
-    }
-    setSongs((prev) => prev.filter((s) => !completedDownloads.some((d) => d.id === s.id || (d.destinationPath && d.destinationPath === s.filePath))));
     setCompletedDownloads([]);
   };
 
-  const handleTrashSong = (track) => {
-    const filePath = track.filePath || track.destinationPath;
-    if (window.electronAPI?.deleteFilePermanently) {
-      window.electronAPI.deleteFilePermanently(filePath, track.id);
-    }
-    setSongs((prev) => {
-      const remaining = prev.filter((s) => s.id !== track.id && (!filePath || s.filePath !== filePath));
-      if (currentTrack && (currentTrack.id === track.id || currentTrack.filePath === filePath)) {
-        if (remaining.length > 0) {
-          handlePlayTrack(remaining[0]);
-        } else {
-          setCurrentTrack(null);
-          setIsPlaying(false);
-          if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; }
-        }
+  const handleDeleteDownload = (taskId) => {
+    const target = completedDownloads.find((d) => d.id === taskId);
+    setCompletedDownloads((prev) => prev.filter((item) => item.id !== taskId));
+    if (target && target.filePath) {
+      setSongs((prev) => prev.filter((s) => s.filePath !== target.filePath && s.id !== target.id));
+      if (window.electronAPI?.trashSong) {
+        window.electronAPI.trashSong(target.id, target.filePath);
       }
-      return remaining;
-    });
-    setCompletedDownloads((prev) => prev.filter((d) => d.id !== track.id && (!filePath || (d.destinationPath !== filePath && d.filePath !== filePath))));
+    }
   };
 
-  const handleRestoreTrack = (track) => {
-    setTrash((prev) => prev.filter((t) => t.id !== track.id));
-    setSongs((prev) => [track, ...prev]);
-    setCompletedDownloads((prev) => [track, ...prev]);
+  // Trash & Library Management
+  const handleTrashSong = async (songId, filePath) => {
+    const songToTrash = songs.find((s) => s.id === songId || s.filePath === filePath);
+    if (songToTrash) {
+      setTrash((prev) => [songToTrash, ...prev]);
+    }
+    setSongs((prev) => prev.filter((s) => s.id !== songId && s.filePath !== filePath));
+    if (window.electronAPI?.trashSong) {
+      await window.electronAPI.trashSong(songId, filePath);
+    }
+  };
+
+  const handlePermanentDelete = async (songId, filePath) => {
+    setTrash((prev) => prev.filter((s) => s.id !== songId && s.filePath !== filePath));
+    if (window.electronAPI?.deleteSong) {
+      await window.electronAPI.deleteSong(songId, filePath);
+    }
+  };
+
+  const handleRestoreFromTrash = (trashId) => {
+    const restored = trash.find((item) => item.id === trashId);
+    if (restored) {
+      setTrash((prev) => prev.filter((item) => item.id !== trashId));
+      setSongs((prev) => [restored, ...prev]);
+    }
+  };
+
+  const handleEmptyTrash = () => {
+    setTrash([]);
   };
 
   const handleUpdateSong = (id, updates) => {
     setSongs((prev) => prev.map((s) => (s.id === id || s.filePath === id ? { ...s, ...updates } : s)));
-    setCompletedDownloads((prev) => prev.map((d) => (d.id === id || d.filePath === id ? { ...d, ...updates } : d)));
     try {
       const saved = JSON.parse(localStorage.getItem('localguy-songs') || '[]');
       const updated = saved.map((s) => (s.id === id || s.filePath === id ? { ...s, ...updates } : s));
       localStorage.setItem('localguy-songs', JSON.stringify(updated));
-    } catch(e) {}
-    if (window.electronAPI?.updateSongMetadata) {
-      window.electronAPI.updateSongMetadata(id, updates);
+    } catch (e) {}
+    if (window.electronAPI?.updateSong) {
+      window.electronAPI.updateSong(id, updates);
     }
   };
 
-  const handlePermanentDelete = async (trackOrId) => {
-    const track = typeof trackOrId === 'object'
-      ? trackOrId
-      : (trash.find((t) => t.id === trackOrId) || songs.find((t) => t.id === trackOrId));
-    const id = track?.id || trackOrId;
-    const filePath = track?.filePath || track?.destinationPath;
-
-    if (filePath && window.electronAPI?.deleteFilePermanently) {
-      try {
-        await window.electronAPI.deleteFilePermanently(filePath, id);
-      } catch(e) {}
-    }
-
-    setTrash((prev) => prev.filter((t) => t.id !== id && (!filePath || (t.filePath !== filePath && t.destinationPath !== filePath))));
-    setSongs((prev) => {
-      const remaining = prev.filter((s) => s.id !== id && (!filePath || (s.filePath !== filePath && s.destinationPath !== filePath)));
-      if (currentTrack && (currentTrack.id === id || (filePath && currentTrack.filePath === filePath))) {
-        if (remaining.length > 0) {
-          handlePlayTrack(remaining[0]);
-        } else {
-          setCurrentTrack(null);
-          setIsPlaying(false);
-          if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; }
-        }
-      }
-      return remaining;
-    });
-    setCompletedDownloads((prev) => prev.filter((d) => d.id !== id && (!filePath || (d.destinationPath !== filePath && d.filePath !== filePath))));
-  };
-
-  const handleEmptyTrash = async () => {
-    const itemsToDelete = [...trash];
-    for (const item of itemsToDelete) {
-      const filePath = item.filePath || item.destinationPath;
-      if (filePath && window.electronAPI?.deleteFilePermanently) {
-        await window.electronAPI.deleteFilePermanently(filePath, item.id);
-      }
-    }
-    setTrash([]);
-    setSongs((prev) => prev.filter((s) => !itemsToDelete.some((item) => item.id === s.id || (item.filePath && item.filePath === s.filePath))));
-    setCompletedDownloads((prev) => prev.filter((d) => !itemsToDelete.some((item) => item.id === d.id || (item.destinationPath && item.destinationPath === d.destinationPath))));
-  };
-
-  const handleOpenFolder = (targetPath) => {
-    const folder = targetPath || preferences?.downloadFolder || 'C:\\Users\\nishant\\Music';
+  const handleOpenFolder = (folderPath) => {
     if (window.electronAPI?.openInFolder) {
-      window.electronAPI.openInFolder(folder);
+      window.electronAPI.openInFolder(folderPath);
     }
   };
 
-  // Audio Event Listeners
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-      if (audioRef.current.duration && !isNaN(audioRef.current.duration)) {
-        setDuration(audioRef.current.duration);
-      }
-    }
-  };
-
-  const handleEnded = () => {
-    if (repeatMode === 'one') {
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play();
-      }
-    } else {
-      handleNextTrack();
-    }
-  };
-
-  const formatAudioSrc = (filePath) => {
-    if (!filePath) return '';
-    if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath;
-    const clean = filePath.replace(/\\/g, '/');
-    const parts = clean.split('/');
-    const encodedParts = parts.map((part, idx) => {
-      if (idx === 0 && part.endsWith(':')) return part;
-      return encodeURIComponent(part);
-    });
-    const normalized = encodedParts.join('/');
-    return 'file:///' + (normalized.startsWith('/') ? normalized.slice(1) : normalized);
-  };
-
-  // Playback Controls with Real Audio Source Loading
-  const handlePlayTrack = async (track, trackList = null) => {
+  // Playback logic
+  const handlePlayTrack = (track, newQueue = null) => {
     if (!track) return;
-
-    let resolvedPath = track.filePath;
-    if (window.electronAPI?.resolveAudioPath && resolvedPath) {
-      try {
-        const actual = await window.electronAPI.resolveAudioPath(resolvedPath, track.title, track.artist);
-        if (actual) resolvedPath = actual;
-      } catch (e) {}
-    }
-
-    const activeTrack = { ...track, filePath: resolvedPath };
-    setCurrentTrack(activeTrack);
-
-    const listToQueue = trackList || (songs.length > 0 ? songs : [activeTrack]);
-    setQueue(listToQueue);
-    const idx = listToQueue.findIndex((t) => (t.id && t.id === track.id) || (t.filePath && t.filePath === resolvedPath));
-    setQueueIndex(idx !== -1 ? idx : 0);
-
-    let audioSrc = activeTrack.streamUrl;
-    if (!audioSrc && resolvedPath) {
-      audioSrc = formatAudioSrc(resolvedPath);
-    }
-
-    if (audioRef.current && audioSrc) {
-      audioRef.current.src = audioSrc;
-      audioRef.current.playbackRate = playbackSpeed;
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch((err) => {
-          console.warn('Audio playback error:', err);
-          setIsPlaying(false);
-        });
-    } else {
-      setIsPlaying(true);
-      setDuration(activeTrack.duration || 215);
-    }
-  };
-
-  const handleTogglePlay = () => {
-    if (!currentTrack) {
-      if (songs.length > 0) {
-        handlePlayTrack(songs[0]);
-      }
-      return;
-    }
-    if (isPlaying) {
-      if (audioRef.current) audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      if (audioRef.current && audioRef.current.src) {
-        audioRef.current
-          .play()
-          .then(() => setIsPlaying(true))
-          .catch(() => setIsPlaying(true));
-      } else {
-        setIsPlaying(true);
-      }
+    setCurrentTrack(track);
+    setIsPlaying(true);
+    if (newQueue) {
+      setPlayQueue(newQueue);
+      setQueueIndex(newQueue.findIndex((t) => t.id === track.id || t.filePath === track.filePath));
     }
   };
 
   const handlePause = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
     setIsPlaying(false);
   };
 
-  const handleSeek = (newTime) => {
-    setCurrentTime(newTime);
-    if (audioRef.current) {
-      audioRef.current.currentTime = newTime;
+  const handleResume = () => {
+    setIsPlaying(true);
+  };
+
+  const handleNext = () => {
+    if (playQueue.length === 0) return;
+    let nextIdx = queueIndex + 1;
+    if (nextIdx >= playQueue.length) {
+      if (repeatMode === 'all') nextIdx = 0;
+      else return;
     }
+    setQueueIndex(nextIdx);
+    setCurrentTrack(playQueue[nextIdx]);
+    setIsPlaying(true);
   };
 
-  const handleVolumeChange = (newVol) => {
-    setVolume(newVol);
-    setIsMuted(newVol === 0);
-    if (audioRef.current) {
-      audioRef.current.volume = newVol;
+  const handlePrevious = () => {
+    if (playQueue.length === 0) return;
+    let prevIdx = queueIndex - 1;
+    if (prevIdx < 0) {
+      if (repeatMode === 'all') prevIdx = playQueue.length - 1;
+      else return;
     }
+    setQueueIndex(prevIdx);
+    setCurrentTrack(playQueue[prevIdx]);
+    setIsPlaying(true);
   };
 
-  const handleToggleMute = () => {
-    if (isMuted) {
-      setIsMuted(false);
-      if (audioRef.current) audioRef.current.volume = volume || 0.85;
-    } else {
-      setIsMuted(true);
-      if (audioRef.current) audioRef.current.volume = 0;
-    }
-  };
-
-  const handleToggleShuffle = () => {
-    setIsShuffle(!isShuffle);
-  };
-
-  const handleToggleRepeat = () => {
-    const modes = ['off', 'all', 'one'];
-    const nextIdx = (modes.indexOf(repeatMode) + 1) % modes.length;
-    setRepeatMode(modes[nextIdx]);
-  };
-
-  const handleChangePlaybackSpeed = (speed) => {
-    setPlaybackSpeed(speed);
-    if (audioRef.current) {
-      audioRef.current.playbackRate = speed;
-    }
-  };
-
-  const handleNextTrack = () => {
-    const list = queue.length > 0 ? queue : songs;
-    if (list.length === 0) return;
-    let nextIndex;
-    if (isShuffle) {
-      nextIndex = Math.floor(Math.random() * list.length);
-    } else {
-      nextIndex = (queueIndex + 1) % list.length;
-    }
-    setQueueIndex(nextIndex);
-    handlePlayTrack(list[nextIndex]);
-  };
-
-  const handlePreviousTrack = () => {
-    const list = queue.length > 0 ? queue : songs;
-    if (list.length === 0) return;
-    const prevIndex = queueIndex > 0 ? queueIndex - 1 : list.length - 1;
-    setQueueIndex(prevIndex);
-    handlePlayTrack(list[prevIndex]);
+  const handleSeek = (time) => {
+    setCurrentTime(time);
   };
 
   const handleToggleLike = (track) => {
-    const key = track.id || track.filePath || track.title;
     setLikedTracks((prev) => {
-      let updated;
-      if (prev.includes(key)) {
-        updated = prev.filter((k) => k !== key);
-      } else {
-        updated = [...prev, key];
-      }
+      const exists = prev.some((t) => t.id === track.id || t.filePath === track.filePath);
+      const updated = exists
+        ? prev.filter((t) => t.id !== track.id && t.filePath !== track.filePath)
+        : [...prev, track];
       try {
         localStorage.setItem('localguy-liked-tracks', JSON.stringify(updated));
       } catch (e) {}
@@ -1276,108 +1135,63 @@ export default function App() {
         const isEditable = e.target.isContentEditable;
         if (tag === 'input' || tag === 'textarea' || isEditable) return;
         e.preventDefault();
-        handleTogglePlay();
+        setIsPlaying((prev) => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentTrack, isPlaying, songs]);
+  }, []);
 
-  const isCurrentTrackLiked = currentTrack
-    ? likedTracks.includes(currentTrack.id || currentTrack.filePath || currentTrack.title)
-    : false;
+  // Update notification dismissal
+  const handleDismissUpdate = () => {
+    setUpdateNotification(null);
+  };
 
   return (
     <div
       className="app-container"
       style={{
         display: 'flex',
-        flexDirection: 'row',
+        flexDirection: 'column',
         height: '100vh',
         width: '100vw',
         overflow: 'hidden',
-        backgroundColor: 'var(--color-background-primary, #ffffff)',
+        backgroundColor: 'var(--bg-main)',
+        color: 'var(--text-primary)',
+        fontFamily: 'inherit',
       }}
     >
-      {/* Hidden Native Audio Element */}
-      <audio
-        ref={audioRef}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={(e) => {
-          if (e.target.duration && !isNaN(e.target.duration)) {
-            setDuration(e.target.duration);
-          }
-        }}
-        onDurationChange={(e) => {
-          if (e.target.duration && !isNaN(e.target.duration)) {
-            setDuration(e.target.duration);
-          }
-        }}
-        onEnded={handleEnded}
-        onError={(e) => {
-          console.warn('Audio tag playback error:', e);
-          setIsPlaying(false);
-        }}
-      />
+      <TitleBar />
 
-      {/* 1. Left Navigation Sidebar */}
-      <Sidebar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        settingsCategory={settingsCategory}
-        setSettingsCategory={setSettingsCategory}
-        isCollapsed={isSidebarCollapsed}
-        setIsCollapsed={setIsSidebarCollapsed}
-        activeDownloadCount={activeDownloads.length}
-        trashCount={trash.length}
-        likedCount={likedTracks.length}
-        theme={theme}
-        onToggleTheme={handleToggleTheme}
-        pluginTabs={pluginTabs}
-      />
-
-      {/* 2. Main App Area */}
-      <div
-        className="app-main"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          flex: 1,
-          minWidth: 0,
-          height: '100vh',
-          overflow: 'hidden',
-          position: 'relative',
-        }}
-      >
-        {/* Top Header / TitleBar */}
-        <TitleBar
-          searchQuery={searchQuery}
-          onSearch={setSearchQuery}
-          libraryTracks={songs}
-          onPlayTrack={handlePlayTrack}
-          onNavigateHome={() => setActiveTab('home')}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        <Sidebar
           activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isCollapsed={isSidebarCollapsed}
+          setIsCollapsed={setIsSidebarCollapsed}
+          activeDownloadCount={activeDownloads.length}
+          playlists={playlists}
+          pluginTabs={pluginTabs}
+          settingsCategory={settingsCategory}
+          setSettingsCategory={setSettingsCategory}
         />
 
-        {/* Center Workspace */}
-        <div
-          className="app-content-row"
+        <main
           style={{
-            display: 'flex',
-            flexDirection: 'row',
             flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            minWidth: 0,
             overflow: 'hidden',
-            minHeight: 0,
-            position: 'relative',
+            backgroundColor: 'var(--bg-main)',
           }}
         >
-          <main
+          {/* Main Views Container */}
+          <div
             style={{
               flex: 1,
-              overflow: 'hidden',
-              minWidth: 0,
+              overflowY: 'auto',
               minHeight: 0,
-              height: '100%',
               display: 'flex',
               flexDirection: 'column',
             }}
@@ -1441,25 +1255,19 @@ export default function App() {
                 onNavigateToHome={() => setActiveTab('home')}
                 currentTrack={currentTrack}
                 isPlaying={isPlaying}
-                onTogglePlay={handleTogglePlay}
-                likedTracks={likedTracks}
-                onToggleLike={handleToggleLike}
               />
             )}
 
             {activeTab === 'liked' && (
               <LikedSongsTab
-                songs={songs}
                 likedTracks={likedTracks}
+                onPlaySong={handlePlayTrack}
                 onToggleLike={handleToggleLike}
-                onPlayTrack={handlePlayTrack}
+                onTrashSong={handleTrashSong}
+                onAddToPlaylist={handleAddTrackToPlaylist}
                 currentTrack={currentTrack}
                 isPlaying={isPlaying}
-                onTogglePlay={handleTogglePlay}
                 onBack={() => setActiveTab('library')}
-                onTrashSong={handleTrashSong}
-                onOpenFolder={handleOpenFolder}
-                downloadFolder={preferences?.downloadFolder || 'C:\\Users\\nishant\\Music'}
                 onNavigateToHome={() => setActiveTab('home')}
               />
             )}
@@ -1498,6 +1306,17 @@ export default function App() {
               const pluginId = activeTab.replace('plugin-', '');
               const matchedPlugin = pluginTabs.find((p) => p.id === pluginId);
               if (!matchedPlugin) return null;
+              if (matchedPlugin.id?.includes('telegram')) {
+                return (
+                  <TelegramTab
+                    key={matchedPlugin.id}
+                    plugin={matchedPlugin}
+                    onStartDownload={handleStartDownload}
+                    preferences={preferences}
+                    onOpenFolder={handleOpenFolder}
+                  />
+                );
+              }
               return (
                 <PluginTabContainer
                   key={matchedPlugin.id}
@@ -1515,158 +1334,90 @@ export default function App() {
                 onSelectCategory={setSettingsCategory}
                 preferences={preferences}
                 theme={theme}
-                onToggleTheme={handleToggleTheme}
+                setTheme={setTheme}
                 appearance={appearance}
-                onUpdateAppearance={setAppearance}
-                onOpenSetupWizard={() => setIsSetupWizardOpen(true)}
+                setAppearance={setAppearance}
+                onSavePreferences={(newPrefs) => {
+                  setPreferences((prev) => ({ ...prev, ...newPrefs }));
+                  if (window.electronAPI?.savePreferences) {
+                    window.electronAPI.savePreferences(newPrefs);
+                  }
+                }}
                 onUpdateExtensions={setInstalledExtensions}
-                onSavePreferences={(prefs) => {
-                  setPreferences(prefs);
-                  window.electronAPI?.savePreferences?.(prefs);
+                onOpenFolder={handleOpenFolder}
+                onClearAllData={() => {
+                  setSongs([]);
+                  setCompletedDownloads([]);
+                  setTrash([]);
+                  setPlaylists([]);
+                  localStorage.clear();
                 }}
               />
             )}
-          </main>
 
-          {/* Sliding Queue Drawer */}
-          <QueueDrawer
-            isOpen={isQueueOpen}
-            onClose={() => setIsQueueOpen(false)}
-            queue={queue.length > 0 ? queue : songs}
-            currentIndex={queueIndex}
-            onSelectTrack={(idx) => {
-              setQueueIndex(idx);
-              const list = queue.length > 0 ? queue : songs;
-              handlePlayTrack(list[idx]);
-            }}
-            onClearQueue={() => setQueue([])}
+            {activeTab === 'trash' && (
+              <TrashTab
+                trash={trash}
+                onRestoreSong={handleRestoreFromTrash}
+                onPermanentDelete={handlePermanentDelete}
+                onEmptyTrash={handleEmptyTrash}
+                onBack={() => setActiveTab('library')}
+                onNavigateToHome={() => setActiveTab('home')}
+              />
+            )}
+          </div>
+
+          {/* Persistent Player Bar at Bottom (Always shown when track is active or music tab) */}
+          <PlayerBar
+            currentTrack={currentTrack}
+            isPlaying={isPlaying}
+            onPlay={handleResume}
+            onPause={handlePause}
+            onNext={handleNext}
+            onPrevious={handlePrevious}
+            onSeek={handleSeek}
+            currentTime={currentTime}
+            duration={duration}
+            volume={volume}
+            setVolume={setVolume}
+            isMuted={isMuted}
+            setIsMuted={setIsMuted}
+            isShuffle={isShuffle}
+            setIsShuffle={setIsShuffle}
+            repeatMode={repeatMode}
+            setRepeatMode={setRepeatMode}
+            isLiked={likedTracks.some(
+              (t) => currentTrack && (t.id === currentTrack.id || t.filePath === currentTrack.filePath)
+            )}
+            onToggleLike={() => currentTrack && handleToggleLike(currentTrack)}
+            onOpenQueue={() => setShowQueueDrawer((prev) => !prev)}
+            onOpenSleepTimer={() => setShowSleepTimerModal(true)}
+            sleepTimerRemaining={sleepTimerRemaining}
           />
-        </div>
-
-        {/* 3. Docked Music Player Bar */}
-        <PlayerBar
-          currentTrack={currentTrack}
-          isPlaying={isPlaying}
-          onTogglePlay={handleTogglePlay}
-          onNext={handleNextTrack}
-          onPrevious={handlePreviousTrack}
-          currentTime={currentTime}
-          duration={duration}
-          onSeek={handleSeek}
-          volume={volume}
-          onVolumeChange={handleVolumeChange}
-          isMuted={isMuted}
-          onToggleMute={handleToggleMute}
-          isShuffle={isShuffle}
-          onToggleShuffle={handleToggleShuffle}
-          repeatMode={repeatMode}
-          onToggleRepeat={handleToggleRepeat}
-          playbackSpeed={playbackSpeed}
-          onChangePlaybackSpeed={handleChangePlaybackSpeed}
-          onOpenSleepTimer={() => setIsSleepTimerOpen(true)}
-          sleepTimerRemaining={sleepTimerRemaining}
-          onToggleQueue={() => setIsQueueOpen(!isQueueOpen)}
-          isQueueOpen={isQueueOpen}
-          isLiked={isCurrentTrackLiked}
-          onToggleLike={handleToggleLike}
-          theme={theme}
-          onToggleTheme={handleToggleTheme}
-        />
+        </main>
       </div>
 
-      {/* Top Update Notification Banner */}
-      {updateNotification && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '40px',
-            right: '24px',
-            zIndex: 9999,
-            backgroundColor: 'var(--bg-card, #ffffff)',
-            borderRadius: '12px',
-            padding: '14px 18px',
-            border: '1.5px solid var(--primary, #7c5cbf)',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            maxWidth: '420px',
-            animation: 'fadeIn 0.2s ease',
+      {/* Queue Drawer */}
+      {showQueueDrawer && (
+        <QueueDrawer
+          queue={playQueue}
+          currentIndex={queueIndex}
+          onSelectTrack={(idx) => {
+            setQueueIndex(idx);
+            setCurrentTrack(playQueue[idx]);
+            setIsPlaying(true);
           }}
-        >
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
-              Update Available: v{updateNotification.latestVersion}
-            </div>
-            <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              A newer release of LuckyGuy is available on GitHub.
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              if (updateNotification.releaseUrl && window.electronAPI?.openExternal) {
-                window.electronAPI.openExternal(updateNotification.releaseUrl);
-              } else if (updateNotification.releaseUrl) {
-                window.open(updateNotification.releaseUrl, '_blank');
-              }
-            }}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '6px',
-              backgroundColor: 'var(--primary, #7c5cbf)',
-              border: 'none',
-              color: '#ffffff',
-              fontSize: '11.5px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Update
-          </button>
-          <button
-            onClick={() => setUpdateNotification(null)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-muted)',
-              fontSize: '14px',
-              cursor: 'pointer',
-              padding: '2px',
-            }}
-          >
-            ✕
-          </button>
-        </div>
+          onClose={() => setShowQueueDrawer(false)}
+        />
       )}
 
-      {/* Setup Wizard Modal */}
-      <SetupWizard
-        isOpen={isSetupWizardOpen}
-        onClose={() => setIsSetupWizardOpen(false)}
-        preferences={preferences}
-        onSavePreferences={(prefs) => {
-          setPreferences((prev) => ({ ...prev, ...prefs }));
-          if (window.electronAPI?.savePreferences) {
-            window.electronAPI.savePreferences(prefs);
-          }
-        }}
-        theme={theme}
-        onToggleTheme={handleToggleTheme}
-      />
-
       {/* Sleep Timer Modal */}
-      {isSleepTimerOpen && (
+      {showSleepTimerModal && (
         <SleepTimerModal
-          isOpen={isSleepTimerOpen}
-          onClose={() => setIsSleepTimerOpen(false)}
-          onSetTimer={(mins) => {
-            setSleepTimerRemaining(mins * 60);
-            setIsSleepTimerOpen(false);
-          }}
-          onCancelTimer={() => {
-            setSleepTimerRemaining(null);
-            setIsSleepTimerOpen(false);
-          }}
+          isOpen={showSleepTimerModal}
+          onClose={() => setShowSleepTimerModal(false)}
+          onSetTimer={(seconds) => setSleepTimerRemaining(seconds)}
+          currentRemaining={sleepTimerRemaining}
         />
       )}
     </div>
