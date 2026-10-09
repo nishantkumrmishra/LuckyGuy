@@ -210,11 +210,15 @@ class LibraryManager {
                 }
               }
 
+              const parentFolder = path.basename(path.dirname(fullPath));
+              const genreName = parentFolder !== 'Music' ? parentFolder : 'Pop';
               discovered.push({
                 id: Buffer.from(fullPath).toString('base64').replace(/=/g, ''),
                 title,
                 artist,
-                album: path.basename(path.dirname(fullPath)),
+                album: parentFolder,
+                genre: genreName,
+                folder: parentFolder,
                 durationSeconds: Math.round(stat.size / (160 * 128)), // estimate or placeholder
                 durationFormatted: '3:45',
                 fileSize: stat.size,
@@ -245,6 +249,9 @@ class LibraryManager {
         this.songs.push(song);
       } else {
         const existing = existingMap.get(song.filePath);
+        existing.genre = song.genre || existing.genre || 'Pop';
+        existing.folder = song.folder || existing.folder || 'Music';
+        existing.album = song.album || existing.album || 'Single';
         // Only update artwork if current is empty or generic and song has a better one
         const isExistingGeneric = !existing.artworkUrl || existing.artworkUrl.includes('ab67706c0000da846c0fc4889bee49b191d99388');
         if (isExistingGeneric && song.artworkUrl && !song.artworkUrl.includes('ab67706c0000da846c0fc4889bee49b191d99388')) {

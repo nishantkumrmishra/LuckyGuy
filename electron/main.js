@@ -390,6 +390,54 @@ ipcMain.handle('library-delete-playlist', async (event, plId) => libraryManager.
 ipcMain.handle('library-update-song', async (event, songId, updates) => libraryManager.updateSong(songId, updates));
 ipcMain.handle('library-find-duplicates', async () => libraryManager.findDuplicates());
 ipcMain.handle('library-organize-fix', async (event, musicDir) => libraryManager.organizeAndFixLibrary(musicDir));
+ipcMain.handle('resolve-audio-path', async (event, filePath, title, artist) => {
+  if (filePath && fs.existsSync(filePath)) return filePath;
+
+  function cleanFuzzy(s) {
+    return (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  // 1. Check in libraryManager.songs
+  const matchInSongs = libraryManager.songs.find(s => 
+    (filePath && s.filePath === filePath) ||
+    (title && s.title && s.title.toLowerCase() === title.toLowerCase()) ||
+    (s.id && filePath && filePath.includes(s.id))
+  );
+  if (matchInSongs && matchInSongs.filePath && fs.existsSync(matchInSongs.filePath)) {
+    return matchInSongs.filePath;
+  }
+
+  // 2. Search Music directory recursively
+  const musicDir = preferences.downloadFolder || path.join(os.homedir(), 'Music');
+  if (fs.existsSync(musicDir)) {
+    const cTitle = cleanFuzzy(title);
+    const cArtist = cleanFuzzy(artist);
+    const cBase = filePath ? cleanFuzzy(path.basename(filePath, path.extname(filePath))) : '';
+
+    const searchFile = (dir) => {
+      try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const e of entries) {
+          const full = path.join(dir, e.name);
+          if (e.isDirectory()) {
+            const found = searchFile(full);
+            if (found) return found;
+          } else if (e.isFile() && e.name.toLowerCase().endsWith('.mp3')) {
+            const cName = cleanFuzzy(e.name);
+            if (cBase && cName.includes(cBase)) return full;
+            if (cTitle && cName.includes(cTitle)) return full;
+            if (cArtist && cName.includes(cArtist)) return full;
+          }
+        }
+      } catch (err) {}
+      return null;
+    };
+    const found = searchFile(musicDir);
+    if (found) return found;
+  }
+
+  return filePath;
+});
 
 // Preferences IPC
 ipcMain.handle('get-preferences', async () => preferences);

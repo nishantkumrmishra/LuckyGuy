@@ -70,6 +70,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateSongMetadata: (songId, updates) => ipcRenderer.invoke('library-update-song', songId, updates),
   findDuplicates: () => ipcRenderer.invoke('library-find-duplicates'),
   organizeAndFixLibrary: (musicDir) => ipcRenderer.invoke('library-organize-fix', musicDir),
+  resolveAudioPath: (filePath, title, artist) => ipcRenderer.invoke('resolve-audio-path', filePath, title, artist),
 
   getPreferences: () => ipcRenderer.invoke('get-preferences'),
   savePreferences: (prefs) => ipcRenderer.invoke('save-preferences', prefs),

@@ -673,7 +673,9 @@ export default function App() {
   const handleTimeUpdate = () => {
     if (audioRef.current) {
       setCurrentTime(audioRef.current.currentTime);
-      setDuration(audioRef.current.duration || 0);
+      if (audioRef.current.duration && !isNaN(audioRef.current.duration)) {
+        setDuration(audioRef.current.duration);
+      }
     }
   };
 
@@ -688,21 +690,37 @@ export default function App() {
     }
   };
 
-  // Playback Controls with Real Audio Source Loading
-  const handlePlayTrack = (track) => {
-    setCurrentTrack(track);
-    setQueue((prev) => {
-      if (!prev.find((t) => (t.id && t.id === track.id) || (t.filePath && t.filePath === track.filePath))) {
-        return [...prev, track];
-      }
-      return prev;
-    });
+  const formatAudioSrc = (filePath) => {
+    if (!filePath) return '';
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath;
+    const clean = filePath.replace(/\\/g, '/');
+    const pathWithSlash = clean.startsWith('/') ? clean : '/' + clean;
+    return 'file://' + encodeURI(pathWithSlash);
+  };
 
-    let audioSrc = track.streamUrl;
-    if (!audioSrc && track.filePath) {
-      audioSrc = track.filePath.startsWith('http') || track.filePath.startsWith('file://')
-        ? track.filePath
-        : 'file:///' + track.filePath.replace(/\\/g, '/');
+  // Playback Controls with Real Audio Source Loading
+  const handlePlayTrack = async (track, trackList = null) => {
+    if (!track) return;
+
+    let resolvedPath = track.filePath;
+    if (window.electronAPI?.resolveAudioPath && resolvedPath) {
+      try {
+        const actual = await window.electronAPI.resolveAudioPath(resolvedPath, track.title, track.artist);
+        if (actual) resolvedPath = actual;
+      } catch (e) {}
+    }
+
+    const activeTrack = { ...track, filePath: resolvedPath };
+    setCurrentTrack(activeTrack);
+
+    const listToQueue = trackList || (songs.length > 0 ? songs : [activeTrack]);
+    setQueue(listToQueue);
+    const idx = listToQueue.findIndex((t) => (t.id && t.id === track.id) || (t.filePath && t.filePath === resolvedPath));
+    setQueueIndex(idx !== -1 ? idx : 0);
+
+    let audioSrc = activeTrack.streamUrl;
+    if (!audioSrc && resolvedPath) {
+      audioSrc = formatAudioSrc(resolvedPath);
     }
 
     if (audioRef.current && audioSrc) {
@@ -713,11 +731,11 @@ export default function App() {
         .then(() => setIsPlaying(true))
         .catch((err) => {
           console.warn('Audio playback error:', err);
-          setIsPlaying(true);
+          setIsPlaying(false);
         });
     } else {
       setIsPlaying(true);
-      setDuration(track.duration || 215);
+      setDuration(activeTrack.duration || 215);
     }
   };
 
@@ -886,8 +904,21 @@ export default function App() {
       <audio
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={(e) => {
+          if (e.target.duration && !isNaN(e.target.duration)) {
+            setDuration(e.target.duration);
+          }
+        }}
+        onDurationChange={(e) => {
+          if (e.target.duration && !isNaN(e.target.duration)) {
+            setDuration(e.target.duration);
+          }
+        }}
         onEnded={handleEnded}
-        onError={() => setIsPlaying(false)}
+        onError={(e) => {
+          console.warn('Audio tag playback error:', e);
+          setIsPlaying(false);
+        }}
       />
 
       {/* 1. Left Navigation Sidebar */}
