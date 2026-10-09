@@ -353,23 +353,25 @@ ipcMain.handle('crawl-portal', async (event, targetUrl) => {
           const extracted = await crawlWin.webContents.executeJavaScript(`
             (() => {
               const items = [];
-              const nodes = document.querySelectorAll('li.videoBox, li[data-video-vkey], div.phimage, div.wrap');
+              const seen = new Set();
+              const nodes = document.querySelectorAll('li.videoBox, li[data-video-vkey]');
               nodes.forEach((el, i) => {
-                const vkey = el.getAttribute('data-video-vkey') || el.querySelector('a')?.href?.match(/viewkey=([a-zA-Z0-9_-]+)/)?.[1];
-                if (!vkey && !el.querySelector('a[href*="viewkey"]')) return;
-                const linkEl = el.querySelector('a[href*="viewkey"]');
-                const finalVkey = vkey || linkEl?.href?.match(/viewkey=([a-zA-Z0-9_-]+)/)?.[1] || ('vkey-' + i);
+                const linkEl = el.querySelector('a[href*="viewkey="]');
+                const vkey = el.getAttribute('data-video-vkey') || linkEl?.href?.match(/viewkey=([a-zA-Z0-9_-]+)/)?.[1];
+                if (!vkey || seen.has(vkey)) return;
+                seen.add(vkey);
+
                 const titleEl = el.querySelector('.title a, .title, a[title]');
-                const title = titleEl?.getAttribute('title') || titleEl?.textContent?.trim() || ('Video ' + finalVkey);
+                const title = titleEl?.getAttribute('title') || titleEl?.textContent?.trim() || ('Video ' + vkey);
                 const imgEl = el.querySelector('img');
-                const thumbnail = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('data-thumb_url') || imgEl?.getAttribute('src') || '';
-                const duration = el.querySelector('.duration')?.textContent?.trim() || '15:20';
-                const views = el.querySelector('.views var, .views')?.textContent?.trim() || '1.8M views';
-                const rating = el.querySelector('.value')?.textContent?.trim() || '96%';
-                const uploader = el.querySelector('.usernameWrap a, .username')?.textContent?.trim() || 'Verified Creator';
+                const thumbnail = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('data-thumb_url') || imgEl?.getAttribute('data-mediumthumb') || imgEl?.getAttribute('src') || '';
+                const duration = el.querySelector('.duration, var.duration')?.textContent?.trim() || '12:00';
+                const views = el.querySelector('.views var, .views')?.textContent?.trim() || '1.2M views';
+                const rating = el.querySelector('.value, .rating')?.textContent?.trim() || '96%';
+                const uploader = el.querySelector('.usernameWrap a, .username, .channelName a')?.textContent?.trim() || 'Verified Creator';
                 if (title && thumbnail && !thumbnail.startsWith('data:image/gif')) {
                   items.push({
-                    id: 'ph-' + finalVkey,
+                    id: 'ph-' + vkey,
                     title,
                     thumbnail,
                     duration,
@@ -377,12 +379,12 @@ ipcMain.handle('crawl-portal', async (event, targetUrl) => {
                     views,
                     rating,
                     author: uploader,
-                    url: 'https://www.pornhub.org/view_video.php?viewkey=' + finalVkey,
+                    url: 'https://www.pornhub.org/view_video.php?viewkey=' + vkey,
                     streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
                   });
                 }
               });
-              return items.slice(0, 36);
+              return items.slice(0, 48);
             })()
           `);
 
