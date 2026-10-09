@@ -67,6 +67,28 @@ export default function PluginTabContainer({
   const [downloadSuccessMsg, setDownloadSuccessMsg] = useState('');
   const [ageVerificationBypassed, setAgeVerificationBypassed] = useState(true);
   const iframeRef = useRef(null);
+  const webviewRef = useRef(null);
+
+  const handleWebBack = () => {
+    try {
+      if (webviewRef.current?.canGoBack?.()) webviewRef.current.goBack();
+      else if (iframeRef.current?.contentWindow) iframeRef.current.contentWindow.history.back();
+    } catch (e) {}
+  };
+
+  const handleWebForward = () => {
+    try {
+      if (webviewRef.current?.canGoForward?.()) webviewRef.current.goForward();
+      else if (iframeRef.current?.contentWindow) iframeRef.current.contentWindow.history.forward();
+    } catch (e) {}
+  };
+
+  const handleWebReload = () => {
+    try {
+      if (webviewRef.current?.reload) webviewRef.current.reload();
+      else if (iframeRef.current) iframeRef.current.src = activeUrl;
+    } catch (e) {}
+  };
 
   // Determine portal category and tag
   const isPornhub = plugin.id?.includes('pornhub') || (activeUrl || '').includes('pornhub');
@@ -766,26 +788,176 @@ export default function PluginTabContainer({
 
       {/* Main Content Area: Media Grid OR Direct Web Frame */}
       {viewMode === 'web' ? (
-        <div style={{ flex: 1, minHeight: '480px', position: 'relative', backgroundColor: '#09090b' }}>
-          {activeUrl ? (
-            <iframe
-              ref={iframeRef}
-              src={activeUrl}
-              title={plugin.name}
-              sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"
-              style={{
-                width: '100%',
-                height: '100%',
-                minHeight: '480px',
-                border: 'none',
-                backgroundColor: '#fff',
-              }}
-            />
-          ) : (
-            <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
-              No active URL loaded. Enter a web portal link above.
+        <div style={{ flex: 1, minHeight: '520px', display: 'flex', flexDirection: 'column', backgroundColor: '#09090b' }}>
+          {/* Web Frame Sub-Bar */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 18px',
+              backgroundColor: 'var(--bg-card)',
+              borderBottom: '1px solid var(--border-medium)',
+              gap: '10px',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                type="button"
+                onClick={handleWebBack}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '5px',
+                  border: '1px solid var(--border-medium)',
+                  backgroundColor: 'var(--bg-main)',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title="Go Back"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={handleWebForward}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '5px',
+                  border: '1px solid var(--border-medium)',
+                  backgroundColor: 'var(--bg-main)',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title="Go Forward"
+              >
+                <ChevronRight size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={handleWebReload}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '5px',
+                  border: '1px solid var(--border-medium)',
+                  backgroundColor: 'var(--bg-main)',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title="Reload Page"
+              >
+                <RefreshCw size={13} />
+              </button>
+              <span
+                style={{
+                  fontSize: '11.5px',
+                  color: 'var(--text-secondary)',
+                  marginLeft: '6px',
+                  maxWidth: '380px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {activeUrl}
+              </span>
             </div>
-          )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '4px 11px',
+                  borderRadius: '5px',
+                  border: '1px solid var(--border-medium)',
+                  backgroundColor: 'var(--bg-main)',
+                  color: 'var(--primary, #7c5cbf)',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <LayoutGrid size={12} />
+                <span>Switch to Media Grid</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.electronAPI?.openExternal) {
+                    window.electronAPI.openExternal(activeUrl);
+                  } else {
+                    window.open(activeUrl, '_blank');
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '4px 10px',
+                  borderRadius: '5px',
+                  border: '1px solid var(--border-medium)',
+                  backgroundColor: 'var(--bg-main)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+                title="Open in external browser window"
+              >
+                <ExternalLink size={12} />
+                <span>Open in Browser</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Web Container: Native <webview> in Electron, unrestricted iframe fallback in web */}
+          <div style={{ flex: 1, minHeight: '480px', position: 'relative', backgroundColor: '#ffffff' }}>
+            {activeUrl ? (
+              typeof window !== 'undefined' && window.electronAPI ? (
+                <webview
+                  ref={webviewRef}
+                  src={activeUrl}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    minHeight: '480px',
+                    border: 'none',
+                    backgroundColor: '#ffffff',
+                  }}
+                  allowpopups="true"
+                />
+              ) : (
+                <iframe
+                  ref={iframeRef}
+                  src={activeUrl}
+                  title={plugin.name}
+                  allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    minHeight: '480px',
+                    border: 'none',
+                    backgroundColor: '#ffffff',
+                  }}
+                />
+              )
+            ) : (
+              <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8' }}>
+                No active URL loaded. Enter a web portal link above.
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         /* YouTube-Style Native Video Indexing Grid */

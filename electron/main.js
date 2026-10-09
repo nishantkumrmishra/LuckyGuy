@@ -79,6 +79,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      webviewTag: true,
       webSecurity: false // allow streaming local audio files
     }
   });
@@ -281,6 +282,12 @@ ipcMain.handle('bypass-age-verification', async () => {
     return { success: true };
   } catch (err) {
     return { error: err.message };
+  }
+});
+
+ipcMain.handle('open-external', (event, url) => {
+  if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+    shell.openExternal(url);
   }
 });
 

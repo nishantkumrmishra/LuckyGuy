@@ -82,6 +82,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   crawlPortal: (url) => ipcRenderer.invoke('crawl-portal', url),
   bypassAgeVerification: () => ipcRenderer.invoke('bypass-age-verification'),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
   onUpdateAvailable: (callback) => {
     if (typeof callback !== 'function') return () => {};
     const handler = (event, data) => callback(data);
