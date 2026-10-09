@@ -193,6 +193,45 @@ export default function App() {
     } catch (e) {}
   }, [theme]);
 
+  const [appearance, setAppearance] = useState(() => {
+    try {
+      const saved = localStorage.getItem('luckyguy-appearance');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      accentColor: '#7c5cbf',
+      fontFamily: 'Inter',
+      borderRadius: '8px'
+    };
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (appearance.accentColor) {
+      root.style.setProperty('--primary', appearance.accentColor);
+      root.style.setProperty('--primary-hover', appearance.accentColor + 'dd');
+      root.style.setProperty('--primary-glow', appearance.accentColor + '26');
+      root.style.setProperty('--accent', appearance.accentColor);
+    }
+    if (appearance.fontFamily) {
+      let fontStack = "'Inter', sans-serif";
+      if (appearance.fontFamily === 'System UI') fontStack = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      else if (appearance.fontFamily === 'JetBrains Mono') fontStack = "'JetBrains Mono', monospace";
+      else if (appearance.fontFamily === 'Geist Sans') fontStack = "'Geist', -apple-system, sans-serif";
+      else if (appearance.fontFamily === 'Merriweather') fontStack = "'Merriweather', Georgia, serif";
+      else if (appearance.fontFamily === 'Comic / Playful') fontStack = "'Comic Sans MS', 'Chalkboard SE', cursive, sans-serif";
+      else fontStack = `'${appearance.fontFamily}', -apple-system, sans-serif`;
+      root.style.setProperty('--font-sans', fontStack);
+      document.body.style.fontFamily = fontStack;
+    }
+    if (appearance.borderRadius) {
+      root.style.setProperty('--app-radius', appearance.borderRadius);
+    }
+    try {
+      localStorage.setItem('luckyguy-appearance', JSON.stringify(appearance));
+    } catch {}
+  }, [appearance]);
+
   const handleToggleTheme = () => {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
   };
@@ -1343,6 +1382,8 @@ export default function App() {
                 preferences={preferences}
                 theme={theme}
                 onToggleTheme={handleToggleTheme}
+                appearance={appearance}
+                onUpdateAppearance={setAppearance}
                 onOpenSetupWizard={() => setIsSetupWizardOpen(true)}
                 onUpdateExtensions={setInstalledExtensions}
                 onSavePreferences={(prefs) => {

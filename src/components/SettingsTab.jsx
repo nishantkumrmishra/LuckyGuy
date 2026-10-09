@@ -31,6 +31,8 @@ export default function SettingsTab({
   onSavePreferences,
   theme = 'light',
   onToggleTheme,
+  appearance = { accentColor: '#7c5cbf', fontFamily: 'Inter', borderRadius: '8px' },
+  onUpdateAppearance,
   onOpenSetupWizard,
   onUpdateExtensions,
 }) {
@@ -59,6 +61,92 @@ ishant\\Music');
       }, 700);
     }
     setUpdateChecking(false);
+  };
+
+  const [accentColor, setAccentColor] = useState(appearance?.accentColor || '#7c5cbf');
+  const [fontFamily, setFontFamily] = useState(appearance?.fontFamily || 'Inter');
+  const [borderRadius, setBorderRadius] = useState(appearance?.borderRadius || '8px');
+  const [themePaste, setThemePaste] = useState('');
+  const [themeMsg, setThemeMsg] = useState('');
+
+  useEffect(() => {
+    if (appearance?.accentColor) setAccentColor(appearance.accentColor);
+    if (appearance?.fontFamily) setFontFamily(appearance.fontFamily);
+    if (appearance?.borderRadius) setBorderRadius(appearance.borderRadius);
+  }, [appearance]);
+
+  const updateAppearanceSetting = (key, value) => {
+    const next = {
+      accentColor: key === 'accentColor' ? value : accentColor,
+      fontFamily: key === 'fontFamily' ? value : fontFamily,
+      borderRadius: key === 'borderRadius' ? value : borderRadius,
+    };
+    if (key === 'accentColor') setAccentColor(value);
+    if (key === 'fontFamily') setFontFamily(value);
+    if (key === 'borderRadius') setBorderRadius(value);
+    flashSaved();
+    if (onUpdateAppearance) onUpdateAppearance(next);
+  };
+
+  const applyPresetTheme = (preset) => {
+    setAccentColor(preset.accentColor);
+    setFontFamily(preset.fontFamily);
+    setBorderRadius(preset.borderRadius);
+    flashSaved();
+    if (preset.mode && preset.mode !== theme) {
+      onToggleTheme?.();
+    }
+    if (onUpdateAppearance) onUpdateAppearance({
+      accentColor: preset.accentColor,
+      fontFamily: preset.fontFamily,
+      borderRadius: preset.borderRadius
+    });
+    setThemeMsg(`Preset "${preset.name}" applied!`);
+    setTimeout(() => setThemeMsg(''), 3000);
+  };
+
+  const handleApplyPastedTheme = (e) => {
+    e.preventDefault();
+    if (!themePaste.trim()) return;
+    try {
+      let raw = themePaste.trim();
+      raw = raw.replace(/^\`\`\`[a-zA-Z]*\s*/i, '').replace(/\s*\`\`\`$/i, '').trim();
+      const parsed = JSON.parse(raw);
+      const nextAccent = parsed.accentColor || accentColor;
+      const nextFont = parsed.fontFamily || fontFamily;
+      const nextRadius = parsed.borderRadius || borderRadius;
+      if (parsed.accentColor) setAccentColor(nextAccent);
+      if (parsed.fontFamily) setFontFamily(nextFont);
+      if (parsed.borderRadius) setBorderRadius(nextRadius);
+      if (parsed.mode && parsed.mode !== theme) onToggleTheme?.();
+      if (onUpdateAppearance) {
+        onUpdateAppearance({
+          accentColor: nextAccent,
+          fontFamily: nextFont,
+          borderRadius: nextRadius
+        });
+      }
+      flashSaved();
+      setThemeMsg(`Theme "${parsed.name || 'Custom Theme'}" applied successfully!`);
+      setThemePaste('');
+      setTimeout(() => setThemeMsg(''), 4000);
+    } catch (err) {
+      setThemeMsg(`Theme parse error: ${err.message}`);
+    }
+  };
+
+  const handleExportTheme = () => {
+    const exportObj = {
+      name: "My LuckyGuy Custom Theme",
+      mode: theme,
+      accentColor,
+      fontFamily,
+      borderRadius,
+      version: "1.0.0"
+    };
+    navigator.clipboard?.writeText(JSON.stringify(exportObj, null, 2));
+    setThemeMsg('Theme JSON copied to clipboard!');
+    setTimeout(() => setThemeMsg(''), 3000);
   };
 
   // Modular Extension Base URL state
@@ -704,14 +792,256 @@ ishant\\Music');
 
       {/* SUBTAB 2: APPEARANCE SETTINGS */}
       {category === 'appearance' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Palette size={16} color="var(--primary, #7c5cbf)" />
-            <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-              Appearance & Theme
-            </h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Palette size={16} color="var(--primary, #7c5cbf)" />
+              <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                Appearance & Theme Studio
+              </h2>
+            </div>
+            {themeMsg && (
+              <span style={{ fontSize: '12px', fontWeight: 500, color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <CheckCircle2 size={13} /> {themeMsg}
+              </span>
+            )}
           </div>
 
+          {/* Grid Layout: Theme Mode & Accent Colors */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+            {/* Mode Card */}
+            <div
+              style={{
+                padding: '18px 20px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-medium, #e2e8f0)',
+                backgroundColor: 'var(--bg-card, #ffffff)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Application Theme Mode
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Toggle between Crisp Studio Light and Deep Obsidian Dark.
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={() => { if (theme !== 'light') onToggleTheme?.(); }}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '12px 16px',
+                    borderRadius: '6px',
+                    border: theme === 'light' ? '2px solid var(--primary, #7c5cbf)' : '1px solid var(--border-medium)',
+                    backgroundColor: theme === 'light' ? 'rgba(124, 92, 191, 0.08)' : 'var(--bg-main)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                    fontSize: '13px',
+                  }}
+                >
+                  <Sun size={18} color={theme === 'light' ? 'var(--primary, #7c5cbf)' : '#f59e0b'} />
+                  <span>Light Mode</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { if (theme !== 'dark') onToggleTheme?.(); }}
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '12px 16px',
+                    borderRadius: '6px',
+                    border: theme === 'dark' ? '2px solid var(--primary, #7c5cbf)' : '1px solid var(--border-medium)',
+                    backgroundColor: theme === 'dark' ? 'rgba(124, 92, 191, 0.12)' : 'var(--bg-main)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                    fontSize: '13px',
+                  }}
+                >
+                  <Moon size={18} color={theme === 'dark' ? 'var(--primary, #7c5cbf)' : '#94a3b8'} />
+                  <span>Obsidian Dark</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Accent Color Palette */}
+            <div
+              style={{
+                padding: '18px 20px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-medium, #e2e8f0)',
+                backgroundColor: 'var(--bg-card, #ffffff)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Primary Accent Color
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    Choose a curated swatch or pick a custom hex hue.
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <input
+                    type="color"
+                    value={accentColor}
+                    onChange={(e) => updateAppearanceSetting('accentColor', e.target.value)}
+                    style={{ width: '28px', height: '28px', border: 'none', borderRadius: '4px', cursor: 'pointer', background: 'none' }}
+                    title="Pick custom color"
+                  />
+                  <span style={{ fontSize: '11px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{accentColor}</span>
+                </div>
+              </div>
+
+              {/* Color Swatches */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                {[
+                  { name: 'Violet', color: '#7c5cbf' },
+                  { name: 'Emerald', color: '#10b981' },
+                  { name: 'Ocean', color: '#0ea5e9' },
+                  { name: 'Ruby', color: '#f43f5e' },
+                  { name: 'Sunset', color: '#f97316' },
+                  { name: 'Amber', color: '#eab308' },
+                  { name: 'Indigo', color: '#6366f1' },
+                  { name: 'Slate', color: '#64748b' },
+                ].map((swatch) => (
+                  <button
+                    key={swatch.color}
+                    type="button"
+                    onClick={() => updateAppearanceSetting('accentColor', swatch.color)}
+                    style={{
+                      height: '32px',
+                      borderRadius: '6px',
+                      border: accentColor.toLowerCase() === swatch.color.toLowerCase() ? '2px solid var(--text-primary)' : '1px solid var(--border-medium)',
+                      backgroundColor: swatch.color,
+                      color: '#ffffff',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+                    }}
+                  >
+                    {swatch.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Typography & Interface Rounding */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+            {/* Font Family Card */}
+            <div
+              style={{
+                padding: '18px 20px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-medium, #e2e8f0)',
+                backgroundColor: 'var(--bg-card, #ffffff)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              }}
+            >
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Typography & Font Family
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                Select the font family for titles, navigation, and track items.
+              </div>
+
+              <select
+                value={fontFamily}
+                onChange={(e) => updateAppearanceSetting('fontFamily', e.target.value)}
+                style={{
+                  height: '36px',
+                  padding: '0 12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-medium, #e2e8f0)',
+                  backgroundColor: 'var(--bg-main, #f8fafc)',
+                  fontSize: '12.5px',
+                  color: 'var(--text-primary)',
+                  outline: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="Inter">Inter (Clean Modern Sans - Default)</option>
+                <option value="System UI">System UI (Native Windows / Segoe UI)</option>
+                <option value="JetBrains Mono">JetBrains Mono (Developer Monospace)</option>
+                <option value="Geist Sans">Geist Sans (High-Precision Tech)</option>
+                <option value="Merriweather">Merriweather (Classic Editorial Serif)</option>
+                <option value="Comic / Playful">Comic / Playful (Casual & Friendly)</option>
+              </select>
+            </div>
+
+            {/* Corner Radius Card */}
+            <div
+              style={{
+                padding: '18px 20px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-medium, #e2e8f0)',
+                backgroundColor: 'var(--bg-card, #ffffff)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              }}
+            >
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Interface Corner Rounding
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                Adjust button, card, and player component curvature.
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                {[
+                  { label: 'Sharp', value: '4px' },
+                  { label: 'Default', value: '8px' },
+                  { label: 'Curved', value: '14px' },
+                  { label: 'Pill', value: '20px' },
+                ].map((r) => (
+                  <button
+                    key={r.value}
+                    type="button"
+                    onClick={() => updateAppearanceSetting('borderRadius', r.value)}
+                    style={{
+                      height: '34px',
+                      borderRadius: r.value,
+                      border: borderRadius === r.value ? '2px solid var(--primary, #7c5cbf)' : '1px solid var(--border-medium)',
+                      backgroundColor: borderRadius === r.value ? 'rgba(124, 92, 191, 0.08)' : 'var(--bg-main)',
+                      color: 'var(--text-primary)',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Curated Theme Presets */}
           <div
             style={{
               padding: '18px 20px',
@@ -720,68 +1050,142 @@ ishant\\Music');
               backgroundColor: 'var(--bg-card, #ffffff)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px',
-              maxWidth: '600px',
+              gap: '14px',
             }}
           >
             <div>
               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                Application Theme Mode
+                Curated Theme Presets
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                Toggle between Light and Deep Obsidian Dark mode.
+                1-click themes that instantly customize mode, accent colors, and typography.
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  if (theme !== 'light') onToggleTheme?.();
-                }}
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '12px 16px',
-                  borderRadius: '6px',
-                  border: theme === 'light' ? '2px solid var(--primary, #7c5cbf)' : '1px solid var(--border-medium)',
-                  backgroundColor: theme === 'light' ? 'rgba(124, 92, 191, 0.08)' : 'var(--bg-main)',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                  fontSize: '13px',
-                }}
-              >
-                <Sun size={18} color={theme === 'light' ? 'var(--primary, #7c5cbf)' : '#f59e0b'} />
-                <span>Light Mode</span>
-              </button>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+              {[
+                { name: 'Royal Velvet', mode: 'light', accentColor: '#7c5cbf', fontFamily: 'Inter', borderRadius: '8px', desc: 'Light • Violet • Inter' },
+                { name: 'Cyberpunk Matrix', mode: 'dark', accentColor: '#10b981', fontFamily: 'JetBrains Mono', borderRadius: '4px', desc: 'Dark • Emerald • Mono' },
+                { name: 'Deep Ocean', mode: 'dark', accentColor: '#0ea5e9', fontFamily: 'Geist Sans', borderRadius: '14px', desc: 'Dark • Ocean • Geist' },
+                { name: 'Neon Flamingo', mode: 'light', accentColor: '#f43f5e', fontFamily: 'Inter', borderRadius: '20px', desc: 'Light • Ruby • Pill' },
+                { name: 'Sunset Amber', mode: 'dark', accentColor: '#f97316', fontFamily: 'Inter', borderRadius: '8px', desc: 'Dark • Orange • Smooth' },
+              ].map((p) => (
+                <button
+                  key={p.name}
+                  type="button"
+                  onClick={() => applyPresetTheme(p)}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-medium)',
+                    backgroundColor: 'var(--bg-main, #f8fafc)',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: p.accentColor }} />
+                    <span style={{ fontSize: '12px', fontWeight: 600 }}>{p.name}</span>
+                  </div>
+                  <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>{p.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
 
+          {/* Theme JSON Code Paste & Export Studio */}
+          <div
+            style={{
+              padding: '18px 20px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-medium, #e2e8f0)',
+              backgroundColor: 'var(--bg-card, #ffffff)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Theme Code & AI Customizer
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Paste any Theme JSON from community docs or export your current palette to share.
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => {
-                  if (theme !== 'dark') onToggleTheme?.();
-                }}
+                onClick={handleExportTheme}
                 style={{
-                  flex: 1,
+                  height: '30px',
+                  padding: '0 12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-medium)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--text-secondary)',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '10px',
-                  padding: '12px 16px',
-                  borderRadius: '6px',
-                  border: theme === 'dark' ? '2px solid var(--primary, #7c5cbf)' : '1px solid var(--border-medium)',
-                  backgroundColor: theme === 'dark' ? 'rgba(124, 92, 191, 0.12)' : 'var(--bg-main)',
-                  color: 'var(--text-primary)',
-                  cursor: 'pointer',
-                  fontWeight: 500,
-                  fontSize: '13px',
+                  gap: '5px',
                 }}
               >
-                <Moon size={18} color={theme === 'dark' ? 'var(--primary, #7c5cbf)' : '#94a3b8'} />
-                <span>Obsidian Dark</span>
+                <span>Export Theme JSON</span>
               </button>
             </div>
+
+            <form onSubmit={handleApplyPastedTheme} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <textarea
+                rows={3}
+                placeholder={`// Paste Theme JSON generated by AI or community, e.g.:
+{
+  "name": "Custom Theme",
+  "accentColor": "#0ea5e9",
+  "fontFamily": "JetBrains Mono",
+  "borderRadius": "8px",
+  "mode": "dark"
+}`}
+                value={themePaste}
+                onChange={(e) => setThemePaste(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-medium, #e2e8f0)',
+                  backgroundColor: 'var(--bg-main, #f8fafc)',
+                  fontSize: '12px',
+                  fontFamily: 'monospace',
+                  color: 'var(--text-primary)',
+                  outline: 'none',
+                  resize: 'vertical',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="submit"
+                  style={{
+                    height: '32px',
+                    padding: '0 14px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: 'var(--primary, #7c5cbf)',
+                    color: '#ffffff',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Apply Theme Preset
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
