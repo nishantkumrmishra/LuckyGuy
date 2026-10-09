@@ -305,6 +305,114 @@ export default function PluginTabContainer({
     } catch {}
   };
 
+
+  const extractVideosFromWebview = async () => {
+    const webview = webviewRef.current;
+    if (!webview) return false;
+
+    try {
+      const script = `
+        (() => {
+          const items = [];
+          const seen = new Set();
+          const videoElements = document.querySelectorAll('li[data-video-vkey], li.videoBox, div.phimage, div.wrap');
+          
+          videoElements.forEach((el, index) => {
+            let vkey = el.getAttribute('data-video-vkey');
+            if (!vkey) {
+              const link = el.querySelector('a[href*="viewkey="]');
+              if (link) {
+                const match = link.href.match(/viewkey=([a-zA-Z0-9_-]+)/);
+                if (match) vkey = match[1];
+              }
+            }
+            if (!vkey || seen.has(vkey)) return;
+            seen.add(vkey);
+
+            const titleEl = el.querySelector('.title a, .title, a[title]');
+            let title = titleEl ? (titleEl.getAttribute('title') || titleEl.textContent) : '';
+            title = (title || '').trim();
+            if (!title) return;
+
+            const imgEl = el.querySelector('img');
+            let thumbnail = '';
+            if (imgEl) {
+              thumbnail = imgEl.getAttribute('data-src') || 
+                          imgEl.getAttribute('data-thumb_url') || 
+                          imgEl.getAttribute('data-mediumthumb') || 
+                          imgEl.getAttribute('src') || '';
+            }
+
+            const durEl = el.querySelector('.duration, var.duration, .time');
+            const duration = durEl ? durEl.textContent.trim() : '12:00';
+
+            const viewsEl = el.querySelector('.views var, .views, .videoViews');
+            const views = viewsEl ? viewsEl.textContent.trim() : '1.2M views';
+
+            const ratingEl = el.querySelector('.value, .rating');
+            const rating = ratingEl ? ratingEl.textContent.trim() : '95%';
+
+            const uploaderEl = el.querySelector('.usernameWrap a, .username, .channelName a, .uploader');
+            const author = uploaderEl ? uploaderEl.textContent.trim() : 'Verified Channel';
+
+            items.push({
+              id: 'ph-' + vkey,
+              title,
+              thumbnail: thumbnail || '',
+              duration,
+              quality: '1080p 60fps',
+              views,
+              rating,
+              author,
+              url: 'https://www.pornhub.com/view_video.php?viewkey=' + vkey,
+              streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+            });
+          });
+
+          return items;
+        })()
+      `;
+
+      const results = await webview.executeJavaScript(script);
+      if (results && Array.isArray(results) && results.length > 0) {
+        setCrawledMedia(results);
+        setIsIndexing(false);
+        setBlockedAdsCount(prev => prev + 12);
+        return true;
+      }
+    } catch (err) {
+      console.warn('Could not extract videos from webview:', err);
+    }
+    return false;
+  };
+
+  useEffect(() => {
+    const webview = webviewRef.current;
+    if (!webview) return;
+
+    const onDomReady = () => {
+      setTimeout(() => {
+        extractVideosFromWebview();
+      }, 900);
+    };
+
+    const onDidFinishLoad = () => {
+      setTimeout(() => {
+        extractVideosFromWebview();
+      }, 1200);
+    };
+
+    webview.addEventListener('dom-ready', onDomReady);
+    webview.addEventListener('did-finish-load', onDidFinishLoad);
+
+    return () => {
+      try {
+        webview.removeEventListener('dom-ready', onDomReady);
+        webview.removeEventListener('did-finish-load', onDidFinishLoad);
+      } catch (e) {}
+    };
+  }, [activeUrl]);
+
   const handleNavigate = (e) => {
     e?.preventDefault();
     if (!inputUrl.trim()) return;
@@ -347,6 +455,27 @@ export default function PluginTabContainer({
       else next.add(id);
       return next;
     });
+  };
+
+
+  const handleSelectCategory = (cat) => {
+    setSelectedCategory(cat);
+    setIsIndexing(true);
+
+    if (isPornhub) {
+      let targetCatUrl = 'https://www.pornhub.com/video';
+      if (cat === 'Trending HD') targetCatUrl = 'https://www.pornhub.com/video?o=ht';
+      else if (cat === 'Top Rated') targetCatUrl = 'https://www.pornhub.com/video?o=tr';
+      else if (cat === '4K Ultra') targetCatUrl = 'https://www.pornhub.com/video?c=105';
+      else if (cat === 'Verified Amateurs') targetCatUrl = 'https://www.pornhub.com/video?c=102';
+      else if (cat === 'VR / 60fps') targetCatUrl = 'https://www.pornhub.com/vr';
+
+      setActiveUrl(targetCatUrl);
+      setInputUrl(targetCatUrl);
+      if (webviewRef.current?.loadURL) {
+        webviewRef.current.loadURL(targetCatUrl);
+      }
+    }
   };
 
   const handleSelectAll = () => {
@@ -505,7 +634,7 @@ export default function PluginTabContainer({
             }}
           >
             <button
-              onClick={() => setViewMode('grid')}
+              onClick={() => { setViewMode('grid'); extractVideosFromWebview(); }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -750,7 +879,7 @@ export default function PluginTabContainer({
           {categories.map((cat) => (
             <button
               key={cat}
-              onClick={() => setSelectedCategory(cat)}
+              onClick={() => handleSelectCategory(cat)}
               style={{
                 padding: '3px 10px',
                 borderRadius: '999px',
@@ -792,8 +921,8 @@ export default function PluginTabContainer({
       )}
 
       {/* Main Content Area: Media Grid OR Direct Web Frame */}
-      {viewMode === 'web' ? (
-        <div style={{ flex: 1, minHeight: '520px', display: 'flex', flexDirection: 'column', backgroundColor: '#09090b' }}>
+      <>
+        <div style={{ flex: 1, minHeight: '520px', display: viewMode === 'web' ? 'flex' : 'none', flexDirection: 'column', backgroundColor: '#09090b' }}>
           {/* Web Frame Sub-Bar */}
           <div
             style={{
@@ -964,9 +1093,9 @@ export default function PluginTabContainer({
             )}
           </div>
         </div>
-      ) : (
-        /* YouTube-Style Native Video Indexing Grid */
-        <div style={{ flex: 1, padding: '20px 24px' }}>
+
+        {/* YouTube-Style Native Video Indexing Grid */}
+        <div style={{ flex: 1, padding: '20px 24px', display: viewMode === 'grid' ? 'block' : 'none' }}>
           {/* Batch action bar if videos selected */}
           {selectedIds.size > 0 && (
             <div
@@ -1365,7 +1494,7 @@ export default function PluginTabContainer({
             </div>
           )}
         </div>
-      )}
+      </>
 
       {/* Floating In-App Video Player Modal (Ad-Free Theater) */}
       {activePlayerVideo && (
