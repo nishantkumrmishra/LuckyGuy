@@ -10,27 +10,54 @@
 </head>
 <body>
 
-    <!-- ===== HEADER ===== -->
+        <!-- ===== HEADER WITH DROPDOWN MENUS & SEARCH ===== -->
     <header>
         <nav>
-            <a href="index.html">
-                <i class="ci-Compass"></i>
-                <span>LuckyGuy Docs</span>
-            </a>
+            <div class="nav-left">
+                <a href="index.html" class="nav-brand">
+                    <i class="ci-Compass"></i>
+                    <span>LuckyGuy Docs</span>
+                </a>
+            </div>
 
-            <ul>
-                <li><a href="index.html"><i class="ci-Compass"></i> Overview</a></li>
-                <li><a href="about.html"><i class="ci-Shield_Check"></i> Architecture</a></li>
-                <li><a href="plugins.html"><i class="ci-Code"></i> Plugin SDK</a></li>
-                <li><a href="themes.html"><i class="ci-Edit_Pencil_01"></i> Theme SDK</a></li>
-                <li><a href="ai-scanner.html" class="active"><i class="ci-Search_Magnifying_Glass"></i> AI Scanner</a></li>
-                <li><a href="downloads.html"><i class="ci-Arrow_Down_Circle"></i> Downloads</a></li>
-            </ul>
+            <div class="nav-center">
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="index.html" class="nav-link"><i class="ci-House_01"></i> Overview</a>
+                    </li>
+                    <li class="nav-item">
+                        <span class="nav-link"><i class="ci-Note"></i> Guides <i class="ci-Chevron_Down" style="font-size:0.7em; margin-left:2px;"></i></span>
+                        <div class="nav-dropdown">
+                            <a href="about.html" class="dropdown-item"><i class="ci-Shield_Check"></i> Architecture & Privacy</a>
+                            <a href="plugins.html" class="dropdown-item"><i class="ci-Code"></i> Plugin & Extension SDK</a>
+                            <a href="themes.html" class="dropdown-item"><i class="ci-Edit_Pencil_01"></i> Theme & Appearance Studio</a>
+                            <a href="ai-scanner.html" class="dropdown-item"><i class="ci-Search_Magnifying_Glass"></i> AI Website Scanner</a>
+                        </div>
+                    </li>
+                    <li class="nav-item">
+                        <span class="nav-link"><i class="ci-Layers"></i> Ecosystem <i class="ci-Chevron_Down" style="font-size:0.7em; margin-left:2px;"></i></span>
+                        <div class="nav-dropdown">
+                            <a href="https://github.com/nishantkumrmishra/LuckyGuy--extensions" target="_blank" class="dropdown-item"><i class="ci-Layers"></i> Extensions Repository</a>
+                            <a href="https://github.com/nishantkumrmishra/LuckyGuy" target="_blank" class="dropdown-item"><i class="ci-Globe"></i> Core Desktop Repo</a>
+                            <a href="plugins.html" class="dropdown-item"><i class="ci-List_Checklist"></i> Sample Plugins</a>
+                        </div>
+                    </li>
+                    <li class="nav-item">
+                        <a href="downloads.html" class="nav-link"><i class="ci-Arrow_Down_Circle"></i> Releases</a>
+                    </li>
+                </ul>
 
-            <div>
-                <a href="https://github.com/nishantkumrmishra/LuckyGuy" target="_blank"><i class="ci-Globe"></i> GitHub</a>
-                <a href="https://github.com/nishantkumrmishra/LuckyGuy--extensions" target="_blank"><i class="ci-Layers"></i> Extensions</a>
-                <a href="downloads.html" style="background: #18181b; color: #ffffff; border-color: #18181b;"><i class="ci-Arrow_Right_LG"></i> Get App</a>
+                <div class="nav-search-container">
+                    <i class="ci-Search_Magnifying_Glass nav-search-icon"></i>
+                    <input type="text" id="docsSearchInput" class="nav-search-input" placeholder="Search docs... (Ctrl+K)" autocomplete="off">
+                    <span class="nav-search-kbd">Ctrl K</span>
+                    <div id="docsSearchResults" class="search-results-modal"></div>
+                </div>
+            </div>
+
+            <div class="nav-actions">
+                <a href="https://github.com/nishantkumrmishra/LuckyGuy" target="_blank" class="nav-link" style="border: 1px solid #e4e4e7;"><i class="ci-Globe"></i> GitHub</a>
+                <a href="downloads.html" class="nav-btn-primary"><i class="ci-Arrow_Down_Circle"></i> Get App</a>
             </div>
         </nav>
     </header>
@@ -226,5 +253,6 @@ Output both files cleanly with zero external npm dependencies.</pre>
             });
         }
     </script>
+    <script src="js/nav-search.js"></script>
 </body>
 </html>
