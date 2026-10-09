@@ -1295,6 +1295,7 @@ export default function App() {
               <DownloadsTab
                 activeDownloads={activeDownloads}
                 completedDownloads={completedDownloads}
+                installedExtensions={installedExtensions}
                 onStartDownload={handleStartDownload}
                 onPauseDownload={handlePauseDownload}
                 onResumeDownload={handleResumeDownload}
@@ -1343,6 +1344,7 @@ export default function App() {
                 theme={theme}
                 onToggleTheme={handleToggleTheme}
                 onOpenSetupWizard={() => setIsSetupWizardOpen(true)}
+                onUpdateExtensions={setInstalledExtensions}
                 onSavePreferences={(prefs) => {
                   setPreferences(prefs);
                   window.electronAPI?.savePreferences?.(prefs);

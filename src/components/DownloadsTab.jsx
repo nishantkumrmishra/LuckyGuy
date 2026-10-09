@@ -40,6 +40,7 @@ export default function DownloadsTab({
   onNavigateToLibrary,
   preferences = {},
   onSavePreferences,
+  installedExtensions = [],
 }) {
   const [urlInput, setUrlInput] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -55,15 +56,7 @@ export default function DownloadsTab({
   const [contextMenu, setContextMenu] = useState(null);
   const containerRef = useRef(null);
 
-  // Read installed extensions
-  const [installedExtensions] = useState(() => {
-    try {
-      const saved = localStorage.getItem('luckyguy-extensions');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
-  });
+  // Uses active installedExtensions passed from App state
 
   const handlePaste = async () => {
     try {
@@ -96,10 +89,8 @@ export default function DownloadsTab({
       }
     }
 
-    if (lower.includes('spotify.com')) return { name: 'Spotify', color: '#1db954', bg: 'rgba(29, 185, 84, 0.12)' };
-    if (lower.includes('youtube.com') || lower.includes('youtu.be')) return { name: 'YouTube', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)' };
-    if (lower.includes('jiosaavn.com')) return { name: 'JioSaavn', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.12)' };
-    if (lower.includes('soundcloud.com')) return { name: 'SoundCloud', color: '#f97316', bg: 'rgba(249, 115, 22, 0.12)' };
+    // If no matching extension is enabled, fall back to neutral Direct Stream or Search
+    if (lower.startsWith('http://') || lower.startsWith('https://')) return { name: 'Direct Stream', color: 'var(--primary, #7c5cbf)', bg: 'rgba(124, 92, 191, 0.12)' };
     if (lower.startsWith('http://') || lower.startsWith('https://')) return { name: 'Direct Stream', color: 'var(--primary, #7c5cbf)', bg: 'rgba(124, 92, 191, 0.12)' };
     return { name: 'Search', color: 'var(--text-secondary)', bg: 'var(--bg-main)' };
   };

@@ -29,6 +29,7 @@ export default function SettingsTab({
   theme = 'light',
   onToggleTheme,
   onOpenSetupWizard,
+  onUpdateExtensions,
 }) {
   const [downloadFolder, setDownloadFolder] = useState(preferences?.downloadFolder || 'C:\\Users\
 ishant\\Music');
@@ -107,6 +108,7 @@ ishant\\Music');
         localStorage.setItem('luckyguy-extensions', JSON.stringify(updated));
       } catch (e) {}
       flashSaved();
+      if (onUpdateExtensions) onUpdateExtensions(updated);
       return updated;
     });
   };
@@ -163,7 +165,7 @@ ishant\\Music');
         tab: manifestObj.tab || null,
         capabilities: manifestObj.capabilities || [],
         adBlockRules: manifestObj.adBlockRules || [],
-        enabled: true,
+        enabled: false, // User explicitly toggles on only the extensions they choose!
       };
 
       const updated = [newExt, ...customExtensions];
@@ -171,6 +173,7 @@ ishant\\Music');
       try {
         localStorage.setItem('luckyguy-extensions', JSON.stringify(updated));
       } catch (e) {}
+      if (onUpdateExtensions) onUpdateExtensions(updated);
 
       setExtensionUrl('');
       setInstallSuccess(`Extension "${newExt.name}" loaded successfully!`);
@@ -188,6 +191,7 @@ ishant\\Music');
       localStorage.setItem('luckyguy-extensions', JSON.stringify(updated));
     } catch (e) {}
     flashSaved();
+    if (onUpdateExtensions) onUpdateExtensions(updated);
   };
 
   const handlePickFolder = async () => {
