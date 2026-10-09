@@ -184,6 +184,110 @@ ishant\\Music');
   // Extension runtime settings
   const [plugins, setPlugins] = useState({});
 
+  // Official Community Extension Suite
+  const OFFICIAL_REGISTRY_EXTENSIONS = [
+    {
+      id: "luckyguy-ext-universal-audio",
+      name: "Universal Audio & Music Engine (YouTube • Spotify • JioSaavn • SoundCloud)",
+      version: "1.0.0",
+      type: "audio",
+      category: "Core Audio Streaming Engine",
+      rating: "all",
+      enabled: false,
+      description: "All-in-one music engine combining YouTube HD audio, Spotify rich metadata & cover art, JioSaavn 320kbps lossless CDN, and SoundCloud streams into a single unified audio resolver.",
+      author: "LuckyGuy Core Suite",
+      entry: "index.js",
+      downloadUrl: "https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/universal-audio/manifest.json",
+      source: "https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/universal-audio/manifest.json",
+      capabilities: ["stream", "download", "search", "320kbps", "metadata", "playlist-extraction"],
+      supportedUrls: [
+        "*://*.youtube.com/*",
+        "*://youtu.be/*",
+        "*://open.spotify.com/*",
+        "*://spotify.link/*",
+        "*://*.jiosaavn.com/*",
+        "*://*.soundcloud.com/*"
+      ]
+    },
+    {
+      id: "luckyguy-ext-archive-movies",
+      name: "Archive Movies & Cinema Portal",
+      version: "1.0.0",
+      type: "portal",
+      category: "Cinema & Video Portal",
+      rating: "all",
+      enabled: false,
+      description: "Stream public domain films, classic documentaries, and open culture videos with ad-blocker and batch page crawler.",
+      author: "Open Archive Community",
+      entry: "index.js",
+      downloadUrl: "https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/archive-movies/manifest.json",
+      source: "https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/archive-movies/manifest.json",
+      tab: {
+        title: "Open Cinema",
+        icon: "Film",
+        url: "https://archive.org/details/movies",
+        badge: "HD"
+      },
+      capabilities: ["stream", "crawlPage", "adblock"],
+      supportedUrls: ["*://archive.org/details/*", "*://ia80*.*.archive.org/*"],
+      adBlockRules: ["*://*.doubleclick.net/*", "*://*.google-analytics.com/*", "*://*.popcash.net/*"]
+    },
+    {
+      id: "luckyguy-ext-radio-browser",
+      name: "Worldwide Live Radio Hub",
+      version: "1.0.0",
+      type: "audio",
+      category: "Live Audio & Broadcasts",
+      rating: "all",
+      enabled: false,
+      description: "Stream 30,000+ live worldwide radio stations, podcasts, and community broadcasts.",
+      author: "Community Broadcasters",
+      entry: "index.js",
+      downloadUrl: "https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/radio-browser/manifest.json",
+      source: "https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/radio-browser/manifest.json",
+      tab: {
+        title: "Live Radio",
+        icon: "Radio",
+        url: "https://www.radio-browser.info",
+        badge: "LIVE"
+      },
+      capabilities: ["stream", "crawlPage", "adblock"],
+      supportedUrls: ["*://*.radio-browser.info/*", "*://*.radioparadise.com/*", "*://*.somafm.com/*"],
+      adBlockRules: ["*://*.doubleclick.net/*", "*://*.scorecardresearch.com/*"]
+    },
+    {
+      id: "luckyguy-ext-pornhub",
+      name: "Pornhub Video & Crawler Engine",
+      version: "1.0.0",
+      type: "portal",
+      category: "Adult Media & Stream Resolver",
+      rating: "18+",
+      enabled: false,
+      description: "Video resolver and crawler extension with dedicated sidebar tab and back-end ad blocking.",
+      author: "Community Contributor",
+      entry: "index.js",
+      downloadUrl: "https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/pornhub/manifest.json",
+      source: "https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/pornhub/manifest.json",
+      tab: {
+        title: "Pornhub Portal",
+        icon: "Film",
+        url: "https://www.pornhub.com",
+        badge: "18+"
+      },
+      capabilities: ["stream", "crawlPage", "search", "adblock"],
+      supportedUrls: ["*://*.pornhub.com/*", "*://*.phncdn.com/*"],
+      adBlockRules: [
+        "*://*.trafficjunky.com/*",
+        "*://*.trafficjunky.net/*",
+        "*://*.hubtraffic.com/*",
+        "*://*popunder*/*",
+        "*://*adservice*/*",
+        "*://*.tsyndicate.com/*",
+        "*://*.exoclick.com/*"
+      ]
+    }
+  ];
+
   // Dynamically installed extensions (empty by default)
   const [customExtensions, setCustomExtensions] = useState(() => {
     try {
@@ -337,15 +441,95 @@ ishant\\Music');
     }
   };
 
+  const handleIndexRegistry = async (targetUrl) => {
+    setInstallError('');
+    setInstallSuccess('');
+    let urlToFetch = targetUrl || 'https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/index.json';
+    if (urlToFetch.includes('LuckyGuy-extensions')) {
+      urlToFetch = urlToFetch.replace('LuckyGuy-extensions', 'LuckyGuy--extensions');
+    }
+
+    let extList = OFFICIAL_REGISTRY_EXTENSIONS;
+    try {
+      const resp = await fetch(urlToFetch);
+      if (resp.ok) {
+        const manifestObj = await resp.json();
+        if (manifestObj && Array.isArray(manifestObj.extensions)) {
+          extList = manifestObj.extensions;
+        } else if (Array.isArray(manifestObj)) {
+          extList = manifestObj;
+        }
+      }
+    } catch (e) {
+      console.warn('Network fetch error, using built-in official registry:', e);
+    }
+
+    // Clean out any previously saved placeholder/unresolved "Custom Extension" items
+    let nextExtensions = customExtensions.filter((e) => e.name !== 'Custom Extension' && !e.id.startsWith('ext-dummy'));
+    let addedCount = 0;
+    let updatedCount = 0;
+
+    for (const item of extList) {
+      const id = item.id || ('ext-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6));
+      const source = item.downloadUrl || item.source || urlToFetch;
+      const existingIdx = nextExtensions.findIndex((e) => e.id === id || e.source === source);
+
+      const extData = {
+        id,
+        name: item.name || 'Unnamed Extension',
+        category: item.category || 'Extension Engine',
+        description: item.description || '',
+        source,
+        version: item.version || '1.0.0',
+        author: item.author || 'LuckyGuy Community',
+        rating: item.rating || 'all',
+        tab: item.tab || null,
+        capabilities: item.capabilities || [],
+        adBlockRules: item.adBlockRules || [],
+        // Preserve user's existing toggle choice if already present, otherwise default to disabled (false)
+        enabled: existingIdx !== -1 ? nextExtensions[existingIdx].enabled : (item.enabled === true ? true : false),
+      };
+
+      if (existingIdx !== -1) {
+        nextExtensions[existingIdx] = extData;
+        updatedCount++;
+      } else {
+        nextExtensions.push(extData);
+        addedCount++;
+      }
+    }
+
+    setCustomExtensions(nextExtensions);
+    try {
+      localStorage.setItem('luckyguy-extensions', JSON.stringify(nextExtensions));
+    } catch (e) {}
+    if (onUpdateExtensions) onUpdateExtensions(nextExtensions);
+
+    setExtensionUrl('');
+    setInstallSuccess(`Master Registry indexed! Loaded ${nextExtensions.length} extensions. You can toggle each one ON/OFF as desired below.`);
+    flashSaved();
+    setTimeout(() => setInstallSuccess(''), 4500);
+  };
+
   const handleInstallExtension = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     setInstallError('');
     setInstallSuccess('');
 
-    const trimmed = extensionUrl.trim();
+    let trimmed = extensionUrl.trim();
     if (!trimmed) {
       setInstallError('Please enter a valid plugin repository or manifest URL.');
       return;
+    }
+
+    // Auto-correct single-hyphen typos to official double-hyphen repo
+    if (trimmed.includes('LuckyGuy-extensions')) {
+      trimmed = trimmed.replace('LuckyGuy-extensions', 'LuckyGuy--extensions');
+    }
+
+    // If master index URL, trigger batch registry indexer
+    if (trimmed.includes('index.json') || trimmed.includes('LuckyGuy--extensions/main')) {
+      return handleIndexRegistry(trimmed);
     }
 
     try {
@@ -360,71 +544,26 @@ ishant\\Music');
         return;
       }
 
-      let manifestObj = {};
+      let resp;
       try {
-        const resp = await fetch(trimmed);
-        if (resp.ok) {
-          manifestObj = await resp.json();
-        }
-      } catch (e) {
-        setInstallError('Failed to fetch from URL: ' + e.message);
+        resp = await fetch(trimmed);
+      } catch (netErr) {
+        setInstallError('Network error reaching manifest URL: ' + netErr.message);
         return;
       }
 
-      // Check if this is a Master Registry Index containing multiple extensions
-      const extList = (manifestObj && Array.isArray(manifestObj.extensions))
-        ? manifestObj.extensions
-        : (Array.isArray(manifestObj) ? manifestObj : null);
-
-      if (extList && extList.length > 0) {
-        let addedCount = 0;
-        let updatedCount = 0;
-        let nextExtensions = [...customExtensions];
-
-        for (const item of extList) {
-          const id = item.id || ('ext-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6));
-          const source = item.downloadUrl || item.source || trimmed;
-          const existingIdx = nextExtensions.findIndex((e) => e.id === id || e.source === source);
-
-          const extData = {
-            id,
-            name: item.name || 'Unnamed Extension',
-            category: item.category || 'Extension Engine',
-            description: item.description || '',
-            source,
-            version: item.version || '1.0.0',
-            author: item.author || parsed.hostname,
-            rating: item.rating || 'all',
-            tab: item.tab || null,
-            capabilities: item.capabilities || [],
-            adBlockRules: item.adBlockRules || [],
-            // Preserve user's toggle state if already installed, otherwise default to false (disabled)
-            enabled: existingIdx !== -1 ? nextExtensions[existingIdx].enabled : (item.enabled === true ? true : false),
-          };
-
-          if (existingIdx !== -1) {
-            nextExtensions[existingIdx] = extData;
-            updatedCount++;
-          } else {
-            nextExtensions.unshift(extData);
-            addedCount++;
-          }
-        }
-
-        setCustomExtensions(nextExtensions);
-        try {
-          localStorage.setItem('luckyguy-extensions', JSON.stringify(nextExtensions));
-        } catch (e) {}
-        if (onUpdateExtensions) onUpdateExtensions(nextExtensions);
-
-        setExtensionUrl('');
-        setInstallSuccess(`Master Registry indexed! Loaded ${addedCount} new & updated ${updatedCount} extensions. Toggle each one ON/OFF as desired below.`);
-        flashSaved();
-        setTimeout(() => setInstallSuccess(''), 4500);
+      if (!resp.ok) {
+        setInstallError(`Failed to fetch extension manifest (HTTP ${resp.status}). Please check URL.`);
         return;
       }
 
-      // Standalone single extension manifest
+      const manifestObj = await resp.json();
+
+      // Check if the response contains multiple extensions
+      if (manifestObj && Array.isArray(manifestObj.extensions)) {
+        return handleIndexRegistry(trimmed);
+      }
+
       let extName = manifestObj.name || 'Custom Extension';
       let extDesc = manifestObj.description || 'Custom media resolver plugin loaded from extension URL.';
       let extVersion = manifestObj.version || '1.0.0';
@@ -445,7 +584,7 @@ ishant\\Music');
         enabled: false, // User explicitly toggles on only the extensions they choose!
       };
 
-      const updated = [newExt, ...customExtensions];
+      const updated = [newExt, ...customExtensions.filter(e => e.name !== 'Custom Extension')];
       setCustomExtensions(updated);
       try {
         localStorage.setItem('luckyguy-extensions', JSON.stringify(updated));
@@ -453,15 +592,15 @@ ishant\\Music');
       if (onUpdateExtensions) onUpdateExtensions(updated);
 
       setExtensionUrl('');
-      setInstallSuccess(`Extension "${newExt.name}" loaded successfully!`);
+      setInstallSuccess(`Extension "${newExt.name}" loaded successfully! Toggle below to activate.`);
       flashSaved();
-      setTimeout(() => setInstallSuccess(''), 3000);
+      setTimeout(() => setInstallSuccess(''), 3500);
     } catch (err) {
-      setInstallError('Invalid URL format. Example: https://raw.githubusercontent.com/.../manifest.json');
+      setInstallError('Invalid URL or manifest error: ' + err.message);
     }
   };
 
-  const handleRemoveExtension = (id) => {
+    const handleRemoveExtension = (id) => {
     const updated = customExtensions.filter((ext) => ext.id !== id);
     setCustomExtensions(updated);
     try {
@@ -1453,7 +1592,52 @@ ishant\\Music');
                   <span>Install Plugin</span>
                 </button>
               </form>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => handleIndexRegistry()}
+                  style={{
+                    height: '30px',
+                    padding: '0 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--primary, #7c5cbf)',
+                    backgroundColor: 'rgba(124, 92, 191, 0.08)',
+                    color: 'var(--primary, #7c5cbf)',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.15s ease',
+                  }}
+                  title="Load all official extensions (YouTube, Spotify, JioSaavn, SoundCloud, Radio, Cinema, 18+)"
+                >
+                  <Sparkles size={13} />
+                  <span>⚡ Index All Official Extensions (1-Click)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExtensionUrl('https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/index.json');
+                    setInstallError('');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-secondary)',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    padding: 0,
+                    textDecoration: 'underline',
+                  }}
+                >
+                  Paste Master URL
+                </button>
+              </div>
+              <div style={{ display: 'none' }}>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Master Registry:</span>
                 <button
                   type="button"
