@@ -19,7 +19,9 @@ import {
   Blocks,
   Sparkles,
   SlidersHorizontal,
-  Film
+  Film,
+  DownloadCloud,
+  Image as ImageIcon
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -144,6 +146,15 @@ export default function Sidebar({
 
   const isMini = width <= 52;
   const isSettingsMode = activeTab === 'settings';
+
+  const getPluginIcon = (iconName, isActive) => {
+    const color = isActive ? 'var(--primary, #7c5cbf)' : 'var(--duo-stroke, currentColor)';
+    const name = (iconName || '').toLowerCase();
+    if (name.includes('download')) return <DownloadCloud size={17} color={color} />;
+    if (name.includes('image') || name.includes('photo')) return <ImageIcon size={17} color={color} />;
+    if (name.includes('film') || name.includes('video')) return <Film size={17} color={color} />;
+    return <Sparkles size={17} color={color} />;
+  };
 
   const navItemStyle = (isActive) => ({
     display: 'flex',
@@ -331,6 +342,38 @@ export default function Sidebar({
                 <span style={labelStyle}>Plugins</span>
               </div>
             </div>
+
+            {/* Dynamic Plugin Settings Tabs */}
+            {pluginTabs.filter((p) => p.settings).length > 0 && (
+              <>
+                <div style={{ height: '1px', backgroundColor: 'var(--border-light, rgba(255,255,255,0.06))', margin: isMini ? '4px 2px' : '4px 6px' }} />
+                {!isMini && (
+                  <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '4px 8px', letterSpacing: '0.5px' }}>
+                    Plugin Setup
+                  </span>
+                )}
+                {pluginTabs.filter((p) => p.settings).map((plugin) => {
+                  const targetCat = 'plugin-' + plugin.id;
+                  const isSelected = settingsCategory === targetCat;
+                  const label = plugin.settings.title || (plugin.name + ' Setup');
+                  return (
+                    <div
+                      key={plugin.id}
+                      style={navItemStyle(isSelected)}
+                      onClick={() => setSettingsCategory?.(targetCat)}
+                      title={isMini ? label : ''}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '20px' }}>
+                          <SlidersHorizontal size={16} color={isSelected ? 'var(--primary, #7c5cbf)' : 'var(--duo-stroke, currentColor)'} />
+                        </div>
+                        <span style={labelStyle}>{plugin.name}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
           </nav>
         ) : (
           /* STANDARD APP MAIN NAVIGATION VIEW */
@@ -464,7 +507,7 @@ export default function Sidebar({
                     >
                       <div style={{ display: 'flex', alignItems: 'center' }}>
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '20px' }}>
-                          <Sparkles size={17} color={isTabActive ? 'var(--primary, #7c5cbf)' : 'var(--duo-stroke, currentColor)'} />
+                          {getPluginIcon(plugin.tab?.icon, isTabActive)}
                         </div>
                         <span style={labelStyle}>{tabTitle}</span>
                       </div>

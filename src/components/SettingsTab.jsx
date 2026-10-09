@@ -22,7 +22,10 @@ import {
   Play,
   FileCode,
   Check,
-  X
+  X,
+  Eye,
+  EyeOff,
+  SlidersHorizontal
 } from 'lucide-react';
 import { CustomIcon } from './DuoIcons';
 
@@ -37,6 +40,7 @@ export default function SettingsTab({
   onUpdateAppearance,
   onOpenSetupWizard,
   onUpdateExtensions,
+  onNavigateTab,
 }) {
   const [downloadFolder, setDownloadFolder] = useState(preferences?.downloadFolder || 'C:\\Users\
 ishant\\Music');
@@ -192,6 +196,9 @@ ishant\\Music');
     } catch (e) {}
     return [];
   });
+
+  const activePluginId = category.startsWith('plugin-') ? category.replace('plugin-', '') : null;
+  const activePluginSettings = activePluginId ? customExtensions.find((e) => e.id === activePluginId) : null;
 
   useEffect(() => {
     if (preferences?.downloadFolder) {
@@ -543,6 +550,7 @@ ishant\\Music');
               • {category === 'downloads' && 'Downloads & Storage'}
               {category === 'appearance' && 'Appearance & UI'}
               {category === 'plugins' && 'Plugins & Extensions'}
+              {category.startsWith('plugin-') && (activePluginSettings?.settings?.title || `${activePluginSettings?.name || 'Plugin'} Setup`)}
             </span>
             {savedNotice && (
               <span
@@ -561,6 +569,7 @@ ishant\\Music');
             {category === 'downloads' && 'Configure download folder paths, audio export bitrate, and storage behavior.'}
             {category === 'appearance' && 'Customize theme mode, UI colors, and visual layout preferences.'}
             {category === 'plugins' && 'Install external plugin modules via URL and manage audio streaming engines.'}
+            {category.startsWith('plugin-') && (activePluginSettings?.settings?.description || 'Configure custom plugin parameters, API tokens, and download folders.')}
           </p>
         </div>
       </div>
@@ -1718,6 +1727,410 @@ ishant\\Music');
           </div>
         </div>
       )}
+
+      {/* SUBTAB 4: DYNAMIC PLUGIN DEDICATED SETTINGS TAB */}
+      {category.startsWith('plugin-') && activePluginSettings && (
+        <PluginSettingsView
+          plugin={activePluginSettings}
+          onFlashSaved={flashSaved}
+          onNavigateTab={onNavigateTab}
+          onSelectCategory={onSelectCategory}
+        />
+      )}
+    </div>
+  );
+}
+
+function PluginSettingsView({ plugin, onFlashSaved, onNavigateTab, onSelectCategory }) {
+  const [values, setValues] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`luckyguy-plugin-settings-${plugin.id}`);
+      const parsed = saved ? JSON.parse(saved) : {};
+      const initial = {};
+      if (plugin.settings?.fields && Array.isArray(plugin.settings.fields)) {
+        plugin.settings.fields.forEach((f) => {
+          initial[f.id] = parsed[f.id] !== undefined ? parsed[f.id] : (f.defaultValue !== undefined ? f.defaultValue : '');
+        });
+      }
+      return { ...initial, ...parsed };
+    } catch {
+      return {};
+    }
+  });
+
+  const [showPasswords, setShowPasswords] = useState({});
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
+
+  const handleChange = (id, val) => {
+    setValues((prev) => ({ ...prev, [id]: val }));
+  };
+
+  const handleSave = (e) => {
+    e?.preventDefault();
+    try {
+      localStorage.setItem(`luckyguy-plugin-settings-${plugin.id}`, JSON.stringify(values));
+    } catch (e) {}
+    onFlashSaved?.();
+    setSaveSuccessMsg(`Settings saved for ${plugin.name}!`);
+    setTimeout(() => setSaveSuccessMsg(''), 3000);
+  };
+
+  const handleReset = () => {
+    const initial = {};
+    if (plugin.settings?.fields && Array.isArray(plugin.settings.fields)) {
+      plugin.settings.fields.forEach((f) => {
+        initial[f.id] = f.defaultValue !== undefined ? f.defaultValue : '';
+      });
+    }
+    setValues(initial);
+    try {
+      localStorage.setItem(`luckyguy-plugin-settings-${plugin.id}`, JSON.stringify(initial));
+    } catch (e) {}
+    onFlashSaved?.();
+    setSaveSuccessMsg('Reset to default values.');
+    setTimeout(() => setSaveSuccessMsg(''), 2500);
+  };
+
+  const handleBrowseFolder = async (fieldId) => {
+    if (window.electronAPI?.selectFolder) {
+      try {
+        const selected = await window.electronAPI.selectFolder();
+        if (selected) handleChange(fieldId, selected);
+      } catch (e) {}
+    }
+  };
+
+  const fields = plugin.settings?.fields || [];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Plugin Header Banner */}
+      <div
+        style={{
+          padding: '20px',
+          borderRadius: '10px',
+          border: '1px solid var(--border-medium, #e2e8f0)',
+          backgroundColor: 'var(--bg-card, #ffffff)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '16px',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '10px',
+              backgroundColor: 'rgba(124, 92, 191, 0.12)',
+              color: 'var(--primary, #7c5cbf)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+            }}
+          >
+            <SlidersHorizontal size={22} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                {plugin.settings?.title || `${plugin.name} Settings`}
+              </h2>
+              <span
+                style={{
+                  fontSize: '10px',
+                  color: 'var(--primary, #7c5cbf)',
+                  backgroundColor: 'rgba(124, 92, 191, 0.08)',
+                  padding: '2px 7px',
+                  borderRadius: '4px',
+                  fontWeight: 600,
+                }}
+              >
+                {plugin.category || 'Plugin Engine'}
+              </span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                v{plugin.version || '1.0.0'}
+              </span>
+            </div>
+            <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+              {plugin.settings?.description || plugin.description || 'Configure parameters for this extension.'}
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {plugin.tab && (
+            <button
+              type="button"
+              onClick={() => onNavigateTab?.('plugin-' + plugin.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '7px 14px',
+                borderRadius: '6px',
+                border: '1px solid var(--primary, #7c5cbf)',
+                backgroundColor: 'rgba(124, 92, 191, 0.08)',
+                color: 'var(--primary, #7c5cbf)',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <ExternalLink size={13} />
+              <span>Open Plugin Tab</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onSelectCategory?.('plugins')}
+            style={{
+              padding: '7px 12px',
+              borderRadius: '6px',
+              border: '1px solid var(--border-medium)',
+              backgroundColor: 'var(--bg-main)',
+              color: 'var(--text-secondary)',
+              fontSize: '12px',
+              cursor: 'pointer',
+            }}
+          >
+            Back to Plugins
+          </button>
+        </div>
+      </div>
+
+      {saveSuccessMsg && (
+        <div
+          style={{
+            padding: '10px 16px',
+            borderRadius: '8px',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            border: '1px solid rgba(16, 185, 129, 0.25)',
+            color: '#10b981',
+            fontSize: '12.5px',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <CheckCircle2 size={16} />
+          <span>{saveSuccessMsg}</span>
+        </div>
+      )}
+
+      {/* Form Fields Card */}
+      <form
+        onSubmit={handleSave}
+        style={{
+          padding: '20px',
+          borderRadius: '10px',
+          border: '1px solid var(--border-medium, #e2e8f0)',
+          backgroundColor: 'var(--bg-card, #ffffff)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '18px',
+        }}
+      >
+        {fields.length > 0 ? (
+          fields.map((field) => {
+            const val = values[field.id] !== undefined ? values[field.id] : '';
+            return (
+              <div key={field.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {field.label}
+                  </label>
+                  {field.type === 'password' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswords((prev) => ({ ...prev, [field.id]: !prev[field.id] }))}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px' }}
+                    >
+                      {showPasswords[field.id] ? <EyeOff size={13} /> : <Eye size={13} />}
+                      <span>{showPasswords[field.id] ? 'Hide' : 'Show'}</span>
+                    </button>
+                  )}
+                </div>
+
+                {field.description && (
+                  <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                    {field.description}
+                  </span>
+                )}
+
+                {/* Field Controls by Type */}
+                {field.type === 'select' ? (
+                  <select
+                    value={val}
+                    onChange={(e) => handleChange(field.id, e.target.value)}
+                    style={{
+                      height: '36px',
+                      padding: '0 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-medium)',
+                      backgroundColor: 'var(--bg-main)',
+                      color: 'var(--text-primary)',
+                      fontSize: '12.5px',
+                      outline: 'none',
+                    }}
+                  >
+                    {(field.options || []).map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : field.type === 'boolean' ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '2px' }}>
+                    <div
+                      onClick={() => handleChange(field.id, !val)}
+                      style={{
+                        width: '42px',
+                        height: '22px',
+                        borderRadius: '999px',
+                        backgroundColor: val ? 'var(--primary, #7c5cbf)' : '#cbd5e1',
+                        position: 'relative',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s ease',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          borderRadius: '50%',
+                          backgroundColor: '#ffffff',
+                          position: 'absolute',
+                          top: '2px',
+                          left: val ? '22px' : '2px',
+                          transition: 'left 0.2s ease',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        }}
+                      />
+                    </div>
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                      {val ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                ) : field.type === 'folder' ? (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      value={val}
+                      onChange={(e) => handleChange(field.id, e.target.value)}
+                      placeholder={field.placeholder || 'Directory path...'}
+                      style={{
+                        flex: 1,
+                        height: '36px',
+                        padding: '0 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-medium)',
+                        backgroundColor: 'var(--bg-main)',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleBrowseFolder(field.id)}
+                      style={{
+                        padding: '0 14px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-medium)',
+                        backgroundColor: 'var(--bg-main)',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Browse...
+                    </button>
+                  </div>
+                ) : field.type === 'code' || field.type === 'textarea' ? (
+                  <textarea
+                    rows={5}
+                    value={val}
+                    onChange={(e) => handleChange(field.id, e.target.value)}
+                    placeholder={field.placeholder || '// Enter custom JavaScript...'}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-medium)',
+                      backgroundColor: 'var(--bg-main)',
+                      color: 'var(--text-primary)',
+                      fontSize: '12px',
+                      fontFamily: 'monospace',
+                      lineHeight: '1.4',
+                      resize: 'vertical',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                ) : (
+                  <input
+                    type={field.type === 'password' && !showPasswords[field.id] ? 'password' : 'text'}
+                    value={val}
+                    onChange={(e) => handleChange(field.id, e.target.value)}
+                    placeholder={field.placeholder || ''}
+                    style={{
+                      height: '36px',
+                      padding: '0 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-medium)',
+                      backgroundColor: 'var(--bg-main)',
+                      color: 'var(--text-primary)',
+                      fontSize: '12.5px',
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+            No specialized configuration schema provided by this plugin.
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '10px', borderTop: '1px solid var(--border-medium)' }}>
+          <button
+            type="button"
+            onClick={handleReset}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: '1px solid var(--border-medium)',
+              backgroundColor: 'var(--bg-main)',
+              color: 'var(--text-secondary)',
+              fontSize: '12px',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            Reset Defaults
+          </button>
+          <button
+            type="submit"
+            style={{
+              padding: '8px 20px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: 'var(--primary, #7c5cbf)',
+              color: '#ffffff',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Save Plugin Settings
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

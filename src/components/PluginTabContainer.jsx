@@ -30,7 +30,11 @@ import {
   ArrowLeft,
   Share2,
   CheckCircle2,
-  ListFilter
+  ListFilter,
+  Image as ImageIcon,
+  ZoomIn,
+  Settings,
+  FolderOpen
 } from 'lucide-react';
 
 export default function PluginTabContainer({
@@ -38,17 +42,33 @@ export default function PluginTabContainer({
   onStartDownload,
   preferences = {},
   onOpenFolder,
+  onOpenSettings,
   onVideoPlay
 }) {
+  // Helper: Domain Aliases Unblocking (learned from Pornhub / regional blocking)
+  const resolveDomainAlias = useCallback((url) => {
+    if (!url) return '';
+    let resolved = url;
+    if (plugin.domainAliases && Array.isArray(plugin.domainAliases)) {
+      for (const alias of plugin.domainAliases) {
+        if (resolved.includes(alias.from)) {
+          resolved = resolved.replace(alias.from, alias.to);
+        }
+      }
+    }
+    if (resolved.includes('pornhub.com')) {
+      resolved = resolved.replace('pornhub.com', 'pornhub.org');
+    }
+    return resolved;
+  }, [plugin.domainAliases]);
+
   const [activeUrl, setActiveUrl] = useState(() => {
     let url = plugin.tab?.url || plugin.tab?.defaultUrl || '';
-    if (url.includes('pornhub.com')) url = url.replace('pornhub.com', 'pornhub.org');
-    return url;
+    return resolveDomainAlias(url);
   });
   const [inputUrl, setInputUrl] = useState(() => {
     let url = plugin.tab?.url || plugin.tab?.defaultUrl || '';
-    if (url.includes('pornhub.com')) url = url.replace('pornhub.com', 'pornhub.org');
-    return url;
+    return resolveDomainAlias(url);
   });
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'web'
   const [isAdBlockEnabled, setIsAdBlockEnabled] = useState(() => {
@@ -79,10 +99,11 @@ export default function PluginTabContainer({
   const [crawledMedia, setCrawledMedia] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   
-  // Selection mode & Watch Page state
+  // Selection mode & Watch Page & Image Lightbox state
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [activePlayerVideo, setActivePlayerVideo] = useState(null);
+  const [activeLightboxImage, setActiveLightboxImage] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [downloadSuccessMsg, setDownloadSuccessMsg] = useState('');
   const [ageVerificationBypassed, setAgeVerificationBypassed] = useState(true);
@@ -92,12 +113,12 @@ export default function PluginTabContainer({
   const webviewRef = useRef(null);
   const loadMoreObserverRef = useRef(null);
 
-  // Helper: Strict Video Deduplication
+  // Helper: Strict Video/Image Deduplication
   const deduplicateVideos = useCallback((videos) => {
     const seen = new Set();
     return (videos || []).filter(v => {
       const vkeyMatch = v.url?.match(/viewkey=([a-zA-Z0-9_-]+)/);
-      const key = vkeyMatch ? vkeyMatch[1] : (v.id || v.title);
+      const key = vkeyMatch ? vkeyMatch[1] : (v.imageUrl || v.url || v.id || v.title);
       if (!key || seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -127,16 +148,19 @@ export default function PluginTabContainer({
 
   // Determine portal category and tag
   const isPornhub = plugin.id?.includes('pornhub') || (activeUrl || '').includes('pornhub');
+  const isTelegraph = plugin.id?.includes('telegraph') || (activeUrl || '').includes('telegra.ph') || (activeUrl || '').includes('t.me');
   const isArchiveMovies = plugin.id?.includes('archive') || (activeUrl || '').includes('archive.org');
   const isRadio = plugin.id?.includes('radio') || (activeUrl || '').includes('radio');
 
   const categories = isPornhub
     ? ['All', 'Trending HD', 'Top Rated', '4K Ultra', 'Verified Amateurs', 'VR / 60fps']
+    : isTelegraph
+    ? ['All', 'Photography', 'Galleries & Albums', 'Digital Art', 'High-Res Nature', 'Architecture']
     : isArchiveMovies
     ? ['All', 'Sci-Fi & Horror', 'Classics', 'Documentaries', 'Silent Film', '1080p Remasters']
     : ['All', 'Top Stations', 'Chillout & Ambient', 'Jazz & Blues', 'Electronic Dance', 'Rock Classics'];
 
-  // Diverse cinema & studio photography thumbnails
+  // Curated photography and cinema thumbnails
   const matureThumbnails = [
     'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=640&auto=format&fit=crop&q=80',
     'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=640&auto=format&fit=crop&q=80',
@@ -152,11 +176,65 @@ export default function PluginTabContainer({
     'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=640&auto=format&fit=crop&q=80',
   ];
 
+  const telegraphArtImages = [
+    'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=800&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=800&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=800&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=800&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1518895949257-7621c3c786d7?w=800&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=800&auto=format&fit=crop&q=85',
+    'https://images.unsplash.com/photo-1526772662000-3f88f10405ff?w=800&auto=format&fit=crop&q=85',
+  ];
+
   // Generator for rich media indexing batches
   const generateIndexedVideos = (category = 'All', page = 1) => {
-    const isMature = isPornhub;
+    if (isTelegraph) {
+      const titles = [
+        'Cosmic Horizon - 4K High Dynamic Range Artwork',
+        'Abstract Geometry & Flowing Colors - Master Collection',
+        'Architectural Minimalism - Modern Spatial Photography',
+        'Neon Cyberpunk Metropolis - Digital Matte Painting',
+        'Ethereal Botanical Forms - Studio Macro Series',
+        'Nordic Solitude - High Resolution Landscape Album',
+        'Prismatic Refraction - Optical Photography Experiments',
+        'Golden Hour Serenity - Uncompressed Raw Portfolio',
+        'Future Nostalgia - Retrowave Concept Gallery',
+        'Sculptural Textures - Marble & Clay Fine Art',
+        'Midnight Reverie - Night Sky & Aurora Borealis Album',
+        'Chromatic Waves - Generative Art Installation'
+      ];
 
-    if (isMature) {
+      const startIndex = (page - 1) * 12;
+      return titles.map((title, i) => {
+        const itemIdx = startIndex + i;
+        const imgUrl = telegraphArtImages[itemIdx % telegraphArtImages.length];
+        const isAlbum = i % 3 === 0;
+
+        return {
+          id: `tg-art-p${page}-${i + 1}`,
+          title: category !== 'All' ? `[${category}] ${title}` : `${title} - Album #${page}`,
+          duration: isAlbum ? '8 Photos' : 'Original Raw',
+          quality: '4K Ultra HD',
+          views: `${(85 + (itemIdx * 14))}K views`,
+          rating: '98%',
+          author: 'Telegraph Channel Contributor',
+          size: `${(4.5 + (i * 1.8)).toFixed(1)} MB`,
+          thumbnail: imgUrl,
+          imageUrl: imgUrl,
+          mediaType: isAlbum ? 'gallery' : 'image',
+          images: [imgUrl, telegraphArtImages[(itemIdx + 1) % telegraphArtImages.length]],
+          url: `https://telegra.ph/article-sample-${itemIdx + 1}`,
+          streamUrl: null,
+        };
+      });
+    }
+
+    if (isPornhub) {
       const sampleTitles = [
         'Exclusive 4K Ultra HD Studio Session - Remastered',
         'Top Rated Scene of the Year - 1080p 60fps HD',
@@ -235,8 +313,9 @@ export default function PluginTabContainer({
         (() => {
           const items = [];
           const seen = new Set();
-          const videoElements = document.querySelectorAll('li.videoBox, li[data-video-vkey]');
           
+          // Check for video boxes
+          const videoElements = document.querySelectorAll('li.videoBox, li[data-video-vkey]');
           videoElements.forEach((el) => {
             const link = el.querySelector('a[href*="viewkey="]');
             const vkey = el.getAttribute('data-video-vkey') || link?.href?.match(/viewkey=([a-zA-Z0-9_-]+)/)?.[1];
@@ -259,13 +338,10 @@ export default function PluginTabContainer({
 
             const durEl = el.querySelector('.duration, var.duration, .time');
             const duration = durEl ? durEl.textContent.trim() : '12:00';
-
             const viewsEl = el.querySelector('.views var, .views, .videoViews');
             const views = viewsEl ? viewsEl.textContent.trim() : '1.2M views';
-
             const ratingEl = el.querySelector('.value, .rating');
             const rating = ratingEl ? ratingEl.textContent.trim() : '95%';
-
             const uploaderEl = el.querySelector('.usernameWrap a, .username, .channelName a, .uploader');
             const author = uploaderEl ? uploaderEl.textContent.trim() : 'Verified Creator';
 
@@ -283,6 +359,30 @@ export default function PluginTabContainer({
                 streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
               });
             }
+          });
+
+          // Check for Telegraph/Image articles
+          const articleImages = document.querySelectorAll('article img, figure img, .tl_article img');
+          articleImages.forEach((img, i) => {
+            const src = img.getAttribute('src') || '';
+            if (!src || src.startsWith('data:') || seen.has(src)) return;
+            seen.add(src);
+            const fullUrl = src.startsWith('/') ? (window.location.origin + src) : src;
+            items.push({
+              id: 'tg-img-' + i,
+              title: document.querySelector('h1')?.textContent?.trim() || ('Telegraph Image #' + (i + 1)),
+              thumbnail: fullUrl,
+              imageUrl: fullUrl,
+              mediaType: 'image',
+              duration: 'HD Image',
+              quality: 'Original',
+              views: '12K views',
+              rating: '98%',
+              author: 'Telegra.ph Author',
+              size: '~3.5 MB',
+              url: window.location.href,
+              streamUrl: null
+            });
           });
 
           return items;
@@ -438,8 +538,7 @@ export default function PluginTabContainer({
   const handleNavigate = (e) => {
     e?.preventDefault();
     if (!inputUrl.trim()) return;
-    let url = inputUrl.trim();
-    if (url.includes('pornhub.com')) url = url.replace('pornhub.com', 'pornhub.org');
+    let url = resolveDomainAlias(inputUrl.trim());
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
@@ -467,13 +566,15 @@ export default function PluginTabContainer({
     }
   };
 
-  // Card Click: Normal Click -> Plays Video! Ctrl/Cmd Click -> Toggle Select!
-  const handleCardClick = (e, video) => {
+  // Card Click: Normal Click -> Plays Video OR Opens Image Lightbox!
+  const handleCardClick = (e, item) => {
     if (isSelectMode || e.ctrlKey || e.metaKey) {
-      handleToggleSelect(video.id);
+      handleToggleSelect(item.id);
       if (!isSelectMode) setIsSelectMode(true);
+    } else if (item.mediaType === 'image' || (!item.streamUrl && item.imageUrl)) {
+      setActiveLightboxImage(item);
     } else {
-      handlePlayVideo(video);
+      handlePlayVideo(item);
     }
   };
 
@@ -500,14 +601,17 @@ export default function PluginTabContainer({
     }
   };
 
-  const handleDownloadSingle = (video) => {
+  const handleDownloadSingle = (item) => {
     if (!onStartDownload) return;
-    onStartDownload(video.url || video.streamUrl, {
-      format: 'MP4 1080p',
-      quality: '1080p',
-      title: video.title
+    const isImg = item.mediaType === 'image' || (!item.streamUrl && item.imageUrl);
+    const downloadTarget = isImg ? (item.imageUrl || item.thumbnail) : (item.url || item.streamUrl);
+    
+    onStartDownload(downloadTarget, {
+      format: isImg ? 'JPG Original' : 'MP4 1080p',
+      quality: isImg ? 'Original' : '1080p',
+      title: item.title
     });
-    setDownloadSuccessMsg(`Queued "${video.title}" for download!`);
+    setDownloadSuccessMsg(`Queued "${item.title}" for download!`);
     setTimeout(() => setDownloadSuccessMsg(''), 3500);
   };
 
@@ -515,18 +619,23 @@ export default function PluginTabContainer({
     if (!crawledMedia || !onStartDownload) return;
     const toDownload = crawledMedia.filter(m => selectedIds.has(m.id));
     toDownload.forEach(m => {
-      onStartDownload(m.url || m.streamUrl, { format: 'MP4 1080p', quality: '1080p', title: m.title });
+      const isImg = m.mediaType === 'image' || (!m.streamUrl && m.imageUrl);
+      onStartDownload(isImg ? (m.imageUrl || m.thumbnail) : (m.url || m.streamUrl), {
+        format: isImg ? 'JPG Original' : 'MP4 1080p',
+        quality: isImg ? 'Original' : '1080p',
+        title: m.title
+      });
     });
-    setDownloadSuccessMsg(`Queued ${toDownload.length} videos for batch download!`);
+    setDownloadSuccessMsg(`Queued ${toDownload.length} items for batch download!`);
     setSelectedIds(new Set());
     setIsSelectMode(false);
     setTimeout(() => setDownloadSuccessMsg(''), 3500);
   };
 
-  const handleCopyLink = (video) => {
+  const handleCopyLink = (item) => {
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(video.url);
-      setCopiedId(video.id);
+      navigator.clipboard.writeText(item.imageUrl || item.url || item.thumbnail);
+      setCopiedId(item.id);
       setTimeout(() => setCopiedId(null), 2000);
     }
   };
@@ -652,6 +761,30 @@ export default function PluginTabContainer({
             </button>
           )}
 
+          {/* Dedicated Plugin Setup Link (Major SDK Upgrade) */}
+          {plugin.settings && (
+            <button
+              onClick={() => onOpenSettings?.('plugin-' + plugin.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '5px 11px',
+                borderRadius: '6px',
+                border: '1px solid var(--border-medium)',
+                backgroundColor: 'var(--bg-main)',
+                color: 'var(--text-secondary)',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+              title="Open dedicated settings tab for API credentials & folders"
+            >
+              <SlidersHorizontal size={12} />
+              <span>Settings</span>
+            </button>
+          )}
+
           {/* View mode toggle */}
           <div
             style={{
@@ -769,7 +902,7 @@ export default function PluginTabContainer({
           <form onSubmit={handleNavigate} style={{ display: 'flex', gap: '8px' }}>
             <input
               type="text"
-              placeholder="Search videos or enter portal link..."
+              placeholder={isTelegraph ? "Enter Telegra.ph or Telegram post URL..." : "Search videos or enter portal link..."}
               value={inputUrl}
               onChange={(e) => setInputUrl(e.target.value)}
               style={{
@@ -848,7 +981,7 @@ export default function PluginTabContainer({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: 600 }}>
             <CheckSquare size={16} />
-            <span>{selectedIds.size} video{selectedIds.size > 1 ? 's' : ''} selected</span>
+            <span>{selectedIds.size} item{selectedIds.size > 1 ? 's' : ''} selected</span>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
@@ -999,7 +1132,7 @@ export default function PluginTabContainer({
                 }}
               >
                 <Download size={13} />
-                <span>Download MP4</span>
+                <span>Download Media</span>
               </button>
             </div>
           </div>
@@ -1307,7 +1440,134 @@ export default function PluginTabContainer({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. DIRECT WEB FRAME (when ViewMode is 'web') */}
+      {/* 2. IMAGE LIGHTBOX MODAL (For Telegraph & Image Portals) */}
+      {/* ========================================================================= */}
+      {activeLightboxImage && (
+        <div
+          onClick={() => setActiveLightboxImage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: 'rgba(0, 0, 0, 0.88)',
+            backdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'relative',
+              maxWidth: '92vw',
+              maxHeight: '92vh',
+              display: 'flex',
+              flexDirection: 'column',
+              backgroundColor: '#09090b',
+              borderRadius: '12px',
+              border: '1px solid #27272a',
+              overflow: 'hidden',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)',
+            }}
+          >
+            {/* Lightbox Header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 18px',
+                borderBottom: '1px solid #27272a',
+                color: '#fff',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ImageIcon size={16} color="var(--primary, #7c5cbf)" />
+                <span style={{ fontSize: '13px', fontWeight: 600 }}>{activeLightboxImage.title}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveLightboxImage(null)}
+                style={{ background: 'none', border: 'none', color: '#a1a1aa', cursor: 'pointer', padding: '4px' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Lightbox High-Res Image View */}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000', overflow: 'hidden' }}>
+              <img
+                src={activeLightboxImage.imageUrl || activeLightboxImage.thumbnail}
+                alt={activeLightboxImage.title}
+                style={{ maxWidth: '100%', maxHeight: '72vh', objectFit: 'contain' }}
+              />
+            </div>
+
+            {/* Lightbox Footer */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 18px',
+                borderTop: '1px solid #27272a',
+                backgroundColor: '#121214',
+                color: '#fff',
+              }}
+            >
+              <span style={{ fontSize: '12px', color: '#a1a1aa' }}>
+                Original Format &bull; {activeLightboxImage.size || '~4 MB'} &bull; {activeLightboxImage.quality || '4K Ultra HD'}
+              </span>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => handleCopyLink(activeLightboxImage)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #3f3f46',
+                    backgroundColor: '#18181b',
+                    color: copiedId === activeLightboxImage.id ? '#10b981' : '#fff',
+                    fontSize: '11.5px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {copiedId === activeLightboxImage.id ? 'Copied Link' : 'Copy Image URL'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownloadSingle(activeLightboxImage);
+                    setActiveLightboxImage(null);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: 'var(--primary, #7c5cbf)',
+                    color: '#fff',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Download size={13} />
+                  <span>Download Original</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 3. DIRECT WEB FRAME (when ViewMode is 'web') */}
       {/* ========================================================================= */}
       {!activePlayerVideo && (
         <div style={{ flex: 1, minHeight: '520px', display: viewMode === 'web' ? 'flex' : 'none', flexDirection: 'column', backgroundColor: '#09090b' }}>
@@ -1426,7 +1686,7 @@ export default function PluginTabContainer({
       )}
 
       {/* ========================================================================= */}
-      {/* 3. CLEAN MEDIA GRID (Clean cards, Infinite scroll, No bulky buttons) */}
+      {/* 4. CLEAN MEDIA GRID (Videos and Images, Infinite scroll, No bulky buttons) */}
       {/* ========================================================================= */}
       {!activePlayerVideo && viewMode === 'grid' && (
         <div style={{ flex: 1, padding: '20px 24px' }}>
@@ -1435,12 +1695,12 @@ export default function PluginTabContainer({
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Sparkles size={16} color="var(--primary, #7c5cbf)" />
               <h3 style={{ fontSize: '14px', fontWeight: 700, margin: 0 }}>
-                {isIndexing ? 'Indexing Media Stream Feed...' : `Discovered Media (${crawledMedia.length} videos)`}
+                {isIndexing ? 'Indexing Media Stream Feed...' : `Discovered Media (${crawledMedia.length} items)`}
               </h3>
             </div>
             {!isIndexing && (
               <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                Tip: Click to play • Press Ctrl to multi-select
+                {isTelegraph ? 'Click to inspect & zoom • Press Ctrl to multi-select' : 'Click to play • Press Ctrl to multi-select'}
               </span>
             )}
           </div>
@@ -1464,7 +1724,7 @@ export default function PluginTabContainer({
               ))}
             </div>
           ) : (
-            /* Clean Uncluttered Video Cards Grid */
+            /* Clean Uncluttered Media Cards Grid */
             <div
               style={{
                 display: 'grid',
@@ -1472,14 +1732,15 @@ export default function PluginTabContainer({
                 gap: '22px',
               }}
             >
-              {crawledMedia.map((video) => {
-                const isSelected = selectedIds.has(video.id);
+              {crawledMedia.map((item) => {
+                const isSelected = selectedIds.has(item.id);
+                const isImg = item.mediaType === 'image' || (!item.streamUrl && item.imageUrl);
 
                 return (
                   <div
-                    key={video.id}
+                    key={item.id}
                     className="clean-video-card"
-                    onClick={(e) => handleCardClick(e, video)}
+                    onClick={(e) => handleCardClick(e, item)}
                     style={{
                       display: 'flex',
                       flexDirection: 'column',
@@ -1501,9 +1762,9 @@ export default function PluginTabContainer({
                       }}
                     >
                       <img
-                        src={video.thumbnail}
-                        alt={video.title}
-                        onError={(e) => { e.target.src = video.thumbnailFallback || matureThumbnails[0]; }}
+                        src={item.thumbnail}
+                        alt={item.title}
+                        onError={(e) => { e.target.src = item.thumbnailFallback || matureThumbnails[0]; }}
                         style={{
                           width: '100%',
                           height: '100%',
@@ -1512,7 +1773,7 @@ export default function PluginTabContainer({
                         }}
                       />
 
-                      {/* Play Hover Overlay */}
+                      {/* Hover Overlay: Play icon for video, Zoom icon for image */}
                       <div
                         className="thumb-play-icon"
                         style={{
@@ -1537,11 +1798,15 @@ export default function PluginTabContainer({
                             boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
                           }}
                         >
-                          <Play size={20} fill="#09090b" style={{ marginLeft: '3px' }} />
+                          {isImg ? (
+                            <ZoomIn size={20} color="#09090b" />
+                          ) : (
+                            <Play size={20} fill="#09090b" style={{ marginLeft: '3px' }} />
+                          )}
                         </div>
                       </div>
 
-                      {/* Duration Tag (Bottom-Right) */}
+                      {/* Duration / Format Tag (Bottom-Right) */}
                       <span
                         style={{
                           position: 'absolute',
@@ -1553,9 +1818,13 @@ export default function PluginTabContainer({
                           fontWeight: 600,
                           padding: '2px 6px',
                           borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
                         }}
                       >
-                        {video.duration}
+                        {isImg && <ImageIcon size={11} />}
+                        <span>{item.duration}</span>
                       </span>
 
                       {/* Quality Tag (Top-Left) */}
@@ -1565,15 +1834,15 @@ export default function PluginTabContainer({
                           top: '6px',
                           left: '6px',
                           backgroundColor: 'rgba(0, 0, 0, 0.75)',
-                          color: '#f59e0b',
+                          color: isImg ? '#38bdf8' : '#f59e0b',
                           fontSize: '10px',
                           fontWeight: 700,
                           padding: '2px 5px',
                           borderRadius: '4px',
-                          border: '1px solid rgba(245, 158, 11, 0.4)',
+                          border: `1px solid ${isImg ? 'rgba(56, 189, 248, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`,
                         }}
                       >
-                        {video.quality}
+                        {item.quality}
                       </span>
 
                       {/* Multi-select check icon when in select mode */}
@@ -1613,7 +1882,7 @@ export default function PluginTabContainer({
                         >
                           <button
                             type="button"
-                            onClick={() => handleDownloadSingle(video)}
+                            onClick={() => handleDownloadSingle(item)}
                             style={{
                               width: '28px',
                               height: '28px',
@@ -1626,20 +1895,20 @@ export default function PluginTabContainer({
                               justifyContent: 'center',
                               cursor: 'pointer',
                             }}
-                            title="Download video"
+                            title="Download item"
                           >
                             <Download size={13} />
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleCopyLink(video)}
+                            onClick={() => handleCopyLink(item)}
                             style={{
                               width: '28px',
                               height: '28px',
                               borderRadius: '4px',
                               backgroundColor: 'rgba(0, 0, 0, 0.75)',
                               border: '1px solid rgba(255, 255, 255, 0.3)',
-                              color: copiedId === video.id ? '#10b981' : '#fff',
+                              color: copiedId === item.id ? '#10b981' : '#fff',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -1647,13 +1916,13 @@ export default function PluginTabContainer({
                             }}
                             title="Copy link"
                           >
-                            {copiedId === video.id ? <Check size={13} /> : <Copy size={13} />}
+                            {copiedId === item.id ? <Check size={13} /> : <Copy size={13} />}
                           </button>
                         </div>
                       )}
                     </div>
 
-                    {/* Video Info (No clunky buttons row!) */}
+                    {/* Media Info */}
                     <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <div
                         style={{
@@ -1665,25 +1934,25 @@ export default function PluginTabContainer({
                           WebkitBoxOrient: 'vertical',
                           overflow: 'hidden',
                         }}
-                        title={video.title}
+                        title={item.title}
                       >
-                        {video.title}
+                        {item.title}
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)' }}>
                         <span style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span>{video.author}</span>
+                          <span>{item.author}</span>
                           <CheckCircle2 size={11} color="var(--primary, #7c5cbf)" />
                         </span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#10b981', fontWeight: 600 }}>
                           <ThumbsUp size={11} />
-                          <span>{video.rating}</span>
+                          <span>{item.rating}</span>
                         </span>
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)' }}>
-                        <span>{video.views}</span>
-                        <span>{video.size || '~220 MB'}</span>
+                        <span>{item.views}</span>
+                        <span>{item.size || '~4 MB'}</span>
                       </div>
                     </div>
                   </div>
