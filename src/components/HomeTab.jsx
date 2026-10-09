@@ -328,9 +328,9 @@ export default function HomeTab({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }}>
           {folderSections.map((sec) => {
             const isExpanded = !!expandedSections[sec.name];
-            // 1 row in responsive grid (up to 5 cards)
-            const visibleTracks = isExpanded ? sec.tracks : sec.tracks.slice(0, 5);
-            const canExpand = sec.tracks.length > 5;
+            // Up to 20 entries in horizontal scrollable row; expand to full grid on View all
+            const visibleTracks = isExpanded ? sec.tracks : sec.tracks.slice(0, 20);
+            const canExpand = sec.tracks.length > 20;
 
             return (
               <section
@@ -472,14 +472,29 @@ export default function HomeTab({
                   ) : null}
                 </div>
 
-                {/* Down: Grid Pattern of Music Cards (2 rows by default, expandable) */}
+                {/* Down: Scrollable 1-row shelf (up to 20 entries) or full grid when expanded */}
                 <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-                    gap: '16px',
-                    width: '100%',
-                  }}
+                  className="shelf-row-container"
+                  style={
+                    isExpanded
+                      ? {
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                          gap: '16px',
+                          width: '100%',
+                        }
+                      : {
+                          display: 'flex',
+                          flexDirection: 'row',
+                          gap: '16px',
+                          width: '100%',
+                          overflowX: 'auto',
+                          overflowY: 'hidden',
+                          paddingBottom: '8px',
+                          scrollbarWidth: 'thin',
+                          scrollbarColor: 'var(--border-medium) transparent',
+                        }
+                  }
                 >
                   {visibleTracks.map((track) => {
                     const isCurrent =
@@ -504,6 +519,8 @@ export default function HomeTab({
                           cursor: 'pointer',
                           position: 'relative',
                           transition: 'all 0.18s ease',
+                          flex: isExpanded ? 'none' : '0 0 160px',
+                          width: isExpanded ? 'auto' : '160px',
                           boxShadow: isCurrent
                             ? '0 4px 14px rgba(124, 92, 191, 0.18)'
                             : '0 2px 6px rgba(0,0,0,0.02)',
