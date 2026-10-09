@@ -80,6 +80,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openDirectoryDialog: () => ipcRenderer.invoke('pick-folder'),
   getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  crawlPortal: (url) => ipcRenderer.invoke('crawl-portal', url),
+  bypassAgeVerification: () => ipcRenderer.invoke('bypass-age-verification'),
   onUpdateAvailable: (callback) => {
     if (typeof callback !== 'function') return () => {};
     const handler = (event, data) => callback(data);

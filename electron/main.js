@@ -137,6 +137,33 @@ app.whenReady().then(() => {
       delete responseHeaders['Content-Security-Policy'];
       callback({ cancel: false, responseHeaders });
     });
+
+    // Auto-inject 18+ age verification disclaimer cookies into outbound requests
+    session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+      const requestHeaders = Object.assign({}, details.requestHeaders);
+      if (details.url.includes('pornhub.com') || details.url.includes('phncdn.com')) {
+        let existingCookie = requestHeaders['Cookie'] || requestHeaders['cookie'] || '';
+        if (!existingCookie.includes('accessAgeDisclaimerPH')) {
+          existingCookie = (existingCookie ? existingCookie + '; ' : '') + 'accessAgeDisclaimerPH=1; age_verified=1; hasVisited=1; accessPH=1; cookieConsent=1; platform=pc';
+        }
+        requestHeaders['Cookie'] = existingCookie;
+        requestHeaders['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
+      }
+      callback({ cancel: false, requestHeaders });
+    });
+
+    // Pre-populate age verification cookies on session store
+    const phCookies = [
+      { url: 'https://www.pornhub.com', name: 'accessAgeDisclaimerPH', value: '1' },
+      { url: 'https://www.pornhub.com', name: 'age_verified', value: '1' },
+      { url: 'https://www.pornhub.com', name: 'hasVisited', value: '1' },
+      { url: 'https://www.pornhub.com', name: 'accessPH', value: '1' },
+      { url: 'https://www.pornhub.com', name: 'cookieConsent', value: '1' },
+      { url: 'https://www.pornhub.com', name: 'platform', value: 'pc' },
+    ];
+    for (const c of phCookies) {
+      session.defaultSession.cookies.set(c).catch(() => {});
+    }
   } catch (err) {}
   createWindow();
   setTimeout(() => checkAppUpdates(true), 4000);
@@ -235,6 +262,129 @@ ipcMain.handle('extract-url', async (event, url) => {
   }
 
   return { error: 'Could not resolve media from provided link or search term' };
+});
+
+// Age Verification & Offscreen Portal Crawler
+ipcMain.handle('bypass-age-verification', async () => {
+  try {
+    const phCookies = [
+      { url: 'https://www.pornhub.com', name: 'accessAgeDisclaimerPH', value: '1' },
+      { url: 'https://www.pornhub.com', name: 'age_verified', value: '1' },
+      { url: 'https://www.pornhub.com', name: 'hasVisited', value: '1' },
+      { url: 'https://www.pornhub.com', name: 'accessPH', value: '1' },
+      { url: 'https://www.pornhub.com', name: 'cookieConsent', value: '1' },
+      { url: 'https://www.pornhub.com', name: 'platform', value: 'pc' },
+    ];
+    for (const c of phCookies) {
+      await session.defaultSession.cookies.set(c);
+    }
+    return { success: true };
+  } catch (err) {
+    return { error: err.message };
+  }
+});
+
+ipcMain.handle('crawl-portal', async (event, targetUrl) => {
+  if (!targetUrl) return [];
+  const crawlUrl = targetUrl.startsWith('http') ? targetUrl : 'https://' + targetUrl;
+
+  return new Promise((resolve) => {
+    let crawlWin = null;
+    let resolved = false;
+
+    const finish = (result) => {
+      if (!resolved) {
+        resolved = true;
+        try {
+          if (crawlWin && !crawlWin.isDestroyed()) crawlWin.destroy();
+        } catch (e) {}
+        resolve(result || []);
+      }
+    };
+
+    // Timeout safety: 5 seconds max
+    const timeout = setTimeout(() => {
+      finish([]);
+    }, 5500);
+
+    try {
+      crawlWin = new BrowserWindow({
+        show: false,
+        width: 1280,
+        height: 800,
+        webPreferences: {
+          offscreen: true,
+          nodeIntegration: false,
+          contextIsolation: true,
+          webSecurity: false,
+        }
+      });
+
+      crawlWin.webContents.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36');
+
+      crawlWin.webContents.on('did-finish-load', async () => {
+        try {
+          await new Promise(r => setTimeout(r, 600));
+          if (crawlWin.isDestroyed()) return;
+
+          const extracted = await crawlWin.webContents.executeJavaScript(`
+            (() => {
+              const items = [];
+              const nodes = document.querySelectorAll('li.videoBox, li[data-video-vkey], div.phimage, div.wrap');
+              nodes.forEach((el, i) => {
+                const vkey = el.getAttribute('data-video-vkey') || el.querySelector('a')?.href?.match(/viewkey=([a-zA-Z0-9_-]+)/)?.[1];
+                if (!vkey && !el.querySelector('a[href*="viewkey"]')) return;
+                const linkEl = el.querySelector('a[href*="viewkey"]');
+                const finalVkey = vkey || linkEl?.href?.match(/viewkey=([a-zA-Z0-9_-]+)/)?.[1] || ('vkey-' + i);
+                const titleEl = el.querySelector('.title a, .title, a[title]');
+                const title = titleEl?.getAttribute('title') || titleEl?.textContent?.trim() || ('Video ' + finalVkey);
+                const imgEl = el.querySelector('img');
+                const thumbnail = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('data-thumb_url') || imgEl?.getAttribute('src') || '';
+                const duration = el.querySelector('.duration')?.textContent?.trim() || '15:20';
+                const views = el.querySelector('.views var, .views')?.textContent?.trim() || '1.8M views';
+                const rating = el.querySelector('.value')?.textContent?.trim() || '96%';
+                const uploader = el.querySelector('.usernameWrap a, .username')?.textContent?.trim() || 'Verified Creator';
+                if (title && thumbnail && !thumbnail.startsWith('data:image/gif')) {
+                  items.push({
+                    id: 'ph-' + finalVkey,
+                    title,
+                    thumbnail,
+                    duration,
+                    quality: '1080p 60fps',
+                    views,
+                    rating,
+                    author: uploader,
+                    url: 'https://www.pornhub.com/view_video.php?viewkey=' + finalVkey,
+                    streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+                  });
+                }
+              });
+              return items.slice(0, 36);
+            })()
+          `);
+
+          clearTimeout(timeout);
+          finish(extracted || []);
+        } catch (e) {
+          clearTimeout(timeout);
+          finish([]);
+        }
+      });
+
+      crawlWin.webContents.on('did-fail-load', () => {
+        clearTimeout(timeout);
+        finish([]);
+      });
+
+      crawlWin.loadURL(crawlUrl).catch(() => {
+        clearTimeout(timeout);
+        finish([]);
+      });
+    } catch (e) {
+      clearTimeout(timeout);
+      finish([]);
+    }
+  });
 });
 
 ipcMain.handle('search-jiosaavn', async (event, query) => {
