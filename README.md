@@ -1,49 +1,124 @@
-# LuckyGuy - Windows Desktop Music Downloader & Player
+# LuckyGuy 🎵
 
-High-performance Electron desktop application for Windows, featuring a NorthTracks-inspired design system with modular extension base, fast audio stream resolution, and local library management.
+<div align="center">
+
+<img src="electron/icon.png" width="120" height="120" alt="LuckyGuy Logo" />
+
+### High-Performance Media Downloader, Streamer & Music Manager for Windows
+
+[![Release](https://img.shields.io/github/v/release/nishantkumrmishra/LuckyGuy?style=for-the-badge&color=7c5cbf)](https://github.com/nishantkumrmishra/LuckyGuy/releases/latest)
+[![Website](https://img.shields.io/badge/Documentation-GitHub_Pages-blue?style=for-the-badge&logo=github)](https://nishantkumrmishra.github.io/LuckyGuy/)
+[![Platform](https://img.shields.io/badge/Platform-Windows_10_%7C_11-0078D6?style=for-the-badge&logo=windows)](https://github.com/nishantkumrmishra/LuckyGuy/releases)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+
+[**🌐 Live Documentation Website**](https://nishantkumrmishra.github.io/LuckyGuy/) • [**📦 Download Releases**](https://github.com/nishantkumrmishra/LuckyGuy/releases/latest)
+
+</div>
 
 ---
 
 ## ⚡ Overview
 
-LuckyGuy is designed with a **desktop-first NorthTracks layout**, **Obsidian dark & light theme modes**, **drag-resizable sidebar navigation**, and a **modular extension base** for music sources.
-
-### 🌟 Key Feature Matrix
-
-| Feature Domain | Windows Desktop App (`LuckyGuy`) |
-| :--- | :--- |
-| **Design Language** | **NorthTracks Design System** (Titlebar with Ctrl+L quick search, smooth resizable sidebar, docked 3-column player bar) |
-| **Theme & UI** | **Obsidian Dark Mode** & **Clean Light Mode** with signature Purple accents (`#7c5cbf`) |
-| **Navigation & Preferences** | **NorthTracks-style preferences view**: When entering Settings, sidebar transitions to a dedicated `< Back` button with sub-categories (**Downloads & Storage**, **Appearance**, **Plugins & Extensions**). |
-| **Modular Extension Base** | Direct URL installer to safely register community plugins & download resolvers without breaking application runtime. |
-| **Media Downloader** | Multi-engine downloader with parallel range chunk acceleration (1-16 chunks) |
-| **Streaming Resolvers** | JioSaavn 320k studio engine, YouTube stream engine, Spotify scraper, SoundCloud resolver |
-| **Music Library** | Local library manager, file scan, playlists manager, liked songs list, recycle bin |
-| **Music Player** | Docked player bar with spacebar play/pause shortcut, seekbar, repeat, shuffle, sleep timer, sliding queue drawer |
+**LuckyGuy** is an advanced desktop music hub crafted for Windows. It combines multi-threaded media downloading with automatic 320kbps audio resolution, seamless 200+ Spotify playlist extraction, self-organizing genre folder libraries, embedded cover artwork, and a built-in music player.
 
 ---
 
-## 🚀 Running the Application
+## 📥 Downloads & Installation
+
+| Package | Type | Description | Link |
+| :--- | :--- | :--- | :--- |
+| **LuckyGuy Setup** | Installer (`.exe`) | Standard Windows installer with desktop and Start Menu shortcuts | [Download Setup](https://github.com/nishantkumrmishra/LuckyGuy/releases/latest) |
+| **LuckyGuy Portable** | Standalone (`.exe`) | Zero-installation, single-file executable. Runs directly from USB or local drive | [Download Portable](https://github.com/nishantkumrmishra/LuckyGuy/releases/latest) |
+
+---
+
+## ✨ Key Features
+
+### 1. 🧙‍♂️ First-Time Setup Wizard
+- Automatically greets you on a new PC or clean install.
+- Walkthrough to configure:
+  - **Music Library Location** (Defaults to `C:\Users\<User>\Music`).
+  - **Auto-Organize by Genre** toggle.
+  - **Visual Theme** (Clean Light Mode or Obsidian Dark).
+- Can be re-launched anytime from **Settings → Downloads & Storage**.
+
+### 2. ⚡ Frictionless Downloads Manager
+- **Zero Configuration Needed**: Automatically extracts and downloads audio at the highest possible fidelity (320kbps / lossless AAC).
+- **Multi-Threaded Queue**: Download individual songs or entire 200+ track playlists in an orderly, parallel pipeline.
+- **Infinite Scroll Table**: Clean, unbounded download table displaying real-time download speeds, percentage, and file size.
+- **Direct Folder Access**: One-click **"Open Folder"** header button to view files directly in Windows File Explorer.
+
+### 3. 📁 Smart Genre Folder Organization
+- Automatically categorizes downloaded songs into clean physical subfolders based on artist & track metadata:
+  - `Music\Bollywood\`
+  - `Music\Pop\`
+  - `Music\Rock\`
+  - `Music\Hip-Hop\`
+  - `Music\Electronic\`
+  - `Music\K-Pop\`
+- Automatically downloads and caches `folder.jpg` in each directory so Windows File Explorer displays rich folder artwork previews.
+
+### 4. 🎨 Embedded Lossless Metadata & Artwork
+- Stamped with genuine song cover art, album name, artist, and year directly into Apple M4A metadata atoms and ID3v2.4 frames.
+- Instant artwork recognition in Windows Media Player, Groove, and VLC.
+
+### 5. 🔓 200+ Track Spotify Playlist Extraction
+- Bypasses public 100-track embed limits via an internal Pathfinder GraphQL session that rapidly paginates 500+ track playlists in seconds.
+- Zero login or developer credentials required out-of-the-box.
+- Optional custom Spotify Developer credentials (`Client ID`, `Client Secret`, and `sp_dc` cookie) can be entered under **Settings → Plugins & Extensions**.
+
+### 6. 🔄 Integrated Auto-Updater
+- Checks GitHub Releases in the background on startup.
+- Displays an in-app update notification banner when a newer release is published.
+- On-demand **"Check for Updates"** button available in Settings.
+
+---
+
+## 🛠️ Development & Building
 
 ### Prerequisites
-- Node.js (v18+)
+- Node.js (v18 or higher)
 - npm
 
-### Launch
+### Run in Development
 ```bash
-# Navigate to project folder
-cd D:\Devs\Active\localguy
+# Clone the repository
+git clone https://github.com/nishantkumrmishra/LuckyGuy.git
+cd LuckyGuy
 
-# Launch the desktop app directly
+# Install dependencies
+npm install
+
+# Start Vite + Electron
 npm run dev
 ```
 
-### Build
+### Build Distribution Binaries
 ```bash
-npm run build
+# Build both Installer and Portable EXE
+npm run dist:all
+
+# Build only Windows Setup Installer
+npm run dist:installer
+
+# Build only Windows Portable EXE
+npm run dist:portable
 ```
+
+Outputs will be saved directly into `dist-release/`:
+- `dist-release/LuckyGuy-Setup-1.0.0.exe`
+- `dist-release/LuckyGuy-Portable-1.0.0.exe`
 
 ---
 
-## 📁 Repository & Source
-- **GitHub Repository**: [https://github.com/nishantkumrmishra/LuckyGuy](https://github.com/nishantkumrmishra/LuckyGuy)
+## 🌐 Documentation Website
+
+A dedicated showcase site mirroring LuckyGuy's desktop UI design is hosted on GitHub Pages:
+- **URL**: [https://nishantkumrmishra.github.io/LuckyGuy/](https://nishantkumrmishra.github.io/LuckyGuy/)
+- **Source**: [`docs/index.html`](docs/index.html)
+
+---
+
+## 📄 License
+
+LuckyGuy is released under the [MIT License](LICENSE).
