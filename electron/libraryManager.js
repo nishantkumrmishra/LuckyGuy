@@ -109,13 +109,9 @@ class LibraryManager {
       if (fs.existsSync(this.playlistsFile)) {
         this.playlists = JSON.parse(fs.readFileSync(this.playlistsFile, 'utf8'));
       } else {
-        this.playlists = [
-          { id: 'favs', title: 'Favorites', songIds: [], createdAt: Date.now() },
-          { id: 'workout', title: 'High Energy', songIds: [], createdAt: Date.now() }
-        ];
+        this.playlists = [];
         this.savePlaylists();
-      }
-    } catch (e) { this.playlists = []; }
+      }} catch (e) { this.playlists = []; }
 
     try {
       if (fs.existsSync(this.ledgerFile)) {

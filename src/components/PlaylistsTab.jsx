@@ -1225,8 +1225,8 @@ export default function PlaylistsTab({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
-            gap: '18px',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+            gap: '12px',
           }}
         >
           {playlists.map((pl) => {
@@ -1241,7 +1241,7 @@ export default function PlaylistsTab({
                 key={pl.id || pl.name}
                 onClick={() => setSelectedPlaylistId(pl.id || pl.name)}
                 style={{
-                  padding: '12px',
+                  padding: '10px',
                   backgroundColor: 'var(--bg-card)',
                   borderRadius: '12px',
                   border: '1px solid var(--border-medium)',
@@ -1277,7 +1277,7 @@ export default function PlaylistsTab({
                   {art ? (
                     <img src={art} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
-                    <ListMusic size={38} color="var(--primary)" />
+                    <ListMusic size={26} color="var(--primary)" />
                   )}
                 </div>
 

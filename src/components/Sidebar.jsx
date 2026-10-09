@@ -465,35 +465,7 @@ export default function Sidebar({
               )}
             </div>
 
-            {/* 6. Trash */}
-            <div
-              style={navItemStyle(activeTab === 'trash')}
-              onClick={() => setActiveTab('trash')}
-              title={isMini ? 'Trash' : ''}
-            >
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '20px' }}>
-                  <DuoTrash size={17} />
-                </div>
-                <span style={labelStyle}>Trash</span>
-              </div>
-
-              {trashCount > 0 && !isMini && (
-                <span
-                  style={{
-                    fontSize: '10.5px',
-                    fontWeight: 500,
-                    padding: '1px 6px',
-                    borderRadius: '999px',
-                    backgroundColor: 'var(--bg-card-hover)',
-                    color: 'var(--text-secondary)',
-                  }}
-                >
-                  {trashCount}
-                </span>
-              )}
-            </div>
-          </nav>
+            </nav>
         )}
       </div>
 

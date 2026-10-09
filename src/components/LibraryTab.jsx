@@ -3,7 +3,6 @@ import EditMetadataModal from './EditMetadataModal';
 import React, { useState, useMemo } from 'react';
 import {
   Wand2,
-  Sparkles,
   FolderSearch,
   Search,
   Play,
@@ -12,13 +11,11 @@ import {
   Trash2,
   FolderOpen,
   Heart,
-  Music,
-  Disc3,
   MoreVertical,
-  SlidersHorizontal,
-  RefreshCw
+  Folder,
+  ArrowLeft,
+  Music
 } from 'lucide-react';
-import AppIcon from './AppIcon';
 import { CustomIcon } from './DuoIcons';
 
 export default function LibraryTab({
@@ -41,13 +38,70 @@ export default function LibraryTab({
   onToggleLike,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('title');
+  const [selectedFolder, setSelectedFolder] = useState(null); // null = overview folders grid, string = opened folder name
   const [isScanning, setIsScanning] = useState(false);
   const [isOrganizing, setIsOrganizing] = useState(false);
   const [organizeToast, setOrganizeToast] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [editingTrack, setEditingTrack] = useState(null);
   const [hoveredTrackId, setHoveredTrackId] = useState(null);
+
+  // Group songs into folders based on category/directory/album
+  const folders = useMemo(() => {
+    const map = new Map();
+    for (const song of songs) {
+      let folderName = 'General';
+      if (song.filePath) {
+        const parts = song.filePath.replace(/\\/g, '/').split('/');
+        if (parts.length > 2) {
+          const parentDir = parts[parts.length - 2];
+          if (parentDir && parentDir.toLowerCase() !== 'music' && parentDir.toLowerCase() !== 'playlists') {
+            folderName = parentDir;
+          }
+        }
+      } else if (song.album && song.album !== 'Unknown Album') {
+        folderName = song.album;
+      }
+
+      if (!map.has(folderName)) {
+        map.set(folderName, []);
+      }
+      map.get(folderName).push(song);
+    }
+
+    const list = [];
+    for (const [name, tracks] of map.entries()) {
+      const firstWithArt = tracks.find((t) => t.artworkUrl || t.coverArt);
+      const coverArt = firstWithArt?.artworkUrl || firstWithArt?.coverArt || null;
+      list.push({
+        name,
+        tracks,
+        trackCount: tracks.length,
+        coverArt,
+      });
+    }
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+  }, [songs]);
+
+  // Active track list: either tracks in selected folder or all filtered songs
+  const activeSongs = useMemo(() => {
+    if (selectedFolder) {
+      const f = folders.find((item) => item.name === selectedFolder);
+      return f ? f.tracks : [];
+    }
+    return songs;
+  }, [selectedFolder, folders, songs]);
+
+  const filteredSongs = useMemo(() => {
+    if (!searchQuery.trim()) return activeSongs;
+    const q = searchQuery.toLowerCase().trim();
+    return activeSongs.filter(
+      (s) =>
+        (s.title || '').toLowerCase().includes(q) ||
+        (s.artist || '').toLowerCase().includes(q) ||
+        (s.album || '').toLowerCase().includes(q)
+    );
+  }, [activeSongs, searchQuery]);
 
   const handleContextMenu = (e, track) => {
     e.preventDefault();
@@ -72,46 +126,24 @@ export default function LibraryTab({
       const res = await onOrganizeLibrary();
       if (res && res.success) {
         const parts = [];
-        if (res.movedCount) parts.push(res.movedCount + ' organized into folders');
-        if (res.updatedArtworkCount) parts.push(res.updatedArtworkCount + ' artworks fixed');
-        setOrganizeToast(parts.length > 0 ? parts.join(' & ') : 'Library and folders up to date');
+        if (res.movedCount) parts.push(res.movedCount + ' organized');
+        if (res.updatedArtworkCount) parts.push(res.updatedArtworkCount + ' artworks updated');
+        setOrganizeToast(parts.length > 0 ? parts.join(' & ') : 'Library folders up to date');
       } else {
         setOrganizeToast('Library checked & organized');
       }
     } catch (e) {
-      setOrganizeToast('Organization completed');
-    } finally {
-      setIsOrganizing(false);
-      setTimeout(() => setOrganizeToast(null), 4000);
+      setOrganizeToast('Organization complete');
     }
+    setIsOrganizing(false);
+    setTimeout(() => setOrganizeToast(null), 3500);
   };
 
-  const filteredSongs = useMemo(() => {
-    let list = [...songs];
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(
-        (s) =>
-          (s.title || '').toLowerCase().includes(q) ||
-          (s.artist || '').toLowerCase().includes(q) ||
-          (s.album || '').toLowerCase().includes(q)
-      );
-    }
-    list.sort((a, b) => {
-      if (sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
-      if (sortBy === 'artist') return (a.artist || '').localeCompare(b.artist || '');
-      if (sortBy === 'album') return (a.album || '').localeCompare(b.album || '');
-      if (sortBy === 'duration') return (a.durationSeconds || a.duration || 0) - (b.durationSeconds || b.duration || 0);
-      return 0;
-    });
-    return list;
-  }, [songs, searchQuery, sortBy]);
-
-  const formatDuration = (secs) => {
-    if (!secs || isNaN(secs)) return '3:30';
-    const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    return m + ':' + (s < 10 ? '0' : '') + s;
+  const formatDuration = (sec) => {
+    if (!sec || isNaN(sec)) return '3:45';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
   return (
@@ -124,7 +156,7 @@ export default function LibraryTab({
         padding: '24px 32px 40px 32px',
         backgroundColor: 'var(--bg-main, #f5f5f5)',
         overflowY: 'auto',
-        gap: '24px',
+        gap: '20px',
         fontFamily: 'inherit',
       }}
     >
@@ -135,33 +167,59 @@ export default function LibraryTab({
           alignItems: 'center',
           justifyContent: 'space-between',
           borderBottom: '1px solid var(--border-medium)',
-          paddingBottom: '16px',
+          paddingBottom: '14px',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {selectedFolder && (
+            <button
+              onClick={() => setSelectedFolder(null)}
+              style={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-medium)',
+                borderRadius: '8px',
+                padding: '6px 10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: 'var(--text-secondary)',
+              }}
+              title="Back to all folders"
+            >
+              <ArrowLeft size={14} />
+              <span>Folders</span>
+            </button>
+          )}
+
           <h1
             style={{
-              fontSize: '22px',
+              fontSize: '20px',
               fontWeight: 700,
               color: 'var(--text-primary)',
               letterSpacing: '-0.01em',
               margin: 0,
             }}
           >
-            Library
+            {selectedFolder ? selectedFolder : 'Music Library'}
           </h1>
+
           <span
             style={{
               fontSize: '11px',
               fontWeight: 600,
-              padding: '3px 10px',
+              padding: '2px 8px',
               borderRadius: '999px',
               backgroundColor: 'var(--bg-card)',
               color: 'var(--text-secondary)',
               border: '1px solid var(--border-medium)',
             }}
           >
-            {songs.length + ' ' + (songs.length === 1 ? 'Track' : 'Tracks')}
+            {selectedFolder
+              ? `${filteredSongs.length} tracks`
+              : `${folders.length} ${folders.length === 1 ? 'folder' : 'folders'} • ${songs.length} tracks`}
           </span>
         </div>
 
@@ -198,15 +256,14 @@ export default function LibraryTab({
                 backgroundColor: 'var(--bg-card)',
                 color: 'var(--text-primary)',
                 border: '1px solid var(--border-medium)',
-                fontSize: '12.5px',
+                fontSize: '12px',
                 fontWeight: 500,
                 cursor: (isOrganizing || isScanning) ? 'wait' : 'pointer',
-                transition: 'all 0.15s ease',
               }}
-              title="Clean track titles, move files into genre folders, and update artworks"
+              title="Organize files into category folders"
             >
-              <Wand2 size={14} className={isOrganizing ? 'animate-spin' : ''} style={{ color: 'var(--primary, #7c5cbf)' }} />
-              <span>{isOrganizing ? 'Organizing...' : 'Organize & Fix'}</span>
+              <Wand2 size={13} className={isOrganizing ? 'animate-spin' : ''} style={{ color: 'var(--primary, #7c5cbf)' }} />
+              <span>{isOrganizing ? 'Organizing...' : 'Organize'}</span>
             </button>
           )}
 
@@ -222,200 +279,157 @@ export default function LibraryTab({
                 backgroundColor: 'var(--bg-card)',
                 color: 'var(--text-secondary)',
                 border: '1px solid var(--border-medium)',
-                fontSize: '12.5px',
+                fontSize: '12px',
                 fontWeight: 500,
                 cursor: 'pointer',
-                transition: 'all 0.15s ease',
               }}
-              title="Open Music folder in Windows Explorer"
+              title="Open folder in Explorer"
             >
-              <FolderOpen size={14} />
-              <span>Open Music Folder</span>
+              <FolderOpen size={13} />
+              <span>Folder</span>
             </button>
           )}
 
-          <button
-            onClick={handleScan}
-            disabled={isScanning}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '8px',
-              backgroundColor: 'var(--primary, #7c5cbf)',
-              color: '#ffffff',
-              border: 'none',
-              fontSize: '12.5px',
-              fontWeight: 500,
-              cursor: isScanning ? 'wait' : 'pointer',
-              boxShadow: '0 2px 8px rgba(124, 92, 191, 0.25)',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <FolderSearch size={14} color="#ffffff" className={isScanning ? 'animate-spin' : ''} />
-            <span>{isScanning ? 'Scanning...' : 'Scan Music Folder'}</span>
-          </button>
+          {onScanLibrary && (
+            <button
+              onClick={handleScan}
+              disabled={isScanning || isOrganizing}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                backgroundColor: 'var(--primary, #7c5cbf)',
+                color: '#ffffff',
+                border: 'none',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: (isScanning || isOrganizing) ? 'wait' : 'pointer',
+              }}
+              title="Scan music files on disk"
+            >
+              <FolderSearch size={13} color="#ffffff" className={isScanning ? 'animate-spin' : ''} />
+              <span>{isScanning ? 'Scanning...' : 'Scan'}</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Picked for You Today Section */}
-      {songs.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Sparkles size={17} color="var(--primary, #7c5cbf)" />
-            <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-              Picked for You Today
-            </h2>
-          </div>
+      {/* VIEW 1: FOLDERS OVERVIEW GRID (Playlist Style) */}
+      {!selectedFolder ? (
+        folders.length === 0 ? (
           <div
             style={{
+              padding: '60px 20px',
+              borderRadius: '12px',
+              backgroundColor: 'var(--bg-card)',
+              border: '1px dashed var(--border-medium)',
+              textAlign: 'center',
               display: 'flex',
-              gap: '14px',
-              overflowX: 'auto',
-              paddingBottom: '6px',
-              scrollbarWidth: 'none',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '8px',
             }}
           >
-            {songs.slice(0, 10).map((track) => {
-              const isCurrent = currentTrack && (currentTrack.id === track.id || (currentTrack.filePath && currentTrack.filePath === track.filePath));
-              const isTrackPlaying = isCurrent && isPlaying;
-              const art = track.artworkUrl || track.coverArt;
-              return (
+            <Folder size={32} color="var(--primary, #7c5cbf)" style={{ opacity: 0.6 }} />
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              No music folders found
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '360px' }}>
+              Download music or add songs to your Music directory to browse them by folder here.
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+              gap: '14px',
+            }}
+          >
+            {folders.map((f) => (
+              <div
+                key={f.name}
+                onClick={() => setSelectedFolder(f.name)}
+                style={{
+                  padding: '10px',
+                  backgroundColor: 'var(--bg-card)',
+                  borderRadius: '12px',
+                  border: '1px solid var(--border-medium)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 14px rgba(0,0,0,0.08)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'none';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)';
+                }}
+              >
+                {/* 1:1 Cover Art / Folder Icon */}
                 <div
-                  key={track.id || track.filePath}
-                  onClick={() => onPlaySong && onPlaySong(track, songs)}
-                  onContextMenu={(e) => handleContextMenu(e, track)}
                   style={{
-                    width: '145px',
-                    flexShrink: 0,
-                    backgroundColor: 'var(--bg-card, #ffffff)',
-                    borderRadius: '12px',
-                    padding: '10px',
-                    border: '1px solid var(--border-medium)',
-                    cursor: 'pointer',
+                    width: '100%',
+                    aspectRatio: '1 / 1',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    backgroundColor: 'var(--bg-main)',
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                    position: 'relative',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-3px)';
-                    e.currentTarget.style.boxShadow = '0 6px 14px rgba(0,0,0,0.08)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'none';
-                    e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.03)';
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
+                  {f.coverArt ? (
+                    <img src={f.coverArt} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <Folder size={28} color="var(--primary, #7c5cbf)" />
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
                   <div
                     style={{
-                      width: '100%',
-                      aspectRatio: '1 / 1',
-                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: 'var(--text-primary)',
+                      whiteSpace: 'nowrap',
                       overflow: 'hidden',
-                      backgroundColor: 'var(--bg-main)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative',
+                      textOverflow: 'ellipsis',
                     }}
+                    title={f.name}
                   >
-                    {art ? (
-                      <img
-                        src={art}
-                        alt={track.title}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <CustomIcon size={32} stroke="var(--primary, #7c5cbf)" />
-                    )}
-
-                    {/* Play Overlay */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        right: '8px',
-                        bottom: '8px',
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        backgroundColor: 'var(--primary, #7c5cbf)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 3px 8px rgba(0,0,0,0.2)',
-                        opacity: isTrackPlaying ? 1 : 0.9,
-                        transition: 'transform 0.15s ease',
-                      }}
-                    >
-                      {isTrackPlaying ? (
-                        <Pause size={14} color="#ffffff" fill="#ffffff" />
-                      ) : (
-                        <Play size={14} color="#ffffff" fill="#ffffff" style={{ marginLeft: '2px' }} />
-                      )}
-                    </div>
+                    {f.name}
                   </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                    <span
-                      style={{
-                        fontSize: '12.5px',
-                        fontWeight: 600,
-                        color: isCurrent ? 'var(--primary, #7c5cbf)' : 'var(--text-primary)',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                      title={track.title}
-                    >
-                      {track.title}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: '11px',
-                        fontWeight: 400,
-                        color: 'var(--text-muted)',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      {track.artist || 'Local Track'}
-                    </span>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                    {f.trackCount} {f.trackCount === 1 ? 'song' : 'songs'}
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
-        </div>
-      )}
-
-      {/* Filter and Search Bar Header */}
-      {songs.length > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '14px',
-            flexWrap: 'wrap',
-          }}
-        >
+        )
+      ) : (
+        /* VIEW 2: INSIDE FOLDER SONGS LIST */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* Search bar inside folder */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '9px',
+              gap: '8px',
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-medium)',
-              borderRadius: '9px',
+              borderRadius: '8px',
               padding: '0 12px',
               height: '36px',
-              width: '280px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              maxWidth: '320px',
             }}
           >
             <Search size={14} color="var(--text-muted)" />
@@ -423,13 +437,12 @@ export default function LibraryTab({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filter tracks by title, artist, album..."
+              placeholder="Search tracks in folder..."
               style={{
                 border: 'none',
                 background: 'transparent',
                 outline: 'none',
                 fontSize: '12.5px',
-                fontWeight: 500,
                 color: 'var(--text-primary)',
                 width: '100%',
               }}
@@ -451,382 +464,221 @@ export default function LibraryTab({
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>Sort:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
+          {filteredSongs.length === 0 ? (
+            <div
               style={{
-                height: '36px',
-                padding: '0 12px',
+                padding: '40px 20px',
+                borderRadius: '10px',
                 backgroundColor: 'var(--bg-card)',
                 border: '1px solid var(--border-medium)',
-                borderRadius: '8px',
-                fontSize: '12.5px',
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                outline: 'none',
-                cursor: 'pointer',
+                textAlign: 'center',
+                color: 'var(--text-secondary)',
+                fontSize: '13px',
               }}
             >
-              <option value="title">Title (A-Z)</option>
-              <option value="artist">Artist (A-Z)</option>
-              <option value="album">Album (A-Z)</option>
-              <option value="duration">Duration</option>
-            </select>
-          </div>
-        </div>
-      )}
-
-      {/* Downside Area: Modernized Premium NorthTracks Songs Table */}
-      {filteredSongs.length === 0 ? (
-        <div
-          style={{
-            padding: '70px 20px',
-            textAlign: 'center',
-            color: 'var(--text-muted)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '10px',
-            backgroundColor: 'var(--bg-card)',
-            borderRadius: '12px',
-            border: '1px solid var(--border-medium)',
-          }}
-        >
-          <div style={{ opacity: 0.6 }}><AppIcon size={42} /></div>
-          <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
-            No Music Files Found
-          </span>
-          <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)', maxWidth: '300px' }}>
-            Paste any link on the Home tab to download and index music in your library.
-          </span>
-          {onNavigateToHome && (
-            <button
-              onClick={onNavigateToHome}
+              No songs found in this folder.
+            </div>
+          ) : (
+            <div
               style={{
-                marginTop: '10px',
-                padding: '7px 16px',
-                borderRadius: '20px',
-                backgroundColor: 'var(--primary, #7c5cbf)',
-                color: '#ffffff',
-                border: 'none',
-                fontSize: '12.5px',
-                fontWeight: 500,
-                cursor: 'pointer',
+                backgroundColor: 'var(--bg-card)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-medium)',
+                overflow: 'hidden',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
               }}
             >
-              Go to Home Tab
-            </button>
-          )}
-        </div>
-      ) : (
-        <div
-          style={{
-            backgroundColor: 'var(--bg-card, #ffffff)',
-            borderRadius: '12px',
-            border: '1px solid var(--border-medium, rgba(0, 0, 0, 0.08))',
-            overflow: 'hidden',
-            boxShadow: '0 2px 10px rgba(0, 0, 0, 0.02)',
-          }}
-        >
-          <table className="tracks-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr
-                style={{
-                  borderBottom: '1px solid var(--border-medium)',
-                  backgroundColor: 'rgba(0, 0, 0, 0.02)',
-                }}
-              >
-                <th style={{ width: '56px', textAlign: 'center', padding: '12px 0', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>#</th>
-                <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>TITLE</th>
-                <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>ARTIST</th>
-                <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>ALBUM</th>
-                <th style={{ width: '90px', textAlign: 'center', padding: '12px 8px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  <Clock size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />
-                </th>
-                <th style={{ width: '120px', textAlign: 'center', padding: '12px 16px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredSongs.map((track, idx) => {
-                const trackKey = track.id || track.filePath || idx;
-                const isCurrent =
-                  currentTrack &&
-                  (currentTrack.id === track.id || currentTrack.filePath === track.filePath);
-                const isTrackPlaying = isCurrent && isPlaying;
-                const isLiked = likedTracks.includes(track.id || track.filePath || track.title);
-                const isHovered = hoveredTrackId === trackKey;
-                const art = track.artworkUrl || track.coverArt;
-
-                return (
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12.5px' }}>
+                <thead>
                   <tr
-                    key={trackKey}
-                    className={isCurrent ? 'playing-row' : ''}
                     style={{
-                      cursor: 'pointer',
-                      borderBottom: '1px solid var(--border-light, rgba(0, 0, 0, 0.04))',
-                      backgroundColor: isCurrent ? 'rgba(124, 92, 191, 0.08)' : (isHovered ? 'var(--bg-card-hover, rgba(0,0,0,0.02))' : 'transparent'),
-                      transition: 'background-color 0.12s ease',
+                      borderBottom: '1px solid var(--border-medium)',
+                      backgroundColor: 'var(--bg-main)',
+                      color: 'var(--text-muted)',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
                     }}
-                    onClick={() => onPlaySong && onPlaySong(track, filteredSongs)}
-                    onMouseEnter={() => setHoveredTrackId(trackKey)}
-                    onMouseLeave={() => setHoveredTrackId(null)}
-                    onContextMenu={(e) => handleContextMenu(e, track)}
                   >
-                    {/* Index / Playing Equalizer / Hover Play */}
-                    <td style={{ textAlign: 'center', color: isCurrent ? 'var(--primary)' : 'var(--text-muted)', padding: '10px 0', width: '56px' }}>
-                      {isTrackPlaying ? (
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2.5px', height: '14px' }}>
-                          <span style={{ width: '3px', height: '14px', backgroundColor: 'var(--primary, #7c5cbf)', borderRadius: '2px', animation: 'bounce 0.8s infinite alternate' }} />
-                          <span style={{ width: '3px', height: '10px', backgroundColor: 'var(--primary, #7c5cbf)', borderRadius: '2px', animation: 'bounce 0.8s infinite alternate 0.2s' }} />
-                          <span style={{ width: '3px', height: '12px', backgroundColor: 'var(--primary, #7c5cbf)', borderRadius: '2px', animation: 'bounce 0.8s infinite alternate 0.4s' }} />
-                        </div>
-                      ) : isHovered ? (
-                        <div
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            color: isCurrent ? 'var(--primary)' : 'var(--text-primary)',
-                          }}
-                        >
-                          <Play size={13} fill="currentColor" style={{ marginLeft: '2px' }} />
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: '12.5px', fontWeight: 500 }}>{idx + 1}</span>
-                      )}
-                    </td>
+                    <th style={{ width: '48px', textAlign: 'center', padding: '10px 0' }}>#</th>
+                    <th style={{ padding: '10px 14px' }}>Title</th>
+                    <th style={{ padding: '10px 14px' }}>Artist</th>
+                    <th style={{ width: '80px', textAlign: 'center', padding: '10px 8px' }}>
+                      <Clock size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />
+                    </th>
+                    <th style={{ width: '100px', textAlign: 'center', padding: '10px 12px' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSongs.map((track, idx) => {
+                    const trackKey = track.id || track.filePath || idx;
+                    const isCurrent = currentTrack && (currentTrack.id === track.id || currentTrack.filePath === track.filePath);
+                    const isTrackPlaying = isCurrent && isPlaying;
+                    const isLiked = likedTracks.includes(track.id || track.filePath || track.title);
+                    const art = track.artworkUrl || track.coverArt;
 
-                    {/* Title & Artwork Thumbnail */}
-                    <td style={{ padding: '10px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div
-                          style={{
-                            width: '42px',
-                            height: '42px',
-                            borderRadius: '8px',
-                            backgroundColor: 'var(--bg-main)',
-                            border: '1px solid var(--border-medium)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden',
-                            flexShrink: 0,
-                            position: 'relative',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
-                          }}
-                        >
-                          {art ? (
-                            <img
-                              src={art}
-                              alt=""
-                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-                          ) : (
-                            <div
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: 'rgba(124, 92, 191, 0.08)',
-                                color: 'var(--primary)',
-                              }}
-                            >
-                              <Music size={18} strokeWidth={2} />
-                            </div>
-                          )}
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                          <span
-                            style={{
-                              fontWeight: 600,
-                              fontSize: '13.5px',
-                              color: isCurrent ? 'var(--primary, #7c5cbf)' : 'var(--text-primary)',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              letterSpacing: '-0.01em',
-                            }}
-                            title={track.title}
-                          >
-                            {track.title}
-                          </span>
-                          {track.formatType && (
-                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                              {track.formatType}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Artist */}
-                    <td
-                      style={{
-                        padding: '10px 16px',
-                        color: 'var(--text-secondary)',
-                        fontSize: '13px',
-                        fontWeight: 500,
-                        maxWidth: '220px',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                      title={track.artist || 'Unknown Artist'}
-                    >
-                      {track.artist || 'Unknown Artist'}
-                    </td>
-
-                    {/* Album */}
-                    <td
-                      style={{
-                        padding: '10px 16px',
-                        color: 'var(--text-muted)',
-                        fontSize: '12.5px',
-                        fontWeight: 400,
-                        maxWidth: '220px',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                      title={track.album || 'Single / Master'}
-                    >
-                      {track.album || 'Single / Master'}
-                    </td>
-
-                    {/* Duration */}
-                    <td
-                      style={{
-                        padding: '10px 8px',
-                        textAlign: 'center',
-                        color: 'var(--text-secondary)',
-                        fontSize: '12.5px',
-                        fontWeight: 500,
-                        fontVariantNumeric: 'tabular-nums',
-                      }}
-                    >
-                      {formatDuration(track.durationSeconds || track.duration)}
-                    </td>
-
-                    {/* Actions */}
-                    <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                      <div
+                    return (
+                      <tr
+                        key={trackKey}
+                        onContextMenu={(e) => handleContextMenu(e, track)}
+                        onDoubleClick={() => onPlaySong && onPlaySong(track, filteredSongs)}
                         style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          justifyContent: 'center',
+                          borderBottom: idx === filteredSongs.length - 1 ? 'none' : '1px solid var(--border-light, rgba(0,0,0,0.04))',
+                          backgroundColor: isCurrent ? 'rgba(124, 92, 191, 0.08)' : 'transparent',
+                          transition: 'background-color 0.12s ease',
+                          cursor: 'pointer',
                         }}
-                        onClick={(e) => e.stopPropagation()}
+                        onMouseEnter={(e) => {
+                          setHoveredTrackId(trackKey);
+                          if (!isCurrent) e.currentTarget.style.backgroundColor = 'var(--bg-card-hover, rgba(0,0,0,0.02))';
+                        }}
+                        onMouseLeave={(e) => {
+                          setHoveredTrackId(null);
+                          if (!isCurrent) e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
                       >
-                        <button
-                          onClick={() => onToggleLike && onToggleLike(track)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '6px',
-                            borderRadius: '6px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: isLiked ? '#a78bfa' : 'var(--text-muted)',
-                            transition: 'transform 0.1s ease',
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          title={isLiked ? 'Unlike' : 'Like'}
-                        >
-                          <Heart size={15} fill={isLiked ? '#a78bfa' : 'none'} color={isLiked ? '#a78bfa' : 'currentColor'} />
-                        </button>
-
-                        <button
-                          onClick={() => onPlaySong && onPlaySong(track, filteredSongs)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '6px',
-                            borderRadius: '6px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: isCurrent ? 'var(--primary)' : 'var(--text-muted)',
-                            transition: 'transform 0.1s ease',
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          title={isTrackPlaying ? 'Pause' : 'Play'}
-                        >
-                          {isTrackPlaying ? <Pause size={15} /> : <Play size={15} />}
-                        </button>
-
-                        {onTrashSong && (
+                        {/* Index / Play indicator */}
+                        <td style={{ textAlign: 'center', padding: '10px 0' }}>
                           <button
-                            onClick={() => onTrashSong(track)}
+                            onClick={() => {
+                              if (isCurrent && onTogglePlay) onTogglePlay();
+                              else if (onPlaySong) onPlaySong(track, filteredSongs);
+                            }}
                             style={{
                               background: 'transparent',
                               border: 'none',
                               cursor: 'pointer',
-                              padding: '6px',
-                              borderRadius: '6px',
-                              display: 'flex',
+                              color: isCurrent ? 'var(--primary, #7c5cbf)' : 'var(--text-muted)',
+                              padding: '2px',
+                              display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              color: 'var(--text-muted)',
-                              transition: 'all 0.15s ease',
                             }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
-                              e.currentTarget.style.color = '#ef4444';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                              e.currentTarget.style.color = 'var(--text-muted)';
-                            }}
-                            title="Move to Trash"
                           >
-                            <Trash2 size={14} />
+                            {isTrackPlaying ? (
+                              <Pause size={13} fill="currentColor" />
+                            ) : hoveredTrackId === trackKey ? (
+                              <Play size={13} fill="currentColor" />
+                            ) : (
+                              <span style={{ fontSize: '11px', fontWeight: isCurrent ? 700 : 400 }}>{idx + 1}</span>
+                            )}
                           </button>
-                        )}
+                        </td>
 
-                        <button
-                          onClick={(e) => handleContextMenu(e, track)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '6px',
-                            borderRadius: '6px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: 'var(--text-muted)',
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.05)'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          title="More Options"
-                        >
-                          <MoreVertical size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        {/* Title & Artwork */}
+                        <td style={{ padding: '10px 14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '6px',
+                                backgroundColor: 'var(--bg-main)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                overflow: 'hidden',
+                                flexShrink: 0,
+                              }}
+                            >
+                              {art ? (
+                                <img src={art} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <CustomIcon size={15} stroke="var(--primary, #7c5cbf)" />
+                              )}
+                            </div>
+                            <span
+                              style={{
+                                fontWeight: isCurrent ? 700 : 600,
+                                fontSize: '13px',
+                                color: isCurrent ? 'var(--primary, #7c5cbf)' : 'var(--text-primary)',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                maxWidth: '300px',
+                              }}
+                            >
+                              {track.title}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Artist */}
+                        <td style={{ padding: '10px 14px', color: 'var(--text-secondary)' }}>
+                          <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
+                            {track.artist || 'Unknown Artist'}
+                          </div>
+                        </td>
+
+                        {/* Duration */}
+                        <td style={{ textAlign: 'center', padding: '10px 8px', color: 'var(--text-muted)', fontSize: '11.5px' }}>
+                          {formatDuration(track.durationSeconds || track.duration)}
+                        </td>
+
+                        {/* Actions */}
+                        <td style={{ textAlign: 'center', padding: '10px 12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                            {onToggleLike && (
+                              <button
+                                onClick={() => onToggleLike(track.id || track.filePath || track.title)}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  padding: '4px',
+                                  color: isLiked ? '#ef4444' : 'var(--text-muted)',
+                                }}
+                                title={isLiked ? 'Unlike' : 'Like'}
+                              >
+                                <Heart size={14} fill={isLiked ? '#ef4444' : 'none'} />
+                              </button>
+                            )}
+
+                            {/* Direct Delete button */}
+                            <button
+                              onClick={() => {
+                                if (onPermanentDelete) onPermanentDelete(track);
+                                else if (onTrashSong) onTrashSong(track);
+                              }}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                color: 'var(--text-muted)',
+                              }}
+                              title="Delete track"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+
+                            <button
+                              onClick={(e) => handleContextMenu(e, track)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                color: 'var(--text-muted)',
+                              }}
+                              title="More"
+                            >
+                              <MoreVertical size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Right Click Context Menu */}
+      {/* Context Menu */}
       {contextMenu && (
         <ContextMenu
           x={contextMenu.x}
@@ -841,26 +693,19 @@ export default function LibraryTab({
           onToggleLike={(t) => onToggleLike && onToggleLike(t)}
           onAddToPlaylist={(plId, t) => onAddToPlaylist && onAddToPlaylist(plId, t.id || t.filePath)}
           onDeleteTrack={(t) => {
-            if (confirm(`Permanently delete "${t.title}" from disk?`)) {
-              if (onPermanentDelete) {
-                onPermanentDelete(t);
-              } else if (onTrashSong) {
-                onTrashSong(t);
-              }
-            }
+            if (onPermanentDelete) onPermanentDelete(t);
+            else if (onTrashSong) onTrashSong(t);
           }}
         />
       )}
 
-      {/* Manual Metadata & Artwork Edit Modal */}
+      {/* Edit Metadata Modal */}
       {editingTrack && (
         <EditMetadataModal
           track={editingTrack}
           onClose={() => setEditingTrack(null)}
           onSave={(trackId, updates) => {
-            if (onUpdateSong) {
-              onUpdateSong(trackId, updates);
-            }
+            if (onUpdateSong) onUpdateSong(trackId, updates);
           }}
         />
       )}

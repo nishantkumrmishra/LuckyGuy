@@ -68,11 +68,7 @@ export default function App() {
       const saved = localStorage.getItem('localguy-playlists');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return [
-      { id: 'pl-chill', name: 'Chill Vibes', description: 'Lo-Fi beats and ambient tracks', icon: '🎧', tracks: [] },
-      { id: 'pl-favorites', name: 'Top Hits', description: 'Heavy rotation studio masters', icon: '🔥', tracks: [] },
-      { id: 'pl-night', name: 'Late Night Focus', description: 'Deep electronic and downtempo', icon: '🌙', tracks: [] },
-    ];
+    return [];
   });
 
   const handleCreatePlaylist = (name, description, icon = '🎵') => {
@@ -606,18 +602,31 @@ export default function App() {
       const deletedPaths = new Set(itemsToDelete.map((item) => item.destinationPath || item.filePath).filter(Boolean));
       setCompletedDownloads((prev) => prev.filter((d) => !ids.includes(d.id)));
       setSongs((prev) => prev.filter((s) => !ids.includes(s.id) && !deletedPaths.has(s.filePath)));
-      setTrash((prev) => [...itemsToDelete, ...prev]);
+      for (const item of itemsToDelete) {
+        const fp = item.destinationPath || item.filePath;
+        if (window.electronAPI?.deleteFilePermanently) {
+          window.electronAPI.deleteFilePermanently(fp, item.id);
+        }
+      }
     }
   };
 
   const handleClearCompleted = () => {
-    setTrash((prev) => [...completedDownloads, ...prev]);
+    for (const item of completedDownloads) {
+      const fp = item.destinationPath || item.filePath;
+      if (window.electronAPI?.deleteFilePermanently) {
+        window.electronAPI.deleteFilePermanently(fp, item.id);
+      }
+    }
     setSongs((prev) => prev.filter((s) => !completedDownloads.some((d) => d.id === s.id || (d.destinationPath && d.destinationPath === s.filePath))));
     setCompletedDownloads([]);
   };
 
   const handleTrashSong = (track) => {
     const filePath = track.filePath || track.destinationPath;
+    if (window.electronAPI?.deleteFilePermanently) {
+      window.electronAPI.deleteFilePermanently(filePath, track.id);
+    }
     setSongs((prev) => {
       const remaining = prev.filter((s) => s.id !== track.id && (!filePath || s.filePath !== filePath));
       if (currentTrack && (currentTrack.id === track.id || currentTrack.filePath === filePath)) {
@@ -631,8 +640,7 @@ export default function App() {
       }
       return remaining;
     });
-    setCompletedDownloads((prev) => prev.filter((d) => d.id !== track.id && (!filePath || d.destinationPath !== filePath)));
-    setTrash((prev) => [track, ...prev]);
+    setCompletedDownloads((prev) => prev.filter((d) => d.id !== track.id && (!filePath || (d.destinationPath !== filePath && d.filePath !== filePath))));
   };
 
   const handleRestoreTrack = (track) => {
@@ -1105,16 +1113,6 @@ export default function App() {
                 downloadFolder={preferences?.downloadFolder || 'C:\\Users\\nishant\\Music'}
                 onNavigateToHome={() => setActiveTab('home')}
                 onNavigateToLibrary={() => setActiveTab('library')}
-              />
-            )}
-
-            {activeTab === 'trash' && (
-              <TrashTab
-                trashItems={trash}
-                onRestoreTrack={handleRestoreTrack}
-                onPermanentDelete={handlePermanentDelete}
-                onEmptyTrash={handleEmptyTrash}
-                onNavigateToHome={() => setActiveTab('home')}
               />
             )}
 
