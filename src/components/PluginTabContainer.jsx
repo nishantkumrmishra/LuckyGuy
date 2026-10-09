@@ -104,6 +104,13 @@ export default function PluginTabContainer({
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [activePlayerVideo, setActivePlayerVideo] = useState(null);
+  const [watchHistory, setWatchHistory] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('luckyguy-video-history-' + plugin.id) || '[]');
+    } catch (e) {
+      return [];
+    }
+  });
   const [activeLightboxImage, setActiveLightboxImage] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [downloadSuccessMsg, setDownloadSuccessMsg] = useState('');
@@ -334,9 +341,14 @@ export default function PluginTabContainer({
             if (!vkey || seen.has(vkey)) return;
             seen.add(vkey);
 
-            const titleEl = el.querySelector('.title a, .title, a[title]');
-            let title = titleEl ? (titleEl.getAttribute('title') || titleEl.textContent) : '';
+            const titleLink = el.querySelector('span.title a, .title a, .videoTitle, a.linkVideoThumb');
+            const imgEl = el.querySelector('img');
+            let title = titleLink ? (titleLink.getAttribute('title') || titleLink.textContent) : (imgEl?.getAttribute('alt') || '');
             title = (title || '').trim();
+            if (/^\d+:\d+(:\d+)?$/.test(title.trim())) {
+              title = imgEl?.getAttribute('alt') || ('Video ' + vkey);
+            }
+            title = title.replace(/^\d+:\d+(:\d+)?\s*/, '').trim();
             if (!title) return;
 
             const imgEl = el.querySelector('img');
@@ -676,6 +688,23 @@ export default function PluginTabContainer({
   const handlePlayVideo = (video) => {
     setActivePlayerVideo(video);
     if (onVideoPlay) onVideoPlay();
+
+    // Save to Watch History & adapt recommendations
+    try {
+      const historyKey = 'luckyguy-video-history-' + plugin.id;
+      const existing = JSON.parse(localStorage.getItem(historyKey) || '[]');
+      const filtered = existing.filter(v => v.id !== video.id && v.url !== video.url);
+      const updated = [{
+        id: video.id,
+        title: video.title,
+        thumbnail: video.thumbnail,
+        url: video.url,
+        author: video.author,
+        watchedAt: Date.now()
+      }, ...filtered].slice(0, 50);
+      localStorage.setItem(historyKey, JSON.stringify(updated));
+      setWatchHistory(updated);
+    } catch(e) {}
   };
 
   const handleToggleSelect = (id) => {
@@ -822,6 +851,192 @@ export default function PluginTabContainer({
           background-color: var(--bg-card-hover, rgba(0, 0, 0, 0.05));
         }
       `}</style>
+
+      {/* Sleek Top Navigation Toolbar inside Tab (Back, Forward, Refresh, URL, View Toggle) */}
+      {!activePlayerVideo && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '10px 20px',
+            backgroundColor: 'var(--bg-card, #ffffff)',
+            borderBottom: '1px solid var(--border-medium, #e2e8f0)',
+            gap: '8px',
+            flexShrink: 0,
+          }}
+        >
+          {/* Back, Forward, Reload buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <button
+              type="button"
+              onClick={handleWebBack}
+              title="Go Back"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '6px',
+                border: '1px solid var(--border-medium, #e2e8f0)',
+                backgroundColor: 'var(--bg-main, #f8fafc)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+              }}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={handleWebForward}
+              title="Go Forward"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '6px',
+                border: '1px solid var(--border-medium, #e2e8f0)',
+                backgroundColor: 'var(--bg-main, #f8fafc)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+              }}
+            >
+              <ChevronRight size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={handleWebReload}
+              title="Refresh"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '6px',
+                border: '1px solid var(--border-medium, #e2e8f0)',
+                backgroundColor: 'var(--bg-main, #f8fafc)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+              }}
+            >
+              <RefreshCw size={13} />
+            </button>
+          </div>
+
+          {/* URL Address Bar */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              let target = (inputUrl || '').trim();
+              if (target) {
+                let resolved = resolveDomainAlias(target);
+                if (!resolved.startsWith('http://') && !resolved.startsWith('https://')) {
+                  resolved = 'https://www.pornhub.org/video/search?search=' + encodeURIComponent(resolved);
+                }
+                setActiveUrl(resolved);
+                setInputUrl(resolved);
+                if (webviewRef.current) {
+                  try { webviewRef.current.loadURL(resolved); } catch(err) {}
+                }
+              }
+            }}
+            style={{
+              flex: 1,
+              maxWidth: '650px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                height: '34px',
+                backgroundColor: 'var(--bg-main, #f8fafc)',
+                borderRadius: '6px',
+                border: '1px solid var(--border-medium, #e2e8f0)',
+                padding: '0 12px',
+                gap: '8px',
+              }}
+            >
+              <Globe size={13} color="var(--text-muted)" />
+              <input
+                type="text"
+                value={inputUrl}
+                onChange={(e) => setInputUrl(e.target.value)}
+                placeholder="https://www.pornhub.org"
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  background: 'transparent',
+                  outline: 'none',
+                  fontSize: '12px',
+                  color: 'var(--text-primary)',
+                  fontFamily: 'monospace',
+                }}
+              />
+            </div>
+          </form>
+
+          {/* View Mode Toggle: Grid | Web */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              backgroundColor: 'var(--bg-main, #f8fafc)',
+              borderRadius: '6px',
+              border: '1px solid var(--border-medium, #e2e8f0)',
+              padding: '2px',
+              marginLeft: 'auto',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => { setViewMode('grid'); extractVideosFromWebview(); }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 10px',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: viewMode === 'grid' ? 'var(--primary, #7c5cbf)' : 'transparent',
+                color: viewMode === 'grid' ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <LayoutGrid size={12} />
+              <span>Media Grid</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('web')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '4px 10px',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: viewMode === 'web' ? 'var(--primary, #7c5cbf)' : 'transparent',
+                color: viewMode === 'web' ? '#ffffff' : 'var(--text-secondary)',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <Globe size={12} />
+              <span>Web Frame</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Floating Batch Selection Bar */}
       {selectedIds.size > 0 && (
@@ -1538,7 +1753,7 @@ export default function PluginTabContainer({
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))',
                 gap: '20px',
               }}
             >
@@ -1556,8 +1771,8 @@ export default function PluginTabContainer({
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                gap: '22px',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))',
+                gap: '14px',
               }}
             >
               {crawledMedia.map((item) => {
@@ -1572,14 +1787,15 @@ export default function PluginTabContainer({
                     style={{
                       display: 'flex',
                       flexDirection: 'column',
-                      borderRadius: '10px',
+                      borderRadius: '8px',
                       backgroundColor: 'var(--bg-card, #ffffff)',
-                      border: `1.5px solid ${isSelected ? 'var(--primary, #7c5cbf)' : 'var(--border-medium, #e2e8f0)'}`,
+                      border: `1px solid ${isSelected ? 'var(--primary, #7c5cbf)' : 'var(--border-medium, #e2e8f0)'}`,
                       overflow: 'hidden',
                       position: 'relative',
+                      cursor: 'pointer',
                     }}
                   >
-                    {/* 16:9 Thumbnail Box */}
+                    {/* Artwork / Thumbnail Box */}
                     <div
                       style={{
                         position: 'relative',
@@ -1601,13 +1817,32 @@ export default function PluginTabContainer({
                         }}
                       />
 
-                      {/* Hover Overlay: Play icon for video, Zoom icon for image */}
+                      {/* Small subtle duration tag in bottom corner */}
+                      {item.duration && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            bottom: '5px',
+                            right: '5px',
+                            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                            color: '#ffffff',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            padding: '1px 5px',
+                            borderRadius: '3px',
+                          }}
+                        >
+                          {item.duration}
+                        </span>
+                      )}
+
+                      {/* Hover Overlay: Play icon */}
                       <div
                         className="thumb-play-icon"
                         style={{
                           position: 'absolute',
                           inset: 0,
-                          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                          backgroundColor: 'rgba(0, 0, 0, 0.35)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1615,172 +1850,65 @@ export default function PluginTabContainer({
                       >
                         <div
                           style={{
-                            width: '44px',
-                            height: '44px',
+                            width: '36px',
+                            height: '36px',
                             borderRadius: '50%',
                             backgroundColor: 'rgba(255, 255, 255, 0.95)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             color: '#09090b',
-                            boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
+                            boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
                           }}
                         >
-                          {isImg ? (
-                            <ZoomIn size={20} color="#09090b" />
-                          ) : (
-                            <Play size={20} fill="#09090b" style={{ marginLeft: '3px' }} />
-                          )}
+                          <Play size={16} fill="#09090b" style={{ marginLeft: '2px' }} />
                         </div>
                       </div>
 
-                      {/* Duration / Format Tag (Bottom-Right) */}
-                      <span
+                      {/* Hover Download button in top-right */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadSingle(item);
+                        }}
                         style={{
                           position: 'absolute',
-                          bottom: '6px',
-                          right: '6px',
-                          backgroundColor: 'rgba(0, 0, 0, 0.82)',
-                          color: '#ffffff',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          padding: '2px 6px',
+                          top: '5px',
+                          right: '5px',
+                          width: '26px',
+                          height: '26px',
                           borderRadius: '4px',
+                          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                          border: 'none',
+                          color: '#fff',
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '4px',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
                         }}
+                        title="Download"
                       >
-                        {isImg && <ImageIcon size={11} />}
-                        <span>{item.duration}</span>
-                      </span>
-
-                      {/* Quality Tag (Top-Left) */}
-                      <span
-                        style={{
-                          position: 'absolute',
-                          top: '6px',
-                          left: '6px',
-                          backgroundColor: 'rgba(0, 0, 0, 0.75)',
-                          color: isImg ? '#38bdf8' : '#f59e0b',
-                          fontSize: '10px',
-                          fontWeight: 700,
-                          padding: '2px 5px',
-                          borderRadius: '4px',
-                          border: `1px solid ${isImg ? 'rgba(56, 189, 248, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`,
-                        }}
-                      >
-                        {item.quality}
-                      </span>
-
-                      {/* Multi-select check icon when in select mode */}
-                      {isSelectMode && (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            top: '6px',
-                            right: '6px',
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '4px',
-                            backgroundColor: isSelected ? 'var(--primary, #7c5cbf)' : 'rgba(0, 0, 0, 0.65)',
-                            border: '1.5px solid #ffffff',
-                            color: '#fff',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          {isSelected && <Check size={14} />}
-                        </div>
-                      )}
-
-                      {/* Quick Hover Action Buttons (Top-Right) */}
-                      {!isSelectMode && (
-                        <div
-                          className="card-quick-actions"
-                          style={{
-                            position: 'absolute',
-                            top: '6px',
-                            right: '6px',
-                            display: 'flex',
-                            gap: '5px',
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadSingle(item)}
-                            style={{
-                              width: '28px',
-                              height: '28px',
-                              borderRadius: '4px',
-                              backgroundColor: 'rgba(0, 0, 0, 0.75)',
-                              border: '1px solid rgba(255, 255, 255, 0.3)',
-                              color: '#fff',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                            }}
-                            title="Download item"
-                          >
-                            <Download size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyLink(item)}
-                            style={{
-                              width: '28px',
-                              height: '28px',
-                              borderRadius: '4px',
-                              backgroundColor: 'rgba(0, 0, 0, 0.75)',
-                              border: '1px solid rgba(255, 255, 255, 0.3)',
-                              color: copiedId === item.id ? '#10b981' : '#fff',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                            }}
-                            title="Copy link"
-                          >
-                            {copiedId === item.id ? <Check size={13} /> : <Copy size={13} />}
-                          </button>
-                        </div>
-                      )}
+                        <Download size={12} />
+                      </button>
                     </div>
 
-                    {/* Media Info */}
-                    <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {/* Artwork Title / Name ONLY */}
+                    <div style={{ padding: '8px 10px 10px 10px', display: 'flex', flexDirection: 'column' }}>
                       <div
                         style={{
-                          fontSize: '13.5px',
+                          fontSize: '12.5px',
                           fontWeight: 600,
                           lineHeight: '1.35',
                           display: '-webkit-box',
                           WebkitLineClamp: 2,
                           WebkitBoxOrient: 'vertical',
                           overflow: 'hidden',
+                          color: 'var(--text-primary)',
                         }}
                         title={item.title}
                       >
                         {item.title}
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)' }}>
-                        <span style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span>{item.author}</span>
-                          <CheckCircle2 size={11} color="var(--primary, #7c5cbf)" />
-                        </span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#10b981', fontWeight: 600 }}>
-                          <ThumbsUp size={11} />
-                          <span>{item.rating}</span>
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)' }}>
-                        <span>{item.views}</span>
-                        <span>{item.size || '~4 MB'}</span>
                       </div>
                     </div>
                   </div>

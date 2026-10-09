@@ -388,8 +388,13 @@ ipcMain.handle('crawl-portal', async (event, targetUrl) => {
                 if (!vkey || seen.has(vkey)) return;
                 seen.add(vkey);
 
-                const titleEl = el.querySelector('.title a, .title, a[title]');
-                const title = titleEl?.getAttribute('title') || titleEl?.textContent?.trim() || ('Video ' + vkey);
+                const titleLink = el.querySelector('span.title a, .title a, .videoTitle, a.linkVideoThumb');
+                const imgEl = el.querySelector('img');
+                let title = titleLink?.getAttribute('title') || titleLink?.textContent?.trim() || imgEl?.getAttribute('alt') || ('Video ' + vkey);
+                if (/^\d+:\d+(:\d+)?$/.test(title.trim())) {
+                  title = imgEl?.getAttribute('alt') || ('Video ' + vkey);
+                }
+                title = title.replace(/^\d+:\d+(:\d+)?\s*/, '').trim();
                 const imgEl = el.querySelector('img');
                 const thumbnail = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('data-thumb_url') || imgEl?.getAttribute('data-mediumthumb') || imgEl?.getAttribute('src') || '';
                 const duration = el.querySelector('.duration, var.duration')?.textContent?.trim() || '12:00';
