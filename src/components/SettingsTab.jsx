@@ -17,7 +17,10 @@ import {
   RefreshCw,
   AlertCircle,
   DownloadCloud,
-  Search
+  Search,
+  Code,
+  Play,
+  FileCode
 } from 'lucide-react';
 import { CustomIcon } from './DuoIcons';
 
@@ -63,6 +66,10 @@ ishant\\Music');
   const [installError, setInstallError] = useState('');
   const [installSuccess, setInstallSuccess] = useState('');
   const [extensionSearch, setExtensionSearch] = useState('');
+  const [pasteSnippet, setPasteSnippet] = useState('');
+  const [pasteError, setPasteError] = useState('');
+  const [pasteSuccess, setPasteSuccess] = useState('');
+  const [activeInputMode, setActiveInputMode] = useState('url'); // 'url' | 'code'
 
   // Extension runtime settings
   const [plugins, setPlugins] = useState({});
@@ -113,7 +120,114 @@ ishant\\Music');
     });
   };
 
-    const handleInstallExtension = async (e) => {
+    const handleLoadSampleTemplate = () => {
+    setPasteSnippet(JSON.stringify({
+      id: "community-stream-hub",
+      name: "Community Stream Hub",
+      version: "1.0.0",
+      description: "Custom streaming portal tab with ad-blocker and crawler integration.",
+      tab: {
+        title: "Stream Hub",
+        icon: "Film",
+        url: "https://archive.org/details/movies",
+        badge: "HD"
+      },
+      capabilities: ["stream", "crawlPage", "adblock"],
+      adBlockRules: [
+        "*://*.doubleclick.net/*",
+        "*://*analytics*/*"
+      ]
+    }, null, 2));
+    setPasteError('');
+    setPasteSuccess('Sample template loaded. Click "Test & Save Script" to register!');
+    setTimeout(() => setPasteSuccess(''), 3000);
+  };
+
+  const handleInstallSnippet = (e) => {
+    e.preventDefault();
+    setPasteError('');
+    setPasteSuccess('');
+
+    const raw = pasteSnippet.trim();
+    if (!raw) {
+      setPasteError('Please paste your extension JSON manifest or script code.');
+      return;
+    }
+
+    try {
+      // Strip markdown code fences if copied directly from ChatGPT / Claude / Gemini
+      let cleaned = raw.replace(/^`[a-zA-Z]*\s*/i, '').replace(/\s*`$/i, '').trim();
+
+      let parsedManifest = null;
+      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          parsedManifest = JSON.parse(jsonMatch[0]);
+        } catch (jsonErr) {}
+      }
+      if (raw.startsWith('{') && raw.endsWith('}')) {
+        parsedManifest = JSON.parse(raw);
+      } else {
+        // If it looks like code, extract or generate a lightweight manifest wrapper
+        let titleMatch = raw.match(/title:\s*['"]([^'"]+)['"]/);
+        let nameMatch = raw.match(/name:\s*['"]([^'"]+)['"]/);
+        let urlMatch = raw.match(/url:\s*['"](https?:\/\/[^'"]+)['"]/);
+
+        parsedManifest = {
+          id: 'custom-' + Date.now(),
+          name: nameMatch ? nameMatch[1] : (titleMatch ? titleMatch[1] : 'Pasted Custom Script'),
+          version: '1.0.0',
+          description: 'Custom plugin script pasted directly in LuckyGuy.',
+          category: 'Custom Script',
+          rating: 'all',
+          tab: urlMatch ? {
+            title: titleMatch ? titleMatch[1] : 'Custom Portal',
+            url: urlMatch[1],
+            badge: 'SCRIPT'
+          } : null,
+          capabilities: ['stream', 'crawlPage', 'adblock'],
+          scriptContent: raw,
+        };
+      }
+
+      if (!parsedManifest.name && !parsedManifest.id) {
+        setPasteError('Could not find extension name or ID in pasted content.');
+        return;
+      }
+
+      const newExt = {
+        id: parsedManifest.id || ('ext-' + Date.now()),
+        name: parsedManifest.name || 'Custom Extension',
+        category: parsedManifest.category || 'Custom Extension',
+        description: parsedManifest.description || 'Pasted custom plugin script.',
+        source: 'Pasted In-App Script',
+        version: parsedManifest.version || '1.0.0',
+        author: parsedManifest.author || 'User',
+        rating: parsedManifest.rating || 'all',
+        tab: parsedManifest.tab || null,
+        capabilities: parsedManifest.capabilities || ['stream', 'crawlPage'],
+        adBlockRules: parsedManifest.adBlockRules || [],
+        scriptContent: raw,
+        enabled: false, // Disabled by default so user enables explicitly
+      };
+
+      const updated = [newExt, ...customExtensions.filter(e => e.id !== newExt.id)];
+      setCustomExtensions(updated);
+      try {
+        localStorage.setItem('luckyguy-extensions', JSON.stringify(updated));
+      } catch (e) {}
+
+      flashSaved();
+      if (onUpdateExtensions) onUpdateExtensions(updated);
+      setPasteSnippet('');
+      setPasteSuccess(`Extension "${newExt.name}" added successfully! Toggle it below to activate.`);
+      setTimeout(() => setPasteSuccess(''), 4000);
+    } catch (err) {
+      setPasteError('Syntax or JSON error in pasted code: ' + err.message);
+    }
+  };
+
+  const handleInstallExtension = async (e) => {
     e.preventDefault();
     setInstallError('');
     setInstallSuccess('');
@@ -675,7 +789,7 @@ ishant\\Music');
       {/* SUBTAB 3: PLUGINS & MODULAR EXTENSIONS */}
       {category === 'plugins' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* SECTION 1: EXTENSION INSTALLER (URL Input Field) */}
+          {/* SECTION 1: EXTENSION INSTALLER (URL or Paste Code Mode) */}
           <div
             style={{
               padding: '18px 20px',
@@ -691,62 +805,189 @@ ishant\\Music');
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <DownloadCloud size={16} color="var(--primary, #7c5cbf)" />
                 <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                  Install Extension from URL
+                  Add Extension or Script
                 </h3>
               </div>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                Modular Extensions Base
-              </span>
+              
+              {/* Mode Toggle: URL vs Paste Code */}
+              <div style={{ display: 'flex', gap: '4px', backgroundColor: 'var(--bg-main, #f8fafc)', padding: '2px', borderRadius: '6px', border: '1px solid var(--border-medium, #e2e8f0)' }}>
+                <button
+                  type="button"
+                  onClick={() => setActiveInputMode('url')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    backgroundColor: activeInputMode === 'url' ? 'var(--bg-card, #ffffff)' : 'transparent',
+                    color: activeInputMode === 'url' ? 'var(--primary, #7c5cbf)' : 'var(--text-secondary)',
+                    boxShadow: activeInputMode === 'url' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                  }}
+                >
+                  From URL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveInputMode('code')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    backgroundColor: activeInputMode === 'code' ? 'var(--bg-card, #ffffff)' : 'transparent',
+                    color: activeInputMode === 'code' ? 'var(--primary, #7c5cbf)' : 'var(--text-secondary)',
+                    boxShadow: activeInputMode === 'code' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                  }}
+                >
+                  Paste Code / JSON
+                </button>
+              </div>
             </div>
 
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
-              Input any external extension repository or manifest URL. LuckyGuy safely validates and integrates plugin engines without interrupting active audio.
+              {activeInputMode === 'url'
+                ? 'Input any extension manifest URL from GitHub or community host. LuckyGuy safely registers the plugin engine.'
+                : 'Simply paste any plugin JSON manifest or script code generated by AI or yourself to test and run it immediately.'}
             </p>
 
-            <form onSubmit={handleInstallExtension} style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="text"
-                placeholder="Paste extension repository or manifest URL (e.g. from LuckyGuy--extensions)..."
-                value={extensionUrl}
-                onChange={(e) => {
-                  setExtensionUrl(e.target.value);
-                  setInstallError('');
-                }}
-                style={{
-                  flex: 1,
-                  height: '36px',
-                  padding: '0 12px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-medium, #e2e8f0)',
-                  backgroundColor: 'var(--bg-main, #f8fafc)',
-                  fontSize: '12.5px',
-                  color: 'var(--text-primary)',
-                  outline: 'none',
-                }}
-              />
-              <button
-                type="submit"
-                style={{
-                  height: '36px',
-                  padding: '0 16px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: 'var(--primary, #7c5cbf)',
-                  color: '#ffffff',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  flexShrink: 0,
-                  transition: 'opacity 0.15s ease',
-                }}
-              >
-                <Plus size={14} />
-                <span>Install Plugin</span>
-              </button>
-            </form>
+            {activeInputMode === 'url' ? (
+              <form onSubmit={handleInstallExtension} style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  placeholder="Paste extension manifest URL (e.g. from LuckyGuy--extensions)..."
+                  value={extensionUrl}
+                  onChange={(e) => {
+                    setExtensionUrl(e.target.value);
+                    setInstallError('');
+                  }}
+                  style={{
+                    flex: 1,
+                    height: '36px',
+                    padding: '0 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-medium, #e2e8f0)',
+                    backgroundColor: 'var(--bg-main, #f8fafc)',
+                    fontSize: '12.5px',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  type="submit"
+                  style={{
+                    height: '36px',
+                    padding: '0 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: 'var(--primary, #7c5cbf)',
+                    color: '#ffffff',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Plus size={14} />
+                  <span>Install Plugin</span>
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleInstallSnippet} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <textarea
+                  rows={5}
+                  placeholder={`// Paste plugin manifest JSON or script snippet here, e.g.:
+{
+  "id": "my-plugin",
+  "name": "Custom Video Streamer",
+  "tab": { "title": "Stream Hub", "url": "https://example.com" },
+  "adBlockRules": ["*://*.ads.com/*"]
+}`}
+                  value={pasteSnippet}
+                  onChange={(e) => {
+                    setPasteSnippet(e.target.value);
+                    setPasteError('');
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-medium, #e2e8f0)',
+                    backgroundColor: 'var(--bg-main, #f8fafc)',
+                    fontSize: '12px',
+                    fontFamily: 'monospace',
+                    color: 'var(--text-primary)',
+                    outline: 'none',
+                    resize: 'vertical',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={handleLoadSampleTemplate}
+                    style={{
+                      height: '32px',
+                      padding: '0 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-medium, #e2e8f0)',
+                      backgroundColor: 'transparent',
+                      color: 'var(--text-secondary, #64748b)',
+                      fontSize: '11.5px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                    }}
+                  >
+                    <Sparkles size={13} color="var(--primary, #7c5cbf)" />
+                    <span>Load Sample Template</span>
+                  </button>
+
+                  <button
+                    type="submit"
+                    style={{
+                      height: '34px',
+                      padding: '0 16px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: 'var(--primary, #7c5cbf)',
+                      color: '#ffffff',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <Play size={13} fill="#fff" />
+                    <span>Test & Save Script</span>
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {pasteError && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', fontSize: '11.5px' }}>
+                <AlertCircle size={14} />
+                <span>{pasteError}</span>
+              </div>
+            )}
+
+            {pasteSuccess && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontSize: '11.5px' }}>
+                <CheckCircle2 size={14} />
+                <span>{pasteSuccess}</span>
+              </div>
+            )}
 
             {installError && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', fontSize: '11.5px' }}>
