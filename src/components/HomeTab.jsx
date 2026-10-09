@@ -323,14 +323,14 @@ export default function HomeTab({
         </div>
       </div>
 
-      {/* 2. Endless Folder / Category Sections with 2-Row Grids & Expandable View All */}
+      {/* 2. Endless Folder / Category Sections with 1-Row Grid & Expandable View All */}
       {folderSections.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }}>
           {folderSections.map((sec) => {
             const isExpanded = !!expandedSections[sec.name];
-            // 2 rows in responsive grid is ~10 cards
-            const visibleTracks = isExpanded ? sec.tracks : sec.tracks.slice(0, 10);
-            const canExpand = sec.tracks.length > 10;
+            // 1 row in responsive grid (up to 5 cards)
+            const visibleTracks = isExpanded ? sec.tracks : sec.tracks.slice(0, 5);
+            const canExpand = sec.tracks.length > 5;
 
             return (
               <section
