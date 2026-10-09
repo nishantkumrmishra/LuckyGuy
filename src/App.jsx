@@ -5,6 +5,7 @@ import PlayerBar from './components/PlayerBar';
 import HomeTab from './components/HomeTab';
 import LibraryTab from './components/LibraryTab';
 import DownloadsTab from './components/DownloadsTab';
+import StreamTab from './components/StreamTab';
 import TrashTab from './components/TrashTab';
 import SettingsTab from './components/SettingsTab';
 import LikedSongsTab from './components/LikedSongsTab';
@@ -1301,6 +1302,14 @@ export default function App() {
                     window.electronAPI.savePreferences(newPrefs);
                   }
                 }}
+              />
+            )}
+
+            {activeTab === 'stream' && (
+              <StreamTab
+                onStartDownload={handleStartDownload}
+                preferences={preferences}
+                onOpenFolder={handleOpenFolder}
               />
             )}
 

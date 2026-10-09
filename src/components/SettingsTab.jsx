@@ -36,6 +36,8 @@ ishant\\Music');
   const [defaultQuality, setDefaultQuality] = useState(preferences?.bitrate || '320k');
   const [chunkCount, setChunkCount] = useState(8);
   const [savedNotice, setSavedNotice] = useState(false);
+  const [updateChecking, setUpdateChecking] = useState(false);
+  const [updateResult, setUpdateResult] = useState(null);
 
   const handleCheckUpdates = async () => {
     setUpdateChecking(true);

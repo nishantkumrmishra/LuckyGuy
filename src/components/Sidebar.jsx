@@ -17,7 +17,8 @@ import {
   FolderDown,
   Palette,
   Blocks,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Film
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -365,6 +366,20 @@ export default function Sidebar({
                   <DuoLibrary size={18} active={activeTab === 'library'} />
                 </div>
                 <span style={labelStyle}>Library</span>
+              </div>
+            </div>
+
+            {/* 2.5 Stream / Watch Tab */}
+            <div
+              style={navItemStyle(activeTab === 'stream')}
+              onClick={() => setActiveTab('stream')}
+              title={isMini ? 'Stream & Video' : ''}
+            >
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '20px' }}>
+                  <Film size={18} color={activeTab === 'stream' ? 'var(--primary, #7c5cbf)' : 'var(--duo-stroke, currentColor)'} />
+                </div>
+                <span style={labelStyle}>Stream</span>
               </div>
             </div>
 
