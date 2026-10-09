@@ -1,18 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import {
-  Home,
-  Search,
-  X,
-  Music2,
-  Menu,
-  ChevronDown,
-  Library,
-  ListMusic,
-  Heart,
-  Download,
-  Settings,
-  Compass,
-} from 'lucide-react';
+import { Home, Search, X, Music2 } from 'lucide-react';
 import WindowControls from './WindowControls';
 
 export default function TitleBar({
@@ -21,30 +8,39 @@ export default function TitleBar({
   libraryTracks = [],
   onPlayTrack,
   onNavigateHome,
-  onNavigate,
-  activeTab = 'home',
-  pluginTabs = []
+  activeTab = 'home'
 }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState([]);
+  const [isScrolled, setIsScrolled] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
   const inputRef = useRef(null);
   const searchContainerRef = useRef(null);
   const dropdownRef = useRef(null);
-  const navMenuRef = useRef(null);
 
-  const handleNav = (tab) => {
-    if (tab === 'home' && onNavigateHome) {
-      onNavigateHome();
-    } else if (onNavigate) {
-      onNavigate(tab);
-    } else if (onNavigateHome) {
-      onNavigateHome();
-    }
-    setIsNavMenuOpen(false);
-  };
+  // Scroll detection for glassmorphism
+  useEffect(() => {
+    const handleScroll = (e) => {
+      const target = e.target;
+      if (target && typeof target.scrollTop === 'number') {
+        const classes = target.classList;
+        if (
+          classes &&
+          (classes.contains('app-content') ||
+            classes.contains('scrollable') ||
+            classes.contains('content-area'))
+        ) {
+          setIsScrolled(target.scrollTop > 0);
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, []);
 
   // Recent searches
   useEffect(() => {
@@ -85,7 +81,6 @@ export default function TitleBar({
       } else if (e.key === 'Escape') {
         inputRef.current?.blur();
         setIsDropdownOpen(false);
-        setIsNavMenuOpen(false);
       }
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -105,12 +100,6 @@ export default function TitleBar({
         !dropdownRef.current.contains(target)
       ) {
         setIsDropdownOpen(false);
-      }
-      if (
-        navMenuRef.current &&
-        !navMenuRef.current.contains(target)
-      ) {
-        setIsNavMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -136,123 +125,67 @@ export default function TitleBar({
     setIsDropdownOpen(false);
   };
 
+  const headerStyle = {
+    height: '62px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '16px',
+    position: 'relative',
+    padding: '0 16px',
+    width: '100%',
+    WebkitAppRegion: 'drag',
+    flexShrink: 0,
+    zIndex: 50,
+    transition: 'background-color 0.25s ease, border-color 0.25s ease, backdrop-filter 0.25s ease, box-shadow 0.25s ease',
+    backgroundColor: isScrolled ? 'rgba(245, 245, 245, 0.75)' : 'transparent',
+    borderBottom: isScrolled ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid transparent',
+    backdropFilter: isScrolled ? 'blur(12px)' : 'none',
+    WebkitBackdropFilter: isScrolled ? 'blur(12px)' : 'none',
+    boxShadow: isScrolled ? '0 4px 20px rgba(0, 0, 0, 0.03)' : 'none',
+  };
+
   return (
-    <header className="titlebar">
-      {/* Left side: Navigation Dropdown Menu & Quick Home */}
-      <div className="titlebar-left">
-        <div className="titlebar-nav-dropdown-wrapper" ref={navMenuRef}>
-          <button
-            type="button"
-            className={`titlebar-menu-btn ${isNavMenuOpen ? 'active' : ''}`}
-            onClick={() => setIsNavMenuOpen(!isNavMenuOpen)}
-            title="Navigation Menu"
-          >
-            <Menu size={15} />
-            <span className="titlebar-menu-text">Menu</span>
-            <ChevronDown
-              size={13}
-              style={{
-                transform: isNavMenuOpen ? 'rotate(180deg)' : 'none',
-                transition: 'transform 0.15s ease',
-              }}
-            />
-          </button>
+    <header className="titlebar" style={headerStyle}>
+      {/* Home navigation button */}
+      <button
+        className="titlebar-home-btn"
+        onClick={onNavigateHome}
+        title="Go to Home"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '40px',
+          height: '40px',
+          borderRadius: '8px',
+          transition: 'all 0.2s ease',
+          WebkitAppRegion: 'no-drag'
+        }}
+      >
+        <Home size={20} />
+      </button>
 
-          {isNavMenuOpen && (
-            <div className="titlebar-dropdown-menu">
-              <div className="titlebar-dropdown-header">Navigation</div>
-              <button
-                type="button"
-                className={`titlebar-dropdown-item ${activeTab === 'home' ? 'active' : ''}`}
-                onClick={() => handleNav('home')}
-              >
-                <Home size={15} />
-                <span>Home</span>
-              </button>
-              <button
-                type="button"
-                className={`titlebar-dropdown-item ${activeTab === 'library' ? 'active' : ''}`}
-                onClick={() => handleNav('library')}
-              >
-                <Library size={15} />
-                <span>Music Library</span>
-              </button>
-              <button
-                type="button"
-                className={`titlebar-dropdown-item ${activeTab === 'playlists' ? 'active' : ''}`}
-                onClick={() => handleNav('playlists')}
-              >
-                <ListMusic size={15} />
-                <span>Playlists</span>
-              </button>
-              <button
-                type="button"
-                className={`titlebar-dropdown-item ${activeTab === 'liked' ? 'active' : ''}`}
-                onClick={() => handleNav('liked')}
-              >
-                <Heart size={15} />
-                <span>Liked Songs</span>
-              </button>
-              <button
-                type="button"
-                className={`titlebar-dropdown-item ${activeTab === 'downloads' ? 'active' : ''}`}
-                onClick={() => handleNav('downloads')}
-              >
-                <Download size={15} />
-                <span>Downloads</span>
-              </button>
-
-              {pluginTabs && pluginTabs.length > 0 && (
-                <>
-                  <div className="titlebar-dropdown-divider" />
-                  <div className="titlebar-dropdown-header">Plugins</div>
-                  {pluginTabs.map((pt) => (
-                    <button
-                      key={pt.id}
-                      type="button"
-                      className={`titlebar-dropdown-item ${activeTab === `plugin-${pt.id}` ? 'active' : ''}`}
-                      onClick={() => handleNav(`plugin-${pt.id}`)}
-                    >
-                      <Compass size={15} />
-                      <span>{pt.tab?.title || pt.name}</span>
-                    </button>
-                  ))}
-                </>
-              )}
-
-              <div className="titlebar-dropdown-divider" />
-              <button
-                type="button"
-                className={`titlebar-dropdown-item ${activeTab === 'settings' ? 'active' : ''}`}
-                onClick={() => handleNav('settings')}
-              >
-                <Settings size={15} />
-                <span>Settings & Appearance</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        <button
-          type="button"
-          className="titlebar-home-btn"
-          onClick={() => handleNav('home')}
-          title="Go to Home"
-        >
-          <Home size={15} />
-        </button>
-      </div>
-
-      {/* Center: Clean Simple Search Bar (sharp non-rounded edges) */}
+      {/* Central Search pill container */}
       <div className="titlebar-search-wrapper" ref={searchContainerRef}>
-        <div className={`titlebar-search-container ${isFocused ? 'focused' : ''}`}>
+        <div
+          className="titlebar-search-container"
+          style={{
+            border: 'none',
+            backgroundColor: isFocused ? 'rgba(0, 0, 0, 0.06)' : 'rgba(0, 0, 0, 0.04)',
+            height: '36px',
+            borderRadius: '18px',
+            boxShadow: isFocused ? '0 0 0 2px rgba(124, 92, 191, 0.25)' : 'none',
+            transition: 'all 0.2s ease',
+          }}
+        >
           <Search className="titlebar-search-icon" size={14} />
           <input
             ref={inputRef}
             id="global-search-input"
             type="text"
             className="titlebar-search-input"
-            placeholder="Search tracks, artists, albums... (Ctrl+L)"
+            placeholder="What do you want to play?"
             value={searchQuery}
             onFocus={() => {
               setIsDropdownOpen(true);
@@ -268,7 +201,6 @@ export default function TitleBar({
           />
           {searchQuery ? (
             <button
-              type="button"
               className="titlebar-search-clear-btn"
               onClick={() => {
                 if (onSearch) onSearch('');
@@ -276,7 +208,7 @@ export default function TitleBar({
               }}
               title="Clear search"
             >
-              <X size={13} />
+              <X size={12} />
             </button>
           ) : (
             <div className="titlebar-shortcut-hint">
@@ -306,7 +238,7 @@ export default function TitleBar({
                             {track.artworkUrl || track.coverArt ? (
                               <img src={track.artworkUrl || track.coverArt} alt="" />
                             ) : (
-                              <Music2 size={16} />
+                              <Music2 size={18} />
                             )}
                           </div>
                           <div className="dropdown-row-meta">
@@ -317,7 +249,7 @@ export default function TitleBar({
                       ))}
                     </div>
                     <button className="dropdown-clear-btn" onClick={handleClearRecent}>
-                      Clear Recent Searches
+                      Clear Recent
                     </button>
                   </>
                 )}
@@ -339,7 +271,7 @@ export default function TitleBar({
                           {track.artworkUrl || track.coverArt ? (
                             <img src={track.artworkUrl || track.coverArt} alt="" />
                           ) : (
-                            <Music2 size={16} />
+                            <Music2 size={18} />
                           )}
                         </div>
                         <div className="dropdown-row-meta">
