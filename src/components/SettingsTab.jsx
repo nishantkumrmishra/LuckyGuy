@@ -139,30 +139,30 @@ ishant\\Music');
       let extVersion = '1.0.0';
       let extCategory = 'Extension Engine';
 
+      let manifestObj = {};
       try {
         const resp = await fetch(trimmed);
         if (resp.ok) {
-          const manifest = await resp.json();
-          if (manifest.name) extName = manifest.name;
-          if (manifest.description) extDesc = manifest.description;
-          if (manifest.version) extVersion = manifest.version;
-          if (manifest.category) extCategory = manifest.category;
+          manifestObj = await resp.json();
+          if (manifestObj.name) extName = manifestObj.name;
+          if (manifestObj.description) extDesc = manifestObj.description;
+          if (manifestObj.version) extVersion = manifestObj.version;
+          if (manifestObj.category) extCategory = manifestObj.category;
         }
-      } catch (fetchErr) {
-        const pathParts = parsed.pathname.split('/').filter(Boolean);
-        const rawName = pathParts.length > 0 ? pathParts[pathParts.length - 1] : 'custom-plugin';
-        const cleanName = rawName.replace(/\.git$/i, '').replace(/\.json$/i, '').replace(/[-_]/g, ' ');
-        extName = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
-      }
+      } catch (e) {}
 
       const newExt = {
-        id: 'ext-' + Date.now(),
+        id: manifestObj.id || ('ext-' + Date.now()),
         name: extName,
         category: extCategory,
         description: extDesc,
         source: trimmed,
         version: extVersion,
-        author: parsed.hostname,
+        author: manifestObj.author || parsed.hostname,
+        rating: manifestObj.rating || 'all',
+        tab: manifestObj.tab || null,
+        capabilities: manifestObj.capabilities || [],
+        adBlockRules: manifestObj.adBlockRules || [],
         enabled: true,
       };
 

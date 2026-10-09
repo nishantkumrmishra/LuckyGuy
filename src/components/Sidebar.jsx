@@ -17,6 +17,7 @@ import {
   FolderDown,
   Palette,
   Blocks,
+  Sparkles,
   SlidersHorizontal,
   Film
 } from 'lucide-react';
@@ -33,6 +34,7 @@ export default function Sidebar({
   likedCount = 0,
   theme = 'light',
   onToggleTheme,
+  pluginTabs = [],
 }) {
   const [width, setWidth] = useState(() => {
     const saved = localStorage.getItem('localguy-sidebar-width');
@@ -369,19 +371,7 @@ export default function Sidebar({
               </div>
             </div>
 
-            {/* 2.5 Stream / Watch Tab */}
-            <div
-              style={navItemStyle(activeTab === 'stream')}
-              onClick={() => setActiveTab('stream')}
-              title={isMini ? 'Stream & Video' : ''}
-            >
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '20px' }}>
-                  <Film size={18} color={activeTab === 'stream' ? 'var(--primary, #7c5cbf)' : 'var(--duo-stroke, currentColor)'} />
-                </div>
-                <span style={labelStyle}>Stream</span>
-              </div>
-            </div>
+
 
             {/* Section Divider */}
             <div style={{ height: '1px', backgroundColor: 'var(--border-light, rgba(255,255,255,0.06))', margin: isMini ? '6px 2px' : '6px 4px' }} />
@@ -456,6 +446,47 @@ export default function Sidebar({
                 </span>
               )}
             </div>
+
+            {/* DYNAMIC PLUGIN-DECLARED TABS */}
+            {pluginTabs.length > 0 && (
+              <>
+                <div style={{ height: '1px', backgroundColor: 'var(--border-light, rgba(255,255,255,0.06))', margin: isMini ? '6px 2px' : '6px 4px' }} />
+                {pluginTabs.map((plugin) => {
+                  const tabId = 'plugin-' + plugin.id;
+                  const isTabActive = activeTab === tabId;
+                  const tabTitle = plugin.tab?.title || plugin.name;
+                  return (
+                    <div
+                      key={plugin.id}
+                      style={navItemStyle(isTabActive)}
+                      onClick={() => setActiveTab(tabId)}
+                      title={isMini ? tabTitle : ''}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '20px' }}>
+                          <Sparkles size={17} color={isTabActive ? 'var(--primary, #7c5cbf)' : 'var(--duo-stroke, currentColor)'} />
+                        </div>
+                        <span style={labelStyle}>{tabTitle}</span>
+                      </div>
+                      {plugin.rating && !isMini && (
+                        <span
+                          style={{
+                            fontSize: '9px',
+                            fontWeight: 700,
+                            padding: '1px 4px',
+                            borderRadius: '3px',
+                            backgroundColor: plugin.rating === '18+' || plugin.rating === 'mature' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(124, 92, 191, 0.15)',
+                            color: plugin.rating === '18+' || plugin.rating === 'mature' ? '#ef4444' : 'var(--primary, #7c5cbf)',
+                          }}
+                        >
+                          {plugin.rating}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            )}
 
             </nav>
         )}

@@ -5,7 +5,7 @@ import PlayerBar from './components/PlayerBar';
 import HomeTab from './components/HomeTab';
 import LibraryTab from './components/LibraryTab';
 import DownloadsTab from './components/DownloadsTab';
-import StreamTab from './components/StreamTab';
+import PluginTabContainer from './components/PluginTabContainer';
 import TrashTab from './components/TrashTab';
 import SettingsTab from './components/SettingsTab';
 import LikedSongsTab from './components/LikedSongsTab';
@@ -26,6 +26,19 @@ export default function App() {
     }
   });
   const [settingsCategory, setSettingsCategory] = useState('downloads');
+
+  // Dynamically load installed user/community extensions
+  const [installedExtensions, setInstalledExtensions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('luckyguy-extensions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Filter plugins that declare their own dedicated tab in sidebar
+  const pluginTabs = installedExtensions.filter((ext) => ext.enabled !== false && ext.tab);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -1147,6 +1160,7 @@ export default function App() {
         likedCount={likedTracks.length}
         theme={theme}
         onToggleTheme={handleToggleTheme}
+        pluginTabs={pluginTabs}
       />
 
       {/* 2. Main App Area */}
@@ -1305,13 +1319,21 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'stream' && (
-              <StreamTab
-                onStartDownload={handleStartDownload}
-                preferences={preferences}
-                onOpenFolder={handleOpenFolder}
-              />
-            )}
+            {/* DYNAMIC PLUGIN-DECLARED TAB ROUTING */}
+            {activeTab.startsWith('plugin-') && (() => {
+              const pluginId = activeTab.replace('plugin-', '');
+              const matchedPlugin = pluginTabs.find((p) => p.id === pluginId);
+              if (!matchedPlugin) return null;
+              return (
+                <PluginTabContainer
+                  key={matchedPlugin.id}
+                  plugin={matchedPlugin}
+                  onStartDownload={handleStartDownload}
+                  preferences={preferences}
+                  onOpenFolder={handleOpenFolder}
+                />
+              );
+            })()}
 
             {activeTab === 'settings' && (
               <SettingsTab
