@@ -1223,6 +1223,8 @@ export default function App() {
           onPlayTrack={handlePlayTrack}
           onNavigateHome={() => setActiveTab('home')}
           activeTab={activeTab}
+          onNavigate={setActiveTab}
+          pluginTabs={pluginTabs}
         />
 
         {/* Center Workspace */}

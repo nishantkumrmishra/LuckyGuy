@@ -257,13 +257,13 @@ h6 {
   right: 0;
   z-index: 999;
   display: flex;
-  height: 32px;
+  height: var(--titlebar-height, 44px);
   -webkit-app-region: no-drag;
 }
 
 .window-control-btn {
   width: 46px;
-  height: 32px;
+  height: var(--titlebar-height, 44px);
   background: transparent;
   border: none;
   border-radius: 0;
@@ -293,49 +293,161 @@ h6 {
   color: #ffffff !important;
 }
 
-/* Redesigned Titlebar & Header Search */
+/* Minimalist Clean Titlebar (Sharp & Simple, No Bubble Corners) */
 .titlebar {
-  height: 62px;
-  background-color: transparent !important;
+  height: var(--titlebar-height, 44px);
+  min-height: 44px;
+  background-color: var(--bg-card);
+  border-bottom: 1px solid var(--border-medium);
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 16px;
+  justify-content: space-between;
+  padding: 0 144px 0 12px;
   position: relative;
-  padding: 0 16px;
-  border-bottom: none !important;
-  border: none !important;
-  box-shadow: none !important;
   -webkit-app-region: drag;
   width: 100%;
+  box-sizing: border-box;
+  z-index: 50;
+  user-select: none;
+}
+
+.titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+  flex-shrink: 0;
+}
+
+.titlebar-nav-dropdown-wrapper {
+  position: relative;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-medium);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  user-select: none;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-menu-btn:hover,
+.titlebar-menu-btn.active {
+  background-color: var(--bg-card-hover);
+  border-color: var(--border-strong, var(--border-medium));
+  color: var(--primary);
+}
+
+.titlebar-menu-text {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .titlebar-home-btn {
-  width: 38px;
-  height: 32px;
-  background-color: transparent;
-  border: none;
+  width: 30px;
+  height: 30px;
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-medium);
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: color 0.2s, transform 0.1s;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   -webkit-app-region: no-drag;
 }
 
 .titlebar-home-btn:hover {
-  color: var(--text-primary);
+  background-color: var(--bg-card-hover);
+  color: var(--primary);
+  border-color: var(--border-strong, var(--border-medium));
 }
 
 .titlebar-home-btn:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
 }
 
+/* Navigation Dropdown Menu Panel */
+.titlebar-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 200px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-medium);
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  padding: 6px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+  animation: fadeIn 0.15s ease;
+}
+
+.titlebar-dropdown-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 6px 8px 4px 8px;
+}
+
+.titlebar-dropdown-divider {
+  height: 1px;
+  background-color: var(--border-medium);
+  margin: 4px 0;
+}
+
+.titlebar-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.titlebar-dropdown-item:hover {
+  background-color: var(--bg-card-hover);
+  color: var(--primary);
+}
+
+.titlebar-dropdown-item.active {
+  background-color: var(--primary-glow);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* Center Search Container (Clean, Minimal, Non-rounded Pill) */
 .titlebar-search-wrapper {
   position: relative;
   width: 100%;
-  max-width: 500px;
+  max-width: 440px;
+  margin: 0 auto;
   -webkit-app-region: no-drag;
 }
 
@@ -344,25 +456,26 @@ h6 {
   display: flex;
   align-items: center;
   width: 100%;
-  height: 32px;
+  height: 30px;
   background-color: var(--bg-main);
-  border-radius: 8px;
-  padding: 0 16px;
-  border: 1px solid var(--border);
-  transition: all 0.2s ease;
+  border-radius: 4px;
+  padding: 0 10px;
+  border: 1px solid var(--border-medium);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .titlebar-search-container:hover {
-  border-color: var(--border-medium);
+  border-color: var(--border-strong, rgba(0, 0, 0, 0.2));
 }
 
-.titlebar-search-container:focus-within {
+.titlebar-search-container:focus-within,
+.titlebar-search-container.focused {
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px var(--primary-glow);
+  box-shadow: 0 0 0 1px var(--primary);
 }
 
 .titlebar-search-icon {
-  color: var(--text-secondary);
+  color: var(--text-muted);
   margin-right: 8px;
   flex-shrink: 0;
 }
@@ -374,7 +487,7 @@ h6 {
   border: none;
   outline: none;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 13px;
   padding: 0;
   font-family: var(--font-sans);
 }
@@ -386,9 +499,9 @@ h6 {
 .titlebar-shortcut-hint {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 10px;
   pointer-events: none;
   user-select: none;
   flex-shrink: 0;
@@ -397,11 +510,11 @@ h6 {
 .titlebar-shortcut-hint kbd {
   background-color: var(--bg-card);
   border: 1px solid var(--border-light);
-  border-radius: 4px;
-  padding: 2px 6px;
+  border-radius: 3px;
+  padding: 1px 5px;
   font-family: inherit;
-  font-weight: 500;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  font-weight: 600;
+  font-size: 10px;
 }
 
 .titlebar-search-clear-btn {
@@ -412,8 +525,8 @@ h6 {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
-  border-radius: 50%;
+  padding: 2px 4px;
+  border-radius: 3px;
   transition: color 0.15s, background-color 0.15s;
   flex-shrink: 0;
 }
@@ -423,58 +536,60 @@ h6 {
   background-color: var(--bg-card-hover);
 }
 
+/* Search Results Dropdown (Sharp Rectangular, Not Rounded) */
 .titlebar-search-dropdown {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   left: 0;
   width: 100%;
-  background-color: var(--bg-surface);
+  background-color: var(--bg-card);
   border: 1px solid var(--border-medium);
-  border-radius: 12px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
   z-index: 1000;
   overflow: hidden;
-  max-height: 480px;
+  max-height: 420px;
   display: flex;
   flex-direction: column;
 }
 
 .dropdown-section {
-  padding: 12px 0;
+  padding: 8px 0;
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
 .dropdown-section-header {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 4px 16px 8px 16px;
+  padding: 4px 14px 6px 14px;
 }
 
 .dropdown-empty-state {
-  padding: 24px 16px;
+  padding: 18px 14px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .dropdown-list {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  max-height: 360px;
+  max-height: 320px;
 }
 
 .dropdown-row {
   display: flex;
   align-items: center;
-  padding: 8px 16px;
-  gap: 12px;
+  padding: 6px 14px;
+  gap: 10px;
   cursor: pointer;
+  border-radius: 0;
   transition: background-color 0.15s ease;
 }
 
@@ -483,10 +598,11 @@ h6 {
 }
 
 .dropdown-row-cover {
-  width: 36px;
-  height: 36px;
-  border-radius: 6px;
-  background-color: var(--bg-card);
+  width: 30px;
+  height: 30px;
+  border-radius: 3px;
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-light);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -509,7 +625,7 @@ h6 {
 }
 
 .dropdown-row-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
@@ -518,8 +634,8 @@ h6 {
 }
 
 .dropdown-row-subtitle {
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-size: 11px;
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -535,26 +651,21 @@ h6 {
 
 .dropdown-clear-btn {
   align-self: center;
-  margin: 12px 0 4px 0;
-  padding: 6px 16px;
-  font-size: 12px;
+  margin: 8px 14px 4px 14px;
+  padding: 5px 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-primary);
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-light);
-  border-radius: 20px;
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-medium);
+  border-radius: 3px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .dropdown-clear-btn:hover {
   background-color: var(--bg-card-hover);
-  border-color: var(--border-medium);
-  transform: translateY(-1px);
-}
-
-.dropdown-clear-btn:active {
-  transform: translateY(0);
+  border-color: var(--border-strong, var(--border-medium));
 }
 
 /* Dashboard Layout & Components */
