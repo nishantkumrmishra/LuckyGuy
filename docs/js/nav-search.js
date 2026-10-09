@@ -250,3 +250,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
+
+// 1-Click Copy helper for direct manifest URL inputs
+window.copyInputUrl = function(btn) {
+  const container = btn.closest('.extension-install-url-box') || btn.parentElement;
+  const input = container.querySelector('input');
+  if (input && input.value) {
+    navigator.clipboard.writeText(input.value).then(() => {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<i class="ci-Check_Big"></i> Copied!';
+      btn.style.backgroundColor = '#10b981';
+      btn.style.borderColor = '#10b981';
+      setTimeout(() => {
+        btn.innerHTML = orig;
+        btn.style.backgroundColor = '';
+        btn.style.borderColor = '';
+      }, 2000);
+    });
+  }
+};

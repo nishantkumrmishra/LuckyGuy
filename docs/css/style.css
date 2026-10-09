@@ -1492,3 +1492,61 @@ header nav {
     background: #27272a;
     border-color: #27272a;
 }
+
+
+/* ===== EXTENSION INSTALL ROWS & 1-CLICK URL COPIER ===== */
+.extension-install-row {
+    background: #fafafa;
+    border: 1px solid #e4e4e7;
+    border-radius: 6px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.extension-install-row:hover {
+    background: #ffffff;
+    border-color: #18181b;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.extension-install-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 0.95em;
+    color: #09090b;
+}
+
+.extension-install-desc {
+    font-size: 0.85em;
+    color: #52525b;
+    margin: 2px 0 6px 0;
+    line-height: 1.45;
+}
+
+.extension-install-url-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    border: 1px solid #e4e4e7;
+    border-radius: 4px;
+    padding: 3px 6px 3px 10px;
+}
+
+.extension-url-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8em;
+    color: #18181b;
+    outline: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
