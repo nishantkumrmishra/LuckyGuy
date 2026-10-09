@@ -34,8 +34,8 @@ export default function HomeTab({
   const [expandedSections, setExpandedSections] = useState({});
   const containerRef = useRef(null);
 
-  // Spring-back peek slider states
-  const [thumbTop, setThumbTop] = useState(0);
+  // Spring-back peek slider states (centered vertically at rest)
+  const [thumbOffset, setThumbOffset] = useState(0); // Offset in px relative to center (0 = center)
   const [isDragging, setIsDragging] = useState(false);
   const [isSnapping, setIsSnapping] = useState(false);
   const [isHoveringTrack, setIsHoveringTrack] = useState(false);
@@ -94,28 +94,7 @@ export default function HomeTab({
     }
   };
 
-  // Sync scroll indicator on normal scroll (when not dragging)
-  const updateThumbPosition = () => {
-    if (!containerRef.current || !trackRef.current || isDragging) return;
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    const maxScroll = scrollHeight - clientHeight;
-    const trackHeight = trackRef.current.clientHeight - 64;
-    if (maxScroll <= 0 || trackHeight <= 0) {
-      setThumbTop(0);
-      return;
-    }
-    const ratio = Math.min(Math.max(scrollTop / maxScroll, 0), 1);
-    setThumbTop(ratio * trackHeight);
-  };
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    container.addEventListener('scroll', updateThumbPosition);
-    return () => container.removeEventListener('scroll', updateThumbPosition);
-  }, [isDragging]);
-
-  // Handle Dragging of the Slider Pill
+  // Handle Dragging of the Center Slider Pill
   const handleThumbMouseDown = (e) => {
     e.preventDefault();
     setIsDragging(true);
@@ -128,33 +107,31 @@ export default function HomeTab({
     if (!isDragging) return;
 
     const handleMouseMove = (e) => {
-      if (!containerRef.current || !trackRef.current) return;
+      if (!containerRef.current) return;
       const deltaY = e.clientY - dragStartY.current;
       const { scrollHeight, clientHeight } = containerRef.current;
       const maxScroll = scrollHeight - clientHeight;
-      const trackHeight = trackRef.current.clientHeight - 64;
 
-      if (trackHeight <= 0 || maxScroll <= 0) return;
+      if (maxScroll <= 0) return;
 
-      const scrollRatio = maxScroll / trackHeight;
-      const targetScroll = Math.max(0, Math.min(dragStartScrollTop.current + deltaY * scrollRatio, maxScroll));
-      containerRef.current.scrollTop = targetScroll;
+      // Move the page smoothly as user drags down or up
+      const scrollSpeedMultiplier = 2.4; // Responsive scrolling feel
+      const newScrollTop = Math.max(0, Math.min(dragStartScrollTop.current + deltaY * scrollSpeedMultiplier, maxScroll));
+      containerRef.current.scrollTop = newScrollTop;
 
-      const visualThumb = Math.max(0, Math.min((targetScroll / maxScroll) * trackHeight, trackHeight));
-      setThumbTop(visualThumb);
+      // Allow pill to move up or down from the center with subtle boundary clamp (+/- 140px)
+      const clampedOffset = Math.max(-140, Math.min(140, deltaY * 0.7));
+      setThumbOffset(clampedOffset);
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
-      // Spring-back rubber-band effect: smoothly scroll back to top when released
+      // Spring back: the scroll bar jumps/springs back to center, while the page stays right where it was scrolled
       setIsSnapping(true);
-      if (containerRef.current) {
-        containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-      }
+      setThumbOffset(0);
       setTimeout(() => {
-        setThumbTop(0);
         setIsSnapping(false);
-      }, 500);
+      }, 450);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -733,7 +710,7 @@ export default function HomeTab({
         )}
       </div>
 
-      {/* 3. Right-Side Spring-Back / Rubber-Band Peek Vertical Slider */}
+      {/* 3. Center-Positioned Spring-Back Slider Pill (Stays in Middle, Page Scrolls, Spring Jumps Back on Release) */}
       <div
         ref={trackRef}
         onMouseEnter={() => setIsHoveringTrack(true)}
@@ -743,15 +720,15 @@ export default function HomeTab({
           top: '20px',
           bottom: '20px',
           right: '8px',
-          width: '14px',
+          width: '16px',
           display: 'flex',
           justifyContent: 'center',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           zIndex: 50,
           pointerEvents: 'auto',
         }}
       >
-        {/* Subtle Track Line */}
+        {/* Subtle Vertical Guide Track Line */}
         <div
           style={{
             position: 'absolute',
@@ -759,49 +736,55 @@ export default function HomeTab({
             bottom: 0,
             width: '3px',
             borderRadius: '2px',
-            backgroundColor: isDragging || isHoveringTrack ? 'rgba(124, 92, 191, 0.2)' : 'rgba(0, 0, 0, 0.05)',
+            backgroundColor: isDragging || isHoveringTrack ? 'rgba(124, 92, 191, 0.25)' : 'rgba(0, 0, 0, 0.05)',
             transition: 'background-color 0.2s ease',
           }}
         />
 
-        {/* Custom SVG Pill Slider with Gripper Dots */}
+        {/* Custom SVG Center Pill Slider */}
         <div
           onMouseDown={handleThumbMouseDown}
           style={{
-            position: 'absolute',
-            top: `${thumbTop}px`,
-            width: isDragging || isHoveringTrack ? '12px' : '8px',
-            height: '64px',
-            borderRadius: '6px',
-            backgroundColor: isDragging ? 'var(--primary, #7c5cbf)' : isHoveringTrack ? 'rgba(124, 92, 191, 0.8)' : 'rgba(124, 92, 191, 0.5)',
-            boxShadow: isDragging ? '0 4px 12px rgba(124, 92, 191, 0.4)' : '0 2px 6px rgba(0,0,0,0.1)',
+            position: 'relative',
+            transform: `translateY(${thumbOffset}px)`,
+            width: isDragging || isHoveringTrack ? '13px' : '9px',
+            height: '68px',
+            borderRadius: '7px',
+            backgroundColor: isDragging
+              ? 'var(--primary, #7c5cbf)'
+              : isHoveringTrack
+              ? 'rgba(124, 92, 191, 0.85)'
+              : 'rgba(124, 92, 191, 0.55)',
+            boxShadow: isDragging
+              ? '0 6px 16px rgba(124, 92, 191, 0.45)'
+              : '0 2px 8px rgba(0,0,0,0.12)',
             cursor: isDragging ? 'grabbing' : 'grab',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             transition: isSnapping
-              ? 'top 0.4s cubic-bezier(0.25, 1, 0.5, 1), width 0.15s ease, background-color 0.2s ease'
+              ? 'transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.15s ease, background-color 0.2s ease'
               : 'width 0.15s ease, background-color 0.2s ease',
             zIndex: 51,
           }}
-          title="Drag down to peek albums, release to spring back"
+          title="Drag up or down to scroll albums, springs back to center on release"
         >
           {/* Custom SVG Gripper Icon */}
           <svg
             width="8"
-            height="18"
-            viewBox="0 0 8 18"
+            height="20"
+            viewBox="0 0 8 20"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             style={{
-              opacity: isDragging || isHoveringTrack ? 0.9 : 0.6,
+              opacity: isDragging || isHoveringTrack ? 0.95 : 0.7,
               transition: 'opacity 0.2s ease',
             }}
           >
-            <circle cx="4" cy="3" r="1.2" fill="#ffffff" />
-            <circle cx="4" cy="9" r="1.2" fill="#ffffff" />
-            <circle cx="4" cy="15" r="1.2" fill="#ffffff" />
+            <circle cx="4" cy="3.5" r="1.3" fill="#ffffff" />
+            <circle cx="4" cy="10" r="1.3" fill="#ffffff" />
+            <circle cx="4" cy="16.5" r="1.3" fill="#ffffff" />
           </svg>
         </div>
       </div>
