@@ -238,19 +238,48 @@ export default function App() {
     } catch (e) {}
   }, [preferences]);
 
-    // Load library songs from backend on boot & verify existence with disk
+    // Real-time disk verification: Ensure library, downloads & trash only contain actual existing files
   useEffect(() => {
-    if (window.electronAPI?.getSongs) {
+    if (!window.electronAPI) return;
+
+    // 1. Sync & verify backend library songs
+    if (window.electronAPI.getSongs) {
       window.electronAPI.getSongs().then(async (loadedSongs) => {
         const validList = Array.isArray(loadedSongs) ? loadedSongs : [];
-        if (validList.length > 0 && window.electronAPI?.verifyFilesExist) {
+        if (validList.length > 0 && window.electronAPI.verifyFilesExist) {
           const existMap = await window.electronAPI.verifyFilesExist(validList.map(s => s.filePath).filter(Boolean));
-          const actualSongs = validList.filter(s => !s.filePath || existMap[s.filePath] !== false);
+          const actualSongs = validList.filter(s => s.filePath && existMap[s.filePath] === true);
           setSongs(actualSongs);
         } else {
-          setSongs(validList);
+          setSongs([]);
         }
       }).catch(console.error);
+    }
+
+    // 2. Verify completed downloads against physical disk files
+    if (window.electronAPI.verifyFilesExist) {
+      const dlPaths = completedDownloads.map(d => d.destinationPath || d.filePath).filter(Boolean);
+      if (dlPaths.length > 0) {
+        window.electronAPI.verifyFilesExist(dlPaths).then((existMap) => {
+          setCompletedDownloads((prev) => prev.filter(d => {
+            const fp = d.destinationPath || d.filePath;
+            return fp && existMap[fp] === true;
+          }));
+        }).catch(console.error);
+      } else if (completedDownloads.length > 0) {
+        setCompletedDownloads([]);
+      }
+
+      // 3. Verify trash items against disk
+      const trashPaths = trash.map(t => t.filePath || t.destinationPath).filter(Boolean);
+      if (trashPaths.length > 0) {
+        window.electronAPI.verifyFilesExist(trashPaths).then((existMap) => {
+          setTrash((prev) => prev.filter(t => {
+            const fp = t.filePath || t.destinationPath;
+            return fp && existMap[fp] === true;
+          }));
+        }).catch(console.error);
+      }
     }
   }, []);
 
