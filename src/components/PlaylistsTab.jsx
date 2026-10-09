@@ -1012,17 +1012,8 @@ export default function PlaylistsTab({
           <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
             Playlists
           </h2>
-          <span
-            style={{
-              fontSize: '11px',
-              padding: '2px 8px',
-              borderRadius: '999px',
-              backgroundColor: 'var(--bg-card)',
-              color: 'var(--text-secondary)',
-              border: '1px solid var(--border-medium)',
-            }}
-          >
-            {playlists.length}
+          <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-muted)', marginLeft: '4px' }}>
+            ({playlists.length})
           </span>
         </div>
 

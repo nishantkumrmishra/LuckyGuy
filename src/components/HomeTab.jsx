@@ -455,16 +455,13 @@ export default function HomeTab({
                           </h2>
                           <span
                             style={{
-                              fontSize: '11px',
+                              fontSize: '12.5px',
                               fontWeight: 500,
-                              padding: '2px 8px',
-                              borderRadius: '999px',
-                              backgroundColor: 'var(--bg-card)',
-                              color: 'var(--text-secondary)',
-                              border: '1px solid var(--border-medium)',
+                              color: 'var(--text-muted)',
+                              marginLeft: '2px',
                             }}
                           >
-                            {sec.tracks.length}
+                            ({sec.tracks.length})
                           </span>
                         </div>
 

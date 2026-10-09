@@ -225,33 +225,25 @@ ishant\\Music');
             </h1>
             <span
               style={{
-                fontSize: '11px',
-                fontWeight: 600,
-                padding: '2px 8px',
-                borderRadius: '999px',
-                backgroundColor: 'rgba(124, 92, 191, 0.1)',
-                color: 'var(--primary, #7c5cbf)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
+                fontSize: '13px',
+                fontWeight: 500,
+                color: 'var(--text-muted)',
               }}
             >
-              {category === 'downloads' && 'Downloads & Storage'}
+              • {category === 'downloads' && 'Downloads & Storage'}
               {category === 'appearance' && 'Appearance & UI'}
               {category === 'plugins' && 'Plugins & Extensions'}
             </span>
             {savedNotice && (
               <span
                 style={{
-                  fontSize: '11px',
+                  fontSize: '12px',
                   fontWeight: 500,
-                  padding: '2px 8px',
-                  borderRadius: '999px',
-                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
                   color: '#10b981',
-                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                  marginLeft: '6px',
                 }}
               >
-                Saved
+                (Saved)
               </span>
             )}
           </div>

@@ -2,19 +2,15 @@ import ContextMenu from './ContextMenu';
 import EditMetadataModal from './EditMetadataModal';
 import React, { useState, useMemo } from 'react';
 import {
-  Wand2,
-  FolderSearch,
   Search,
   Play,
   Pause,
   Clock,
   Trash2,
-  FolderOpen,
   Heart,
   MoreVertical,
   Folder,
   ArrowLeft,
-  Music
 } from 'lucide-react';
 import { CustomIcon } from './DuoIcons';
 
@@ -22,8 +18,6 @@ export default function LibraryTab({
   songs = [],
   playlists = [],
   onPlaySong,
-  onScanLibrary,
-  onOrganizeLibrary,
   onTrashSong,
   onPermanentDelete,
   onOpenFolder,
@@ -39,9 +33,6 @@ export default function LibraryTab({
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFolder, setSelectedFolder] = useState(null); // null = overview folders grid, string = opened folder name
-  const [isScanning, setIsScanning] = useState(false);
-  const [isOrganizing, setIsOrganizing] = useState(false);
-  const [organizeToast, setOrganizeToast] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [editingTrack, setEditingTrack] = useState(null);
   const [hoveredTrackId, setHoveredTrackId] = useState(null);
@@ -113,32 +104,6 @@ export default function LibraryTab({
     });
   };
 
-  const handleScan = async () => {
-    setIsScanning(true);
-    if (onScanLibrary) await onScanLibrary();
-    setTimeout(() => setIsScanning(false), 800);
-  };
-
-  const handleOrganize = async () => {
-    if (!onOrganizeLibrary || isOrganizing) return;
-    setIsOrganizing(true);
-    try {
-      const res = await onOrganizeLibrary();
-      if (res && res.success) {
-        const parts = [];
-        if (res.movedCount) parts.push(res.movedCount + ' organized');
-        if (res.updatedArtworkCount) parts.push(res.updatedArtworkCount + ' artworks updated');
-        setOrganizeToast(parts.length > 0 ? parts.join(' & ') : 'Library folders up to date');
-      } else {
-        setOrganizeToast('Library checked & organized');
-      }
-    } catch (e) {
-      setOrganizeToast('Organization complete');
-    }
-    setIsOrganizing(false);
-    setTimeout(() => setOrganizeToast(null), 3500);
-  };
-
   const formatDuration = (sec) => {
     if (!sec || isNaN(sec)) return '3:45';
     const m = Math.floor(sec / 60);
@@ -160,7 +125,7 @@ export default function LibraryTab({
         fontFamily: 'inherit',
       }}
     >
-      {/* Top Toolbar */}
+      {/* Top Toolbar - Clean and Uncluttered */}
       <div
         style={{
           display: 'flex',
@@ -170,7 +135,7 @@ export default function LibraryTab({
           paddingBottom: '14px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {selectedFolder && (
             <button
               onClick={() => setSelectedFolder(null)}
@@ -206,113 +171,19 @@ export default function LibraryTab({
             {selectedFolder ? selectedFolder : 'Music Library'}
           </h1>
 
+          {/* Simple Clean Text - No Rounded Capsule/Pill */}
           <span
             style={{
-              fontSize: '11px',
-              fontWeight: 600,
-              padding: '2px 8px',
-              borderRadius: '999px',
-              backgroundColor: 'var(--bg-card)',
-              color: 'var(--text-secondary)',
-              border: '1px solid var(--border-medium)',
+              fontSize: '13px',
+              fontWeight: 500,
+              color: 'var(--text-muted)',
+              marginLeft: '6px',
             }}
           >
             {selectedFolder
               ? `${filteredSongs.length} tracks`
               : `${folders.length} ${folders.length === 1 ? 'folder' : 'folders'} • ${songs.length} tracks`}
           </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {organizeToast && (
-            <span
-              style={{
-                fontSize: '11.5px',
-                fontWeight: 600,
-                padding: '4px 10px',
-                borderRadius: '6px',
-                backgroundColor: 'rgba(124, 92, 191, 0.08)',
-                color: 'var(--primary, #7c5cbf)',
-                border: '1px solid rgba(124, 92, 191, 0.2)',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-              }}
-            >
-              <span>✓</span> {organizeToast}
-            </span>
-          )}
-
-          {onOrganizeLibrary && (
-            <button
-              onClick={handleOrganize}
-              disabled={isOrganizing || isScanning}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                backgroundColor: 'var(--bg-card)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-medium)',
-                fontSize: '12px',
-                fontWeight: 500,
-                cursor: (isOrganizing || isScanning) ? 'wait' : 'pointer',
-              }}
-              title="Organize files into category folders"
-            >
-              <Wand2 size={13} className={isOrganizing ? 'animate-spin' : ''} style={{ color: 'var(--primary, #7c5cbf)' }} />
-              <span>{isOrganizing ? 'Organizing...' : 'Organize'}</span>
-            </button>
-          )}
-
-          {onOpenFolder && (
-            <button
-              onClick={() => onOpenFolder(downloadFolder)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                backgroundColor: 'var(--bg-card)',
-                color: 'var(--text-secondary)',
-                border: '1px solid var(--border-medium)',
-                fontSize: '12px',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-              title="Open folder in Explorer"
-            >
-              <FolderOpen size={13} />
-              <span>Folder</span>
-            </button>
-          )}
-
-          {onScanLibrary && (
-            <button
-              onClick={handleScan}
-              disabled={isScanning || isOrganizing}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 14px',
-                borderRadius: '8px',
-                backgroundColor: 'var(--primary, #7c5cbf)',
-                color: '#ffffff',
-                border: 'none',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: (isScanning || isOrganizing) ? 'wait' : 'pointer',
-              }}
-              title="Scan music files on disk"
-            >
-              <FolderSearch size={13} color="#ffffff" className={isScanning ? 'animate-spin' : ''} />
-              <span>{isScanning ? 'Scanning...' : 'Scan'}</span>
-            </button>
-          )}
         </div>
       </div>
 

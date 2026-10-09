@@ -287,29 +287,6 @@ export default function Sidebar({
               width: '100%',
             }}
           >
-            {/* Go Back / Return to App Button */}
-            <div
-              style={{
-                ...navItemStyle(false),
-                fontWeight: 600,
-                color: 'var(--primary, #7c5cbf)',
-              }}
-              onClick={handleBackFromSettings}
-              title={isMini ? 'Go Back' : ''}
-            >
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '20px' }}>
-                  <ChevronLeft size={18} color="var(--primary, #7c5cbf)" />
-                </div>
-                <span style={{ ...labelStyle, fontWeight: 600, color: 'var(--primary, #7c5cbf)' }}>
-                  Back
-                </span>
-              </div>
-            </div>
-
-            {/* Subtle Divider under Back item */}
-            <div style={{ height: '1px', backgroundColor: 'var(--border-light, rgba(255,255,255,0.06))', margin: isMini ? '6px 2px' : '6px 4px' }} />
-
             {/* Category 1: Downloads & Storage */}
             <div
               style={navItemStyle(settingsCategory === 'downloads')}
@@ -478,7 +455,7 @@ export default function Sidebar({
           display: 'flex',
           flexDirection: 'column',
           gap: '4px',
-          padding: isMini ? '0 4px 10px 4px' : '0 10px 10px 10px',
+          padding: isMini ? '0 4px 34px 4px' : '0 10px 34px 10px',
           boxSizing: 'border-box',
           width: '100%',
         }}
