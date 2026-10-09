@@ -292,6 +292,7 @@ class TaskDownloader extends EventEmitter {
 
 class DownloadManager extends EventEmitter {
   constructor() {
+    super();
     this.tasks = new Map();
     this.activeDownloaders = new Map();
   }
