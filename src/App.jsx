@@ -428,8 +428,12 @@ export default function App() {
       } catch (e) {}
     }
 
-    // 3. Fallback resolution for web mode
+    // 3. Fallback resolution for web mode (only for text search queries, NEVER for URLs)
     if (!resolvedTrack) {
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+        console.warn('URL could not be resolved or extracted:', trimmed);
+        return;
+      }
       let title = trimmed;
       let artist = 'Various Artists';
       if (trimmed.includes('-')) {

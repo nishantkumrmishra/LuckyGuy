@@ -165,6 +165,7 @@ ipcMain.handle('extract-url', async (event, url) => {
         ...entity
       };
     }
+    return { error: 'Could not extract playlist or track details from Spotify link. Please verify the URL or network connection.' };
   }
 
   // 2. YouTube
@@ -178,6 +179,7 @@ ipcMain.handle('extract-url', async (event, url) => {
         ...meta
       };
     }
+    return { error: 'Could not extract audio metadata from YouTube link.' };
   }
 
   // 3. Direct Audio Search / JioSaavn
@@ -190,20 +192,27 @@ ipcMain.handle('extract-url', async (event, url) => {
     };
   }
 
-  // 4. Direct HTTP URL
+  // 4. Direct HTTP Audio/Video Stream
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    const ext = path.extname(new URL(trimmed).pathname) || '.m4a';
-    return {
-      platform: 'Direct Stream',
-      type: 'track',
-      id: Buffer.from(trimmed).toString('base64').substring(0, 12),
-      title: path.basename(new URL(trimmed).pathname, ext) || 'Web Stream Track',
-      artist: 'Web Source',
-      streamUrl: trimmed,
-      directStreamUrl: trimmed,
-      artworkUrl: '',
-      durationSeconds: 0
-    };
+    try {
+      const urlObj = new URL(trimmed);
+      const ext = path.extname(urlObj.pathname).toLowerCase();
+      const isDirectMedia = ['.mp3', '.m4a', '.mp4', '.flac', '.wav', '.aac', '.ogg', '.opus', '.webm'].includes(ext);
+      if (isDirectMedia) {
+        return {
+          platform: 'Direct Stream',
+          type: 'track',
+          id: Buffer.from(trimmed).toString('base64').substring(0, 12),
+          title: path.basename(urlObj.pathname, ext) || 'Web Stream Track',
+          artist: 'Web Source',
+          streamUrl: trimmed,
+          directStreamUrl: trimmed,
+          artworkUrl: '',
+          durationSeconds: 0
+        };
+      }
+    } catch (e) {}
+    return { error: 'Provided link is not a recognized media stream or supported playlist format.' };
   }
 
   return { error: 'Could not resolve media from provided link or search term' };
@@ -296,17 +305,12 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     : '';
 
   let targetDir = preferences.downloadFolder;
-  if (genre && genre !== 'Music') {
-    const cleanGenre = genre.replace(/[\/\\?%*:|"<>]/g, '_');
+  // Auto-organize into genre subfolder when enabled
+  const shouldOrganize = preferences.autoOrganizeByGenre !== false;
+  if (shouldOrganize) {
+    const cleanGenre = (genre && genre !== 'Music') ? genre.replace(/[\/\\?%*:|"<>]/g, '_') : 'Pop';
     targetDir = path.join(preferences.downloadFolder, cleanGenre);
   }
-  if (!fs.existsSync(targetDir)) {
-    try { fs.mkdirSync(targetDir, { recursive: true }); } catch (e) {}
-  }
-
-  // Auto-organize into genre subfolder
-  const cleanGenre = (genre && genre !== 'Music') ? genre.replace(/[\/\\?%*:|"<>]/g, '_') : 'Pop';
-  targetDir = path.join(preferences.downloadFolder, cleanGenre);
   if (!fs.existsSync(targetDir)) {
     try { fs.mkdirSync(targetDir, { recursive: true }); } catch (e) {}
   }
