@@ -23,7 +23,10 @@ import {
   LayoutGrid,
   Globe,
   Lock,
-  Unlock
+  Unlock,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw
 } from 'lucide-react';
 
 export default function PluginTabContainer({
