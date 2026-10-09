@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Website Scanner Prompt | LuckyGuy Documentation</title>
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="stylesheet" href="assets/icons/coolicons/coolicons.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- ===== HEADER ===== -->
+    <header>
+        <nav>
+            <a href="index.html">
+                <i class="ci-Compass"></i>
+                <span>LuckyGuy Docs</span>
+            </a>
+
+            <ul>
+                <li><a href="index.html"><i class="ci-Compass"></i> Overview</a></li>
+                <li><a href="about.html"><i class="ci-Shield_Check"></i> Architecture</a></li>
+                <li><a href="plugins.html"><i class="ci-Code"></i> Plugin SDK</a></li>
+                <li><a href="themes.html"><i class="ci-Edit_Pencil_01"></i> Theme SDK</a></li>
+                <li><a href="ai-scanner.html" class="active"><i class="ci-Search_Magnifying_Glass"></i> AI Scanner</a></li>
+                <li><a href="downloads.html"><i class="ci-Arrow_Down_Circle"></i> Downloads</a></li>
+            </ul>
+
+            <div>
+                <a href="https://github.com/nishantkumrmishra/LuckyGuy" target="_blank"><i class="ci-Globe"></i> GitHub</a>
+                <a href="https://github.com/nishantkumrmishra/LuckyGuy--extensions" target="_blank"><i class="ci-Layers"></i> Extensions</a>
+                <a href="downloads.html" style="background: #18181b; color: #ffffff; border-color: #18181b;"><i class="ci-Arrow_Right_LG"></i> Get App</a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- ===== HERO BANNER ===== -->
+    <section class="page-hero">
+        <div>
+            <h1>AI Website Scanner & Generator</h1>
+            <p>Scan Any Media Website With AI • Generate Clean Extensions in Seconds</p>
+        </div>
+    </section>
+
+    <!-- ===== PAGE CONTAINER ===== -->
+    <div class="page-container">
+
+        <!-- STEP BY STEP -->
+        <div class="content-card">
+            <h3><i class="ci-Compass"></i> How to Use the AI Scanner</h3>
+            <p>
+                You don't need to write code by hand. Any modern AI (ChatGPT, Claude, Gemini, DeepSeek) can scan a media website and generate a complete LuckyGuy plugin using this master prompt:
+            </p>
+            <ol style="padding-left:20px; display:flex; flex-direction:column; gap:8px; color:#52525b;">
+                <li><strong>Copy the Master Prompt below.</strong></li>
+                <li><strong>Paste it into ChatGPT / Claude / Gemini</strong> along with the URL or HTML sample of the website you want to stream.</li>
+                <li><strong>Copy the AI's generated JSON or JS output.</strong></li>
+                <li><strong>Open LuckyGuy Desktop &rarr; Preferences &rarr; Plugins & Extensions</strong>, choose <strong>"Paste Code / JSON"</strong>, and click <strong>"Test & Save Script"</strong>.</li>
+                <li><strong>Toggle the plugin switch ON</strong> to immediately launch your custom tab and ad-blocker!</li>
+            </ol>
+        </div>
+
+        <!-- MASTER PROMPT BOX -->
+        <div class="content-card">
+            <h3><i class="ci-Search_Magnifying_Glass"></i> Master AI Developer Prompt</h3>
+            <p>Copy and send this prompt to your AI assistant:</p>
+
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span>AI Master Prompt (Copy & Paste)</span>
+                    <button class="code-box-copy" id="copyMasterAiBtn"><i class="ci-Copy"></i> Copy Prompt</button>
+                </div>
+                <pre id="masterAiPromptText">You are an expert JavaScript extension engineer for LuckyGuy Desktop (an Electron/React media manager and streaming platform).
+Your task is to scan the following media website and build a 100% compliant LuckyGuy extension.
+
+TARGET WEBSITE URL: [INSERT TARGET WEBSITE OR PAGE URL HERE]
+
+### LuckyGuy Architecture Rules:
+1. Every extension provides a manifest.json and an index.js.
+2. The core platform is offline-first and neutral. All scrapers, stream decoders, and crawlers run via extensions.
+3. Content Rating: Specify "all", "mature", or "18+" depending on content.
+4. Dynamic Tab: If the extension provides a video portal or web interface, declare the `tab` object with title, icon, and url.
+5. AdBlock Rules: Include an array of regex/glob patterns under `adBlockRules` to strip out popunders, banners, and malicious redirects.
+6. The extension MUST default to "enabled": false on install.
+
+### Plugin Manifest Template (manifest.json):
+{
+  "id": "custom-extension-id",
+  "name": "Extension Display Name",
+  "version": "1.0.0",
+  "type": "portal",
+  "rating": "all",
+  "enabled": false,
+  "description": "Short explanation of the plugin",
+  "author": "Author Name",
+  "entry": "index.js",
+  "tab": {
+    "title": "Sidebar Label",
+    "icon": "Film",
+    "url": "https://target-site.com",
+    "badge": "HD"
+  },
+  "capabilities": ["stream", "crawlPage", "adblock"],
+  "supportedUrls": ["*://target-site.com/*"],
+  "adBlockRules": [
+    "*://*.popunder-ad.com/*",
+    "*://*.trackers.net/*"
+  ]
+}
+
+### Plugin Implementation Template (index.js):
+module.exports = {
+  isSupported(url) {
+    return url && url.includes('target-site.com');
+  },
+
+  async resolve(url) {
+    try {
+      // Extract media stream (.mp4, .m3u8, or webm) and artwork
+      return {
+        id: "video-id",
+        title: "Video Title",
+        thumbnail: "https://.../thumb.jpg",
+        videoUrl: "https://.../stream.mp4",
+        format: "MP4",
+        headers: { "Referer": "https://target-site.com/" }
+      };
+    } catch (err) {
+      return { error: "Stream resolution failed: " + err.message };
+    }
+  },
+
+  async crawlPage(url) {
+    // Scrape 50-100 media items from the page for batch multi-select downloading
+    return {
+      success: true,
+      count: 20,
+      items: [
+        {
+          id: "item-1",
+          title: "Sample Video",
+          thumbnail: "https://.../thumb.jpg",
+          streamUrl: "https://.../stream.mp4",
+          duration: "10m"
+        }
+      ]
+    };
+  }
+};
+
+Output both files cleanly with zero external npm dependencies.</pre>
+            </div>
+        </div>
+
+        <!-- TROUBLESHOOTING CARD -->
+        <div class="content-card">
+            <h3><i class="ci-Shield_Check"></i> Troubleshooting & Best Practices</h3>
+            <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:10px;">
+                <li><i class="ci-Check_Big"></i> <strong>HLS (.m3u8) Streams:</strong> If the video uses HLS streaming, set <code>format: "HLS"</code> and provide the <code>.m3u8</code> manifest URL in <code>videoUrl</code>.</li>
+                <li><i class="ci-Check_Big"></i> <strong>HTTP Referer Headers:</strong> Many video hosts require a matching <code>Referer</code> or <code>User-Agent</code> header. Always return <code>headers: { 'Referer': 'https://target-site.com/' }</code> in <code>resolve()</code>.</li>
+                <li><i class="ci-Check_Big"></i> <strong>AdBlock Patterns:</strong> If a website opens annoying popups, inspect the popup domains and add them to <code>adBlockRules</code> (e.g. <code>"*://*popcash*/*"</code>, <code>"*://*adservice*/*"</code>).</li>
+            </ul>
+        </div>
+
+        <div style="text-align:center; margin-top:20px;">
+            <a href="plugins.html" class="cta-primary"><i class="ci-Code"></i> View Plugin SDK</a>
+            <a href="downloads.html" class="cta-secondary" style="margin-left:12px;"><i class="ci-Arrow_Down_Circle"></i> Download LuckyGuy</a>
+        </div>
+    </div>
+
+    <!-- ===== FOOTER ===== -->
+    <footer>
+        <div class="footer-grid">
+            <div>
+                <h3><i class="ci-Compass"></i> LuckyGuy Platform</h3>
+                <p>Modular media streamer, lossless downloader & extensible SDK built for Windows.</p>
+            </div>
+
+            <div>
+                <h4><i class="ci-List_Checklist"></i> Documentation</h4>
+                <ul>
+                    <li><a href="about.html"><i class="ci-Shield_Check"></i> Architecture</a></li>
+                    <li><a href="plugins.html"><i class="ci-Code"></i> Plugin SDK</a></li>
+                    <li><a href="themes.html"><i class="ci-Edit_Pencil_01"></i> Theme SDK</a></li>
+                    <li><a href="ai-scanner.html"><i class="ci-Search_Magnifying_Glass"></i> AI Scanner</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h4><i class="ci-Globe"></i> Community</h4>
+                <ul>
+                    <li><a href="https://github.com/nishantkumrmishra/LuckyGuy" target="_blank"><i class="ci-Globe"></i> Main App Repo</a></li>
+                    <li><a href="https://github.com/nishantkumrmishra/LuckyGuy--extensions" target="_blank"><i class="ci-Layers"></i> Extensions Repo</a></li>
+                    <li><a href="downloads.html"><i class="ci-Tag"></i> Release Binaries</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h4><i class="ci-Shield"></i> Open Source</h4>
+                <address>
+                    <p>Released under the MIT License.</p>
+                    <p>100% User Freedom &bull; Zero Telemetry</p>
+                </address>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>&copy; 2026 LuckyGuy Desktop. Crafted with Electron, React, Vite & Modern Web Standards.</p>
+            <ul>
+                <li><a href="about.html"><i class="ci-Check_Big"></i> Privacy First</a></li>
+                <li><a href="plugins.html"><i class="ci-Code"></i> Open SDK</a></li>
+            </ul>
+        </div>
+    </footer>
+
+    <script>
+        const btn = document.getElementById('copyMasterAiBtn');
+        const text = document.getElementById('masterAiPromptText');
+        if (btn && text) {
+            btn.addEventListener('click', () => {
+                navigator.clipboard.writeText(text.innerText).then(() => {
+                    btn.innerHTML = '<i class="ci-Check_Big"></i> Master Prompt Copied!';
+                    setTimeout(() => { btn.innerHTML = '<i class="ci-Copy"></i> Copy Prompt'; }, 2000);
+                });
+            });
+        }
+    </script>
+</body>
+</html>

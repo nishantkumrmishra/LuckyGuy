@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appearance & Theme Studio SDK | LuckyGuy Documentation</title>
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="stylesheet" href="assets/icons/coolicons/coolicons.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- ===== HEADER ===== -->
+    <header>
+        <nav>
+            <a href="index.html">
+                <i class="ci-Compass"></i>
+                <span>LuckyGuy Docs</span>
+            </a>
+
+            <ul>
+                <li><a href="index.html"><i class="ci-Compass"></i> Overview</a></li>
+                <li><a href="about.html"><i class="ci-Shield_Check"></i> Architecture</a></li>
+                <li><a href="plugins.html"><i class="ci-Code"></i> Plugin SDK</a></li>
+                <li><a href="themes.html" class="active"><i class="ci-Edit_Pencil_01"></i> Theme SDK</a></li>
+                <li><a href="ai-scanner.html"><i class="ci-Search_Magnifying_Glass"></i> AI Scanner</a></li>
+                <li><a href="downloads.html"><i class="ci-Arrow_Down_Circle"></i> Downloads</a></li>
+            </ul>
+
+            <div>
+                <a href="https://github.com/nishantkumrmishra/LuckyGuy" target="_blank"><i class="ci-Globe"></i> GitHub</a>
+                <a href="https://github.com/nishantkumrmishra/LuckyGuy--extensions" target="_blank"><i class="ci-Layers"></i> Extensions</a>
+                <a href="downloads.html" style="background: #18181b; color: #ffffff; border-color: #18181b;"><i class="ci-Arrow_Right_LG"></i> Get App</a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- ===== HERO BANNER ===== -->
+    <section class="page-hero">
+        <div>
+            <h1>Appearance & Theme Studio SDK</h1>
+            <p>Monochrome Accents • Typography Stacks • Corner Curvature • Theme Presets</p>
+        </div>
+    </section>
+
+    <!-- ===== PAGE CONTAINER ===== -->
+    <div class="page-container">
+
+        <!-- 1. APPEARANCE STUDIO OVERVIEW -->
+        <div class="content-card">
+            <h3><i class="ci-Edit_Pencil_01"></i> 1. In-App Theme Studio Features</h3>
+            <p>
+                In <strong>LuckyGuy Desktop &rarr; Preferences &rarr; Appearance & Theme Studio</strong>, every visual component responds live:
+            </p>
+            <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:10px;">
+                <li><i class="ci-Check_Big"></i> <strong>Theme Modes:</strong> Crisp Studio Light vs. Deep Obsidian Dark.</li>
+                <li><i class="ci-Check_Big"></i> <strong>Primary Palette:</strong> Violet, Emerald, Ocean, Ruby Rose, Sunset Orange, Amber, Indigo, Slate, or custom hex color picker.</li>
+                <li><i class="ci-Check_Big"></i> <strong>Typography:</strong> Inter, System UI (Segoe UI), JetBrains Mono, Geist Sans, Merriweather Serif, Comic.</li>
+                <li><i class="ci-Check_Big"></i> <strong>Corner Curvature:</strong> Sharp (4px), Balanced (8px), Curved (14px), Pill (20px).</li>
+                <li><i class="ci-Check_Big"></i> <strong>Import/Export Theme JSON:</strong> 1-click clipboard copy to share themes with others or paste community themes.</li>
+            </ul>
+        </div>
+
+        <!-- 2. THEME JSON SPECIFICATION -->
+        <div class="content-card">
+            <h3><i class="ci-Code"></i> 2. Theme JSON Specification</h3>
+            <p>
+                LuckyGuy themes are stored as simple JSON objects in localStorage and can be shared or pasted into the app:
+            </p>
+
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span>theme.json</span>
+                    <button class="code-box-copy" onclick="copyBox(this)"><i class="ci-Copy"></i> Copy</button>
+                </div>
+                <pre>{
+  "name": "Cyberpunk Emerald",
+  "mode": "dark",              // "light" | "dark"
+  "accentColor": "#10b981",    // Any hex color string
+  "fontFamily": "JetBrains Mono", // "Inter" | "JetBrains Mono" | "System UI" | "Geist Sans" | "Merriweather"
+  "borderRadius": "4px",       // "4px" | "8px" | "14px" | "20px"
+  "version": "1.0.0"
+}</pre>
+            </div>
+        </div>
+
+        <!-- 3. LIVE SANDBOX -->
+        <div class="content-card">
+            <h3><i class="ci-Settings"></i> 3. Interactive Web Theme Sandbox</h3>
+            <p>Test combinations directly in this web sandbox and copy the generated JSON to paste into LuckyGuy Desktop:</p>
+
+            <div class="theme-sandbox-card">
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px;">
+                    <div>
+                        <label style="font-size:0.85em; font-weight:500; color:#27272a; display:block; margin-bottom:4px;">Accent Color</label>
+                        <input type="color" id="themePageColor" value="#7c5cbf" style="width:40px; height:34px; border:none; cursor:pointer;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.85em; font-weight:500; color:#27272a; display:block; margin-bottom:4px;">Font Family</label>
+                        <select id="themePageFont" style="width:100%; padding:8px 12px; border:1px solid #e4e4e7; border-radius:6px;">
+                            <option value="Inter">Inter (Clean Modern Sans)</option>
+                            <option value="JetBrains Mono">JetBrains Mono (Developer Code)</option>
+                            <option value="System UI">System UI (Windows Native)</option>
+                            <option value="Geist Sans">Geist Sans (Tech Precision)</option>
+                            <option value="Merriweather">Merriweather (Classic Serif)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:0.85em; font-weight:500; color:#27272a; display:block; margin-bottom:4px;">Corner Radius</label>
+                        <select id="themePageRadius" style="width:100%; padding:8px 12px; border:1px solid #e4e4e7; border-radius:6px;">
+                            <option value="4px">Sharp (4px)</option>
+                            <option value="8px" selected>Balanced (8px)</option>
+                            <option value="14px">Curved (14px)</option>
+                            <option value="20px">Pill (20px)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="themePreviewBox" style="background:#ffffff; border:1px solid #e4e4e7; border-left:4px solid #7c5cbf; border-radius:8px; padding:18px; margin-top:10px;">
+                    <strong style="color:#09090b; font-size:1em;">LuckyGuy Live Player Preview</strong>
+                    <p style="font-size:0.9em; color:#71717a; margin-top:4px;">Pristine 320kbps Studio Audio Master • Dynamic AdBlock Active</p>
+                </div>
+
+                <div style="text-align:right;">
+                    <button id="copyThemeJsonBtn" class="cta-primary" style="padding:8px 18px; font-size:0.9em;"><i class="ci-Copy"></i> Copy Generated Theme JSON</button>
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align:center; margin-top:20px;">
+            <a href="plugins.html" class="cta-primary"><i class="ci-Code"></i> Plugin SDK</a>
+            <a href="ai-scanner.html" class="cta-secondary" style="margin-left:12px;"><i class="ci-Search_Magnifying_Glass"></i> AI Scanner Prompt</a>
+        </div>
+    </div>
+
+    <!-- ===== FOOTER ===== -->
+    <footer>
+        <div class="footer-grid">
+            <div>
+                <h3><i class="ci-Compass"></i> LuckyGuy Platform</h3>
+                <p>Modular media streamer, lossless downloader & extensible SDK built for Windows.</p>
+            </div>
+
+            <div>
+                <h4><i class="ci-List_Checklist"></i> Documentation</h4>
+                <ul>
+                    <li><a href="about.html"><i class="ci-Shield_Check"></i> Architecture</a></li>
+                    <li><a href="plugins.html"><i class="ci-Code"></i> Plugin SDK</a></li>
+                    <li><a href="themes.html"><i class="ci-Edit_Pencil_01"></i> Theme SDK</a></li>
+                    <li><a href="ai-scanner.html"><i class="ci-Search_Magnifying_Glass"></i> AI Scanner</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h4><i class="ci-Globe"></i> Community</h4>
+                <ul>
+                    <li><a href="https://github.com/nishantkumrmishra/LuckyGuy" target="_blank"><i class="ci-Globe"></i> Main App Repo</a></li>
+                    <li><a href="https://github.com/nishantkumrmishra/LuckyGuy--extensions" target="_blank"><i class="ci-Layers"></i> Extensions Repo</a></li>
+                    <li><a href="downloads.html"><i class="ci-Tag"></i> Release Binaries</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h4><i class="ci-Shield"></i> Open Source</h4>
+                <address>
+                    <p>Released under the MIT License.</p>
+                    <p>100% User Freedom &bull; Zero Telemetry</p>
+                </address>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>&copy; 2026 LuckyGuy Desktop. Crafted with Electron, React, Vite & Modern Web Standards.</p>
+            <ul>
+                <li><a href="about.html"><i class="ci-Check_Big"></i> Privacy First</a></li>
+                <li><a href="plugins.html"><i class="ci-Code"></i> Open SDK</a></li>
+            </ul>
+        </div>
+    </footer>
+
+    <script>
+        function copyBox(btn) {
+            const pre = btn.closest('.code-box').querySelector('pre');
+            navigator.clipboard.writeText(pre.innerText).then(() => {
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="ci-Check_Big"></i> Copied!';
+                setTimeout(() => { btn.innerHTML = orig; }, 2000);
+            });
+        }
+
+        const colorInput = document.getElementById('themePageColor');
+        const fontInput = document.getElementById('themePageFont');
+        const radiusInput = document.getElementById('themePageRadius');
+        const previewBox = document.getElementById('themePreviewBox');
+        const copyBtn = document.getElementById('copyThemeJsonBtn');
+
+        function updateSandbox() {
+            if (!previewBox) return;
+            previewBox.style.borderLeftColor = colorInput.value;
+            previewBox.style.fontFamily = fontInput.value + ', sans-serif';
+            previewBox.style.borderRadius = radiusInput.value;
+        }
+
+        if (colorInput && fontInput && radiusInput) {
+            colorInput.addEventListener('input', updateSandbox);
+            fontInput.addEventListener('change', updateSandbox);
+            radiusInput.addEventListener('change', updateSandbox);
+        }
+
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => {
+                const json = {
+                    name: "Custom Theme",
+                    mode: "light",
+                    accentColor: colorInput.value,
+                    fontFamily: fontInput.value,
+                    borderRadius: radiusInput.value,
+                    version: "1.0.0"
+                };
+                navigator.clipboard.writeText(JSON.stringify(json, null, 2)).then(() => {
+                    copyBtn.innerHTML = '<i class="ci-Check_Big"></i> Copied Theme JSON!';
+                    setTimeout(() => { copyBtn.innerHTML = '<i class="ci-Copy"></i> Copy Generated Theme JSON'; }, 2000);
+                });
+            });
+        }
+    </script>
+</body>
+</html>

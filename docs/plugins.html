@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugin SDK & Specification | LuckyGuy Documentation</title>
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="stylesheet" href="assets/icons/coolicons/coolicons.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- ===== HEADER ===== -->
+    <header>
+        <nav>
+            <a href="index.html">
+                <i class="ci-Compass"></i>
+                <span>LuckyGuy Docs</span>
+            </a>
+
+            <ul>
+                <li><a href="index.html"><i class="ci-Compass"></i> Overview</a></li>
+                <li><a href="about.html"><i class="ci-Shield_Check"></i> Architecture</a></li>
+                <li><a href="plugins.html" class="active"><i class="ci-Code"></i> Plugin SDK</a></li>
+                <li><a href="themes.html"><i class="ci-Edit_Pencil_01"></i> Theme SDK</a></li>
+                <li><a href="ai-scanner.html"><i class="ci-Search_Magnifying_Glass"></i> AI Scanner</a></li>
+                <li><a href="downloads.html"><i class="ci-Arrow_Down_Circle"></i> Downloads</a></li>
+            </ul>
+
+            <div>
+                <a href="https://github.com/nishantkumrmishra/LuckyGuy" target="_blank"><i class="ci-Globe"></i> GitHub</a>
+                <a href="https://github.com/nishantkumrmishra/LuckyGuy--extensions" target="_blank"><i class="ci-Layers"></i> Extensions</a>
+                <a href="downloads.html" style="background: #18181b; color: #ffffff; border-color: #18181b;"><i class="ci-Arrow_Right_LG"></i> Get App</a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- ===== HERO BANNER ===== -->
+    <section class="page-hero">
+        <div>
+            <h1>Plugin & Extension SDK</h1>
+            <p>Declarative Manifests • Stream Resolvers • Batch Crawlers • AdBlock Rules</p>
+        </div>
+    </section>
+
+    <!-- ===== PAGE CONTAINER ===== -->
+    <div class="page-container">
+
+        <!-- 1. MANIFEST SPEC -->
+        <div class="content-card">
+            <h3><i class="ci-Code"></i> 1. Extension Manifest (manifest.json)</h3>
+            <p>
+                Every extension provides a <span class="badge-tag">manifest.json</span> that tells LuckyGuy about its identity, permissions, dynamic sidebar presentation, and ad blocking rules:
+            </p>
+
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span>manifest.json Template</span>
+                    <button class="code-box-copy" onclick="copyBox(this)"><i class="ci-Copy"></i> Copy</button>
+                </div>
+                <pre>{
+  "id": "luckyguy-ext-archive-movies",
+  "name": "Archive Cinema & Open Movies",
+  "version": "1.0.0",
+  "type": "portal",             // "portal" | "audio" | "video" | "crawler"
+  "rating": "all",              // "all" | "mature" | "18+"
+  "enabled": false,             // Must default to false on install
+  "description": "Stream public cinema and documentaries with ad blocking.",
+  "author": "Open Archive Community",
+  "entry": "index.js",
+  "tab": {
+    "title": "Open Cinema",     // Displayed in sidebar navigation
+    "icon": "Film",             // Lucide icon name (Film, Music, Radio, etc.)
+    "url": "https://archive.org/details/movies",
+    "badge": "HD"               // Optional status pill
+  },
+  "capabilities": ["stream", "crawlPage", "adblock"],
+  "supportedUrls": [
+    "*://archive.org/details/*",
+    "*://ia80*.*.archive.org/*"
+  ],
+  "adBlockRules": [
+    "*://*.doubleclick.net/*",
+    "*://*.popunder*/*",
+    "*://*.adservice*/*"
+  ]
+}</pre>
+            </div>
+
+            <h4 style="margin-top:16px; margin-bottom:8px; font-weight:500;">Field Definitions:</h4>
+            <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:8px;">
+                <li><code>id</code> (String, required): Unique identifier in kebab-case.</li>
+                <li><code>rating</code> (String): Content rating flag (<code>"all"</code>, <code>"mature"</code>, or <code>"18+"</code>).</li>
+                <li><code>tab</code> (Object, optional): When supplied, LuckyGuy automatically adds a dedicated tab to the sidebar navigation.</li>
+                <li><code>adBlockRules</code> (Array): Glob and URL matching patterns blocked from loading in the webview.</li>
+            </ul>
+        </div>
+
+        <!-- 2. RUNTIME SPEC -->
+        <div class="content-card">
+            <h3><i class="ci-Layers"></i> 2. Runtime Implementation (index.js)</h3>
+            <p>
+                The entry script <span class="badge-tag">index.js</span> implements the resolver and crawler lifecycle methods:
+            </p>
+
+            <div class="code-box">
+                <div class="code-box-header">
+                    <span>index.js Implementation</span>
+                    <button class="code-box-copy" onclick="copyBox(this)"><i class="ci-Copy"></i> Copy</button>
+                </div>
+                <pre>module.exports = {
+  // 1. URL Support Check
+  isSupported(url) {
+    return url && url.includes('archive.org');
+  },
+
+  // 2. Single Stream Resolver
+  async resolve(url) {
+    try {
+      const match = url.match(/\/details\/([^/?#]+)/);
+      const identifier = match ? match[1] : 'sample-media';
+
+      return {
+        id: identifier,
+        title: `Archive Cinema: ${identifier.replace(/[-_]/g, ' ')}`,
+        thumbnail: `https://archive.org/services/img/${identifier}`,
+        videoUrl: `https://archive.org/download/${identifier}/${identifier}.mp4`,
+        format: 'MP4', // "MP4" | "HLS" | "WEBM"
+        duration: '1h 32m',
+        quality: '1080p',
+        headers: {
+          'Referer': 'https://archive.org/',
+          'User-Agent': 'LuckyGuy-Desktop/1.0'
+        }
+      };
+    } catch (err) {
+      return { error: 'Resolution failed: ' + err.message };
+    }
+  },
+
+  // 3. Batch Webpage Crawler (50 - 200 items)
+  async crawlPage(url) {
+    try {
+      const items = [
+        {
+          id: 'movie-101',
+          title: 'Night of the Living Dead (1968)',
+          thumbnail: 'https://.../thumb.jpg',
+          streamUrl: 'https://.../stream.mp4',
+          duration: '1h 36m'
+        }
+      ];
+      return { success: true, count: items.length, items };
+    } catch (err) {
+      return { success: false, error: err.message, items: [] };
+    }
+  }
+};</pre>
+            </div>
+        </div>
+
+        <!-- 3. IN-APP PASTE & RUN -->
+        <div class="content-card">
+            <h3><i class="ci-Edit_Pencil_01"></i> 3. Testing Plugins: Zero-Friction Paste & Run</h3>
+            <p>
+                You don't need a code editor, local compiler, or Git repository to test or run extensions:
+            </p>
+            <ol style="padding-left:20px; display:flex; flex-direction:column; gap:8px; color:#52525b;">
+                <li>Open <strong>LuckyGuy Desktop &rarr; Preferences &rarr; Plugins & Extensions</strong>.</li>
+                <li>Click <strong>"Paste Code / JSON"</strong>.</li>
+                <li>Paste your manifest JSON or JS script directly into the box. Markdown code blocks (<code>```json</code>) are cleaned up automatically.</li>
+                <li>Click <strong>"Test & Save Script"</strong> to validate syntax and save.</li>
+                <li>Toggle the switch <strong>ON</strong> to activate the tab in your sidebar!</li>
+            </ol>
+        </div>
+
+        <div style="text-align:center; margin-top:20px;">
+            <a href="ai-scanner.html" class="cta-primary"><i class="ci-Search_Magnifying_Glass"></i> Generate via AI Scanner</a>
+            <a href="themes.html" class="cta-secondary" style="margin-left:12px;"><i class="ci-Edit_Pencil_01"></i> Appearance SDK</a>
+        </div>
+    </div>
+
+    <!-- ===== FOOTER ===== -->
+    <footer>
+        <div class="footer-grid">
+            <div>
+                <h3><i class="ci-Compass"></i> LuckyGuy Platform</h3>
+                <p>Modular media streamer, lossless downloader & extensible SDK built for Windows.</p>
+            </div>
+
+            <div>
+                <h4><i class="ci-List_Checklist"></i> Documentation</h4>
+                <ul>
+                    <li><a href="about.html"><i class="ci-Shield_Check"></i> Architecture</a></li>
+                    <li><a href="plugins.html"><i class="ci-Code"></i> Plugin SDK</a></li>
+                    <li><a href="themes.html"><i class="ci-Edit_Pencil_01"></i> Theme SDK</a></li>
+                    <li><a href="ai-scanner.html"><i class="ci-Search_Magnifying_Glass"></i> AI Scanner</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h4><i class="ci-Globe"></i> Community</h4>
+                <ul>
+                    <li><a href="https://github.com/nishantkumrmishra/LuckyGuy" target="_blank"><i class="ci-Globe"></i> Main App Repo</a></li>
+                    <li><a href="https://github.com/nishantkumrmishra/LuckyGuy--extensions" target="_blank"><i class="ci-Layers"></i> Extensions Repo</a></li>
+                    <li><a href="downloads.html"><i class="ci-Tag"></i> Release Binaries</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h4><i class="ci-Shield"></i> Open Source</h4>
+                <address>
+                    <p>Released under the MIT License.</p>
+                    <p>100% User Freedom &bull; Zero Telemetry</p>
+                </address>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>&copy; 2026 LuckyGuy Desktop. Crafted with Electron, React, Vite & Modern Web Standards.</p>
+            <ul>
+                <li><a href="about.html"><i class="ci-Check_Big"></i> Privacy First</a></li>
+                <li><a href="plugins.html"><i class="ci-Code"></i> Open SDK</a></li>
+            </ul>
+        </div>
+    </footer>
+
+    <script>
+        function copyBox(btn) {
+            const pre = btn.closest('.code-box').querySelector('pre');
+            navigator.clipboard.writeText(pre.innerText).then(() => {
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="ci-Check_Big"></i> Copied!';
+                setTimeout(() => { btn.innerHTML = orig; }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
