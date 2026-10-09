@@ -359,10 +359,25 @@ ipcMain.handle('delete-file-permanently', async (event, filePath, songId) => {
       console.warn('Failed to delete physical file:', e.message);
     }
   }
-  if (songId) {
-    libraryManager.deleteSong(songId);
+  if (songId || filePath) {
+    libraryManager.removeSong(songId, filePath);
   }
   return fileDeleted;
+});
+
+ipcMain.handle('clear-cache-data', async () => {
+  try {
+    if (mainWindow && mainWindow.webContents && mainWindow.webContents.session) {
+      await mainWindow.webContents.session.clearCache();
+      await mainWindow.webContents.session.clearStorageData({
+        storages: ['appcache', 'shadercache', 'serviceworkers', 'cachestorage']
+      });
+    }
+    libraryManager.pruneMissingFiles();
+    return true;
+  } catch (e) {
+    return false;
+  }
 });
 
 ipcMain.handle('verify-files-exist', async (event, filePaths) => {

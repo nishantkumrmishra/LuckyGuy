@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   openInFolder: (filePath) => ipcRenderer.invoke('open-in-folder', filePath),
   deleteFilePermanently: (filePath, songId) => ipcRenderer.invoke('delete-file-permanently', filePath, songId),
+  clearCacheData: () => ipcRenderer.invoke('clear-cache-data'),
   moveToTrash: (filePath, songId) => ipcRenderer.invoke('move-to-trash', filePath, songId),
 
   verifyFilesExist: (paths) => ipcRenderer.invoke('verify-files-exist', paths),

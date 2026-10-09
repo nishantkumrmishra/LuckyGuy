@@ -238,12 +238,17 @@ export default function App() {
     } catch (e) {}
   }, [preferences]);
 
-    // Load library songs from backend on boot
+    // Load library songs from backend on boot & verify existence with disk
   useEffect(() => {
     if (window.electronAPI?.getSongs) {
-      window.electronAPI.getSongs().then((loadedSongs) => {
-        if (loadedSongs && Array.isArray(loadedSongs) && loadedSongs.length > 0) {
-          setSongs(loadedSongs);
+      window.electronAPI.getSongs().then(async (loadedSongs) => {
+        const validList = Array.isArray(loadedSongs) ? loadedSongs : [];
+        if (validList.length > 0 && window.electronAPI?.verifyFilesExist) {
+          const existMap = await window.electronAPI.verifyFilesExist(validList.map(s => s.filePath).filter(Boolean));
+          const actualSongs = validList.filter(s => !s.filePath || existMap[s.filePath] !== false);
+          setSongs(actualSongs);
+        } else {
+          setSongs(validList);
         }
       }).catch(console.error);
     }
