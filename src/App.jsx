@@ -1159,7 +1159,7 @@ export default function App() {
       className="app-container"
       style={{
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: 'row',
         height: '100vh',
         width: '100vw',
         overflow: 'hidden',
@@ -1168,19 +1168,7 @@ export default function App() {
         fontFamily: 'inherit',
       }}
     >
-      <TitleBar
-        searchQuery={searchQuery}
-        onSearch={setSearchQuery}
-        libraryTracks={songs}
-        onPlayTrack={handlePlayTrack}
-        onNavigateHome={() => setActiveTab('home')}
-        activeTab={activeTab}
-        isPluginTab={activeTab.startsWith('plugin-')}
-        pluginNav={pluginNavState}
-      />
-
-      <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
-        <Sidebar
+      <Sidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           isCollapsed={isSidebarCollapsed}
@@ -1190,6 +1178,18 @@ export default function App() {
           pluginTabs={pluginTabs}
           settingsCategory={settingsCategory}
           setSettingsCategory={setSettingsCategory}
+        />
+
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, height: '100vh', overflow: 'hidden' }}>
+        <TitleBar
+          searchQuery={searchQuery}
+          onSearch={setSearchQuery}
+          libraryTracks={songs}
+          onPlayTrack={handlePlayTrack}
+          onNavigateHome={() => setActiveTab('home')}
+          activeTab={activeTab}
+          isPluginTab={activeTab.startsWith('plugin-')}
+          pluginNav={pluginNavState}
         />
 
         <main
