@@ -246,7 +246,7 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
 
   const targetPath = taskConfig.destinationPath || path.join(targetDir, `${cleanArtist}${cleanTitle}${ext}`);
 
-  const downloader = downloadManager.addTask({
+  downloadManager.addTask({
     ...taskConfig,
     title: taskConfig.title,
     artist: taskConfig.artist,
@@ -258,82 +258,87 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     chunkCount: preferences.chunkCount || 8
   });
 
-  downloader.on('update', (snap) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('download-progress', snap);
+  return true;
+});
+
+// Global DownloadManager event routing
+downloadManager.on('update', (snap) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('download-progress', snap);
+  }
+});
+
+downloadManager.on('completed', async (snap) => {
+  const targetPath = snap.destinationPath;
+  const targetDir = targetPath ? path.dirname(targetPath) : preferences.downloadFolder;
+  if (targetPath && targetPath.endsWith('.mp3')) {
+    try {
+      await embedId3Metadata(targetPath, {
+        title: snap.title,
+        artist: snap.artist,
+        album: snap.album,
+        year: snap.year,
+        genre: snap.genre,
+        artworkUrl: snap.artworkUrl
+      });
+    } catch (tagErr) {
+      console.warn('Failed to embed ID3 tags into MP3:', tagErr.message);
     }
+  }
+
+  const activeArtwork = snap.artworkUrl;
+  if (activeArtwork && activeArtwork.startsWith('http') && targetDir) {
+    try {
+      const folderCover = path.join(targetDir, 'folder.jpg');
+      if (!fs.existsSync(folderCover)) {
+        const { fetchBuffer } = require('./id3Tagger');
+        fetchBuffer(activeArtwork).then(res => {
+          if (res && res.buffer) fs.writeFileSync(folderCover, res.buffer);
+        }).catch(() => {});
+      }
+    } catch (coverErr) {}
+  }
+
+  let finalSize = snap.downloadedBytes;
+  try {
+    if (targetPath && fs.existsSync(targetPath)) {
+      finalSize = fs.statSync(targetPath).size;
+    }
+  } catch (e) {}
+
+  historyManager.recordDownload(snap.title, snap.artist, targetPath, 'COMPLETED');
+
+  libraryManager.recordDownloadTransaction({
+    ...snap,
+    genre: snap.genre,
+    filePath: targetPath,
+    fileSize: finalSize,
+    status: 'COMPLETED'
   });
 
-  downloader.on('completed', async (snap) => {
-    if (targetPath.endsWith('.mp3')) {
-      try {
-        await embedId3Metadata(targetPath, {
-          title: taskConfig.title || snap.title,
-          artist: taskConfig.artist || snap.artist,
-          album: album || snap.album,
-          year: year || snap.year,
-          genre: genre || snap.genre,
-          artworkUrl: artworkUrl || snap.artworkUrl
-        });
-      } catch (tagErr) {
-        console.warn('Failed to embed ID3 tags into MP3:', tagErr.message);
-      }
-    }
+  if (targetDir) {
+    libraryManager.scanDirectories([preferences.downloadFolder, targetDir]);
+  }
 
-    const activeArtwork = artworkUrl || snap.artworkUrl;
-    if (activeArtwork && activeArtwork.startsWith('http')) {
-      try {
-        const folderCover = path.join(targetDir, 'folder.jpg');
-        if (!fs.existsSync(folderCover)) {
-          const { fetchBuffer } = require('./id3Tagger');
-          fetchBuffer(activeArtwork).then(res => {
-            if (res && res.buffer) fs.writeFileSync(folderCover, res.buffer);
-          }).catch(() => {});
-        }
-      } catch (coverErr) {}
-    }
-
-    let finalSize = snap.downloadedBytes;
-    try {
-      if (fs.existsSync(targetPath)) {
-        finalSize = fs.statSync(targetPath).size;
-      }
-    } catch (e) {}
-
-    historyManager.recordDownload(taskConfig.title, taskConfig.artist, targetPath, 'COMPLETED');
-
-    libraryManager.recordDownloadTransaction({
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('download-progress', {
       ...snap,
-      genre,
       filePath: targetPath,
       fileSize: finalSize,
       status: 'COMPLETED'
     });
+    mainWindow.webContents.send('download-completed', {
+      ...snap,
+      filePath: targetPath,
+      fileSize: finalSize
+    });
+  }
+});
 
-    libraryManager.scanDirectories([preferences.downloadFolder, targetDir]);
-
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('download-progress', {
-        ...snap,
-        filePath: targetPath,
-        fileSize: finalSize,
-        status: 'COMPLETED'
-      });
-      mainWindow.webContents.send('download-completed', {
-        ...snap,
-        filePath: targetPath,
-        fileSize: finalSize
-      });
-    }
-  });
-
-  downloader.on('failed', (snap) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('download-failed', snap);
-    }
-  });
-
-  return downloader.start();
+downloadManager.on('failed', (snap) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('download-failed', snap);
+  }
 });
 
 ipcMain.handle('download-pause', async (event, id) => downloadManager.pauseTask(id));

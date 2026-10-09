@@ -45,7 +45,9 @@ export default function App() {
       const saved = localStorage.getItem('localguy-downloads');
       if (saved) {
         const parsed = JSON.parse(saved);
-        return parsed.filter((t) => t.title !== '4tHJc5agHg9LVsijAwtooy' && !/^[a-zA-Z0-9]{20,}$/.test(t.title) && !t.title.toLowerCase().includes('3 drags'));
+        return Array.isArray(parsed)
+          ? parsed.filter((t) => (t.filePath || t.destinationPath) && t.status !== 'Skipped (Already on Device)' && t.title !== '4tHJc5agHg9LVsijAwtooy' && !/^[a-zA-Z0-9]{20,}$/.test(t.title) && !t.title.toLowerCase().includes('3 drags'))
+          : [];
       }
       return [];
     } catch {
@@ -316,9 +318,13 @@ export default function App() {
           item.id === payload.id
             ? {
                 ...item,
-                progress: payload.progress,
-                speed: payload.speed || item.speed,
-                status: 'downloading',
+                progress: payload.progress !== undefined
+                  ? (payload.progress <= 1 && payload.progress > 0 ? Math.round(payload.progress * 100) : Math.round(payload.progress))
+                  : item.progress,
+                downloadedBytes: payload.downloadedBytes ?? item.downloadedBytes,
+                totalBytes: payload.totalBytes ?? item.totalBytes,
+                speed: payload.speed || (payload.speedBytesPerSec ? (payload.speedBytesPerSec / (1024 * 1024)).toFixed(1) + ' MB/s' : item.speed),
+                status: payload.status ? payload.status.toLowerCase() : item.status,
               }
             : item
         )
@@ -327,6 +333,12 @@ export default function App() {
 
     window.electronAPI.onDownloadCompleted((payload) => {
       setActiveDownloads((prev) => prev.filter((item) => item.id !== payload.id));
+      const finalBytes = payload.fileSize || payload.downloadedBytes;
+      let formattedSize = payload.size || 'Saved';
+      if (finalBytes && !isNaN(finalBytes) && finalBytes > 0) {
+        const mb = finalBytes / (1024 * 1024);
+        formattedSize = mb >= 1000 ? (mb / 1024).toFixed(2) + ' GB' : mb.toFixed(1) + ' MB';
+      }
       const completed = {
         id: payload.id,
         title: payload.title,
@@ -337,7 +349,8 @@ export default function App() {
         streamUrl: payload.streamUrl,
         filePath: payload.filePath,
         format: payload.format || 'MP3 320k',
-        size: payload.size || 'Saved',
+        size: formattedSize,
+        fileSize: finalBytes,
         downloadedAt: new Date().toLocaleDateString(),
       };
       setCompletedDownloads((prev) => [completed, ...prev]);
@@ -422,19 +435,6 @@ export default function App() {
         }
 
         if (isAlreadyOnDevice) {
-          const skippedEntry = {
-            id: 'skip-' + Date.now() + '-' + Math.random().toString(36).substring(7),
-            title: itemTitle,
-            artist: itemArtist,
-            album: resolvedTrack.title || 'Playlist',
-            artworkUrl: itemCover,
-            duration: Math.round((t.durationMs || 215000) / 1000),
-            format: 'MP3 320k',
-            size: 'Saved',
-            status: 'Skipped (Already on Device)',
-            downloadedAt: 'Already Exists',
-          };
-          setCompletedDownloads((prev) => [skippedEntry, ...prev]);
           continue;
         }
 
@@ -571,6 +571,24 @@ export default function App() {
           );
         }
       }, 350);
+    }
+  };
+
+  const handlePauseDownload = async (id) => {
+    setActiveDownloads((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, status: 'paused' } : d))
+    );
+    if (window.electronAPI?.pauseDownload) {
+      await window.electronAPI.pauseDownload(id);
+    }
+  };
+
+  const handleResumeDownload = async (id) => {
+    setActiveDownloads((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, status: 'downloading' } : d))
+    );
+    if (window.electronAPI?.resumeDownload) {
+      await window.electronAPI.resumeDownload(id);
     }
   };
 
@@ -1103,6 +1121,8 @@ export default function App() {
                 activeDownloads={activeDownloads}
                 completedDownloads={completedDownloads}
                 onStartDownload={handleStartDownload}
+                onPauseDownload={handlePauseDownload}
+                onResumeDownload={handleResumeDownload}
                 onPauseAll={handlePauseAll}
                 onResumeAll={handleResumeAll}
                 onCancelDownload={handleCancelDownload}

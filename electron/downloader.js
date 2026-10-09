@@ -62,7 +62,7 @@ class TaskDownloader extends EventEmitter {
       this.speedBytesPerSec = 0;
       this.etaSeconds = 0;
       this.emit('update', this.snapshot());
-      this.emit('completed', this.task);
+      this.emit('completed', this.snapshot());
     } catch (err) {
       if (!this.isCanceled && !this.isPaused) {
         this.status = 'ERROR';
@@ -286,7 +286,7 @@ class TaskDownloader extends EventEmitter {
   }
 }
 
-class DownloadManager {
+class DownloadManager extends EventEmitter {
   constructor() {
     this.tasks = new Map();
     this.activeDownloaders = new Map();

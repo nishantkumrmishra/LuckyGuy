@@ -37,13 +37,9 @@ class HistoryManager {
   }
 
   isDownloaded(title, artist, targetPath) {
-    const key = this.normalizeKey(title, artist);
-    if (this.downloadedKeys.has(key)) {
-      return true;
-    }
-    if (targetPath && typeof targetPath === 'string' && fs.existsSync(targetPath)) {
-      this.downloadedKeys.add(key);
-      return true;
+    // Only consider downloaded if the file physically exists on disk
+    if (targetPath && typeof targetPath === 'string') {
+      return fs.existsSync(targetPath);
     }
     return false;
   }
