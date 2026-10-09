@@ -2,8 +2,18 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   minimize: () => ipcRenderer.send('window-minimize'),
+  minimizeWindow: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
+  maximizeWindow: () => ipcRenderer.send('window-maximize'),
   close: () => ipcRenderer.send('window-close'),
+  closeWindow: () => ipcRenderer.send('window-close'),
+  getWindowState: () => ipcRenderer.invoke('window-get-state'),
+  onWindowStateChanged: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('window-state-changed', handler);
+    return () => ipcRenderer.removeListener('window-state-changed', handler);
+  },
 
   extractUrl: (url) => ipcRenderer.invoke('extract-url', url),
   searchJioSaavn: (query) => ipcRenderer.invoke('search-jiosaavn', query),

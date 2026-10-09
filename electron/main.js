@@ -109,6 +109,13 @@ function createWindow() {
     }
   });
 
+  mainWindow.on('maximize', () => {
+    mainWindow?.webContents?.send('window-state-changed', { isMaximized: true });
+  });
+  mainWindow.on('unmaximize', () => {
+    mainWindow?.webContents?.send('window-state-changed', { isMaximized: false });
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -134,6 +141,9 @@ ipcMain.on('window-maximize', () => {
   else mainWindow.maximize();
 });
 ipcMain.on('window-close', () => mainWindow?.close());
+ipcMain.handle('window-get-state', () => {
+  return { isMaximized: mainWindow ? mainWindow.isMaximized() : false };
+});
 
 // URL Extractor & Resolver
 ipcMain.handle('extract-url', async (event, url) => {
