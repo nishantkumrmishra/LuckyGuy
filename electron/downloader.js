@@ -262,7 +262,7 @@ class TaskDownloader extends EventEmitter {
         if (fs.existsSync(part)) {
           const buffer = fs.readFileSync(part);
           outStream.write(buffer);
-          try { fs.unlinkSync(part); } catch (e) {}\
+          try { fs.unlinkSync(part); } catch (e) {}
         }
       }
       outStream.end();
@@ -273,7 +273,7 @@ class TaskDownloader extends EventEmitter {
     for (const part of this.partFiles) {
       try {
         if (fs.existsSync(part)) fs.unlinkSync(part);
-      } catch (e) {}\
+      } catch (e) {}
     }
   }
 
@@ -294,4 +294,94 @@ class TaskDownloader extends EventEmitter {
 
   snapshot() {
     const progress = this.totalBytes > 0 ? Math.min(1.0, this.downloadedBytes / this.totalBytes) : 0;
-    return {\n      ...this.task,\n      status: this.status,\n      downloadedBytes: this.downloadedBytes,\n      totalBytes: this.totalBytes,\n      speedBytesPerSec: this.speedBytesPerSec,\n      etaSeconds: this.etaSeconds,\n      progress,\n      activeChunks: this.activeChunks,\n      errorMessage: this.errorMessage || null\n    };\n  }\n}\n\nclass DownloadManager extends EventEmitter {\n  constructor() {\n    super();\n    this.tasks = new Map();\n    this.activeDownloaders = new Map();\n  }\n\n  addTask(taskConfig) {\n    const downloader = new TaskDownloader(taskConfig);\n    this.tasks.set(taskConfig.id, downloader.snapshot());\n    this.activeDownloaders.set(taskConfig.id, downloader);\n\n    downloader.on('update', (snap) => {\n      this.tasks.set(taskConfig.id, snap);\n      this.emit('update', snap);\n    });\n\n    downloader.on('completed', (snap) => {\n      this.tasks.delete(taskConfig.id);\n      this.activeDownloaders.delete(taskConfig.id);\n      this.emit('completed', snap);\n    });\n\n    downloader.on('error', (err) => {\n      this.emit('error', { id: taskConfig.id, error: err.message });\n      this.emit('failed', { id: taskConfig.id, error: err.message });\n    });\n\n    downloader.start();\n    return downloader;\n  }\n\n  pauseTask(id) {\n    const d = this.activeDownloaders.get(id);\n    if (d) d.pause();\n  }\n\n  resumeTask(id) {\n    const prev = this.tasks.get(id);\n    if (prev) {\n      prev.status = 'QUEUED';\n      this.addTask(prev);\n    }\n  }\n\n  cancelTask(id) {\n    const d = this.activeDownloaders.get(id);\n    if (d) d.cancel();\n  }\n\n  removeTask(id) {\n    this.cancelTask(id);\n    this.tasks.delete(id);\n    this.activeDownloaders.delete(id);\n  }\n\n  pauseAll() {\n    for (const d of this.activeDownloaders.values()) {\n      if (d && !d.isPaused && !d.isCanceled) d.pause();\n    }\n  }\n\n  resumeAll() {\n    for (const [id, task] of this.tasks.entries()) {\n      if (task.status === 'PAUSED') this.resumeTask(id);\n    }\n  }\n\n  getAllTasks() {\n    return Array.from(this.tasks.values());\n  }\n}\n\nmodule.exports = {\n  DownloadManager,\n  TaskDownloader\n};\n
+    return {
+      ...this.task,
+      status: this.status,
+      downloadedBytes: this.downloadedBytes,
+      totalBytes: this.totalBytes,
+      speedBytesPerSec: this.speedBytesPerSec,
+      etaSeconds: this.etaSeconds,
+      progress,
+      activeChunks: this.activeChunks,
+      errorMessage: this.errorMessage || null
+    };
+  }
+}
+
+class DownloadManager extends EventEmitter {
+  constructor() {
+    super();
+    this.tasks = new Map();
+    this.activeDownloaders = new Map();
+  }
+
+  addTask(taskConfig) {
+    const downloader = new TaskDownloader(taskConfig);
+    this.tasks.set(taskConfig.id, downloader.snapshot());
+    this.activeDownloaders.set(taskConfig.id, downloader);
+
+    downloader.on('update', (snap) => {
+      this.tasks.set(taskConfig.id, snap);
+      this.emit('update', snap);
+    });
+
+    downloader.on('completed', (snap) => {
+      this.tasks.delete(taskConfig.id);
+      this.activeDownloaders.delete(taskConfig.id);
+      this.emit('completed', snap);
+    });
+
+    downloader.on('error', (err) => {
+      this.emit('error', { id: taskConfig.id, error: err.message });
+      this.emit('failed', { id: taskConfig.id, error: err.message });
+    });
+
+    downloader.start();
+    return downloader;
+  }
+
+  pauseTask(id) {
+    const d = this.activeDownloaders.get(id);
+    if (d) d.pause();
+  }
+
+  resumeTask(id) {
+    const prev = this.tasks.get(id);
+    if (prev) {
+      prev.status = 'QUEUED';
+      this.addTask(prev);
+    }
+  }
+
+  cancelTask(id) {
+    const d = this.activeDownloaders.get(id);
+    if (d) d.cancel();
+  }
+
+  removeTask(id) {
+    this.cancelTask(id);
+    this.tasks.delete(id);
+    this.activeDownloaders.delete(id);
+  }
+
+  pauseAll() {
+    for (const d of this.activeDownloaders.values()) {
+      if (d && !d.isPaused && !d.isCanceled) d.pause();
+    }
+  }
+
+  resumeAll() {
+    for (const [id, task] of this.tasks.entries()) {
+      if (task.status === 'PAUSED') this.resumeTask(id);
+    }
+  }
+
+  getAllTasks() {
+    return Array.from(this.tasks.values());
+  }
+}
+
+module.exports = {
+  DownloadManager,
+  TaskDownloader
+};
