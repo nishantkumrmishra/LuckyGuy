@@ -50,24 +50,55 @@ export default function HomeTab({
     }));
   };
 
+
+  // Defense-in-depth: Deduplicate songs by physical path and title+artist
+  const safeSongs = useMemo(() => {
+    if (!Array.isArray(songs)) return [];
+    const seenPaths = new Set();
+    const seenKeys = new Set();
+    const seenIds = new Set();
+    const result = [];
+    for (const t of songs) {
+      if (!t) continue;
+      const rawPath = (t.filePath || t.destinationPath || "").replace(/[\\/]+/g, "/").toLowerCase().trim();
+      const idKey = t.id ? String(t.id).trim() : "";
+      const titleKey = (t.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const artistKey = (t.artist && t.artist !== "Unknown Artist" && t.artist !== "Various Artists")
+        ? (t.artist || "").toLowerCase().replace(/[^a-z0-9]/g, "")
+        : "";
+      const songKey = `${titleKey}__${artistKey}`;
+
+      if (rawPath && seenPaths.has(rawPath)) continue;
+      if (idKey && seenIds.has(idKey)) continue;
+      if (titleKey.length >= 2 && seenKeys.has(songKey)) continue;
+
+      if (rawPath) seenPaths.add(rawPath);
+      if (idKey) seenIds.add(idKey);
+      if (titleKey.length >= 2) seenKeys.add(songKey);
+      result.push(t);
+    }
+    return result;
+  }, [songs]);
+
   // Group songs into folder / category sections
   const folderSections = useMemo(() => {
     const map = {};
-    songs.forEach((s) => {
+    safeSongs.forEach((s) => {
       let folderName = s.folder || s.genre;
-      if (!folderName || folderName === 'undefined' || folderName === 'Music') {
-        const parts = (s.filePath || '').split(/[\\/]/);
-        if (parts.length >= 2 && parts[parts.length - 2] !== 'Music') {
+      if (!folderName || folderName === "undefined" || folderName === "Music") {
+        const parts = (s.filePath || "").replace(/[\\/]+/g, "/").split("/");
+        if (parts.length >= 2 && parts[parts.length - 2] !== "Music") {
           folderName = parts[parts.length - 2];
         }
       }
-      folderName = folderName || 'Other';
+      folderName = folderName || "Other";
 
-      let folderPath = '';
+      let folderPath = "";
       if (s.filePath) {
-        const lastSlash = Math.max(s.filePath.lastIndexOf('\\'), s.filePath.lastIndexOf('/'));
+        const norm = s.filePath.replace(/[\\/]+/g, "/");
+        const lastSlash = norm.lastIndexOf("/");
         if (lastSlash !== -1) {
-          folderPath = s.filePath.substring(0, lastSlash);
+          folderPath = norm.substring(0, lastSlash).replace(/\//g, "\\");
         }
       }
       if (!folderPath) {
@@ -79,13 +110,18 @@ export default function HomeTab({
           name: folderName,
           folderPath,
           tracks: [],
+          seenTrackPaths: new Set(),
         };
       }
-      map[folderName].tracks.push(s);
+      const normPath = (s.filePath || s.id || "").replace(/[\\/]+/g, "/").toLowerCase();
+      if (!map[folderName].seenTrackPaths.has(normPath)) {
+        map[folderName].seenTrackPaths.add(normPath);
+        map[folderName].tracks.push(s);
+      }
     });
 
     return Object.values(map).sort((a, b) => b.tracks.length - a.tracks.length);
-  }, [songs]);
+  }, [safeSongs]);
 
   const handleOpenFolder = (folderPath) => {
     if (window.electronAPI?.openInFolder && folderPath) {
@@ -216,7 +252,7 @@ export default function HomeTab({
               Music Library
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              {songs.length} tracks available
+              {safeSongs.length} tracks available
             </div>
           </div>
         </div>
@@ -567,15 +603,18 @@ export default function HomeTab({
                         }
                       >
                         {visibleTracks.map((track) => {
+                          const normCurrPath = currentTrack?.filePath ? currentTrack.filePath.replace(/[\\/]+/g, "/").toLowerCase() : "";
+                          const normTrackPath = track?.filePath ? track.filePath.replace(/[\\/]+/g, "/").toLowerCase() : "";
                           const isCurrent =
                             currentTrack &&
-                            (currentTrack.id === track.id || currentTrack.filePath === track.filePath);
+                            ((normCurrPath && normTrackPath && normCurrPath === normTrackPath) ||
+                             (currentTrack.id && track.id && currentTrack.id === track.id));
                           const isTrackPlaying = isCurrent && isPlaying;
                           const art = track.artworkUrl || track.coverArt;
 
                           return (
                             <div
-                              key={track.id || track.filePath}
+                              key={track.filePath ? track.filePath.replace(/[\\/]+/g, "/") : (track.id || track.title)}
                               onClick={() => onPlaySong && onPlaySong(track, sec.tracks)}
                               style={{
                                 backgroundColor: 'var(--bg-card)',

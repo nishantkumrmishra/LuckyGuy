@@ -148,14 +148,14 @@ export default function PluginTabContainer({
 
   // Determine portal category and tag
   const isPornhub = plugin.id?.includes('pornhub') || (activeUrl || '').includes('pornhub');
-  const isTelegraph = plugin.id?.includes('telegraph') || (activeUrl || '').includes('telegra.ph') || (activeUrl || '').includes('t.me');
+  const isTelegram = plugin.id?.includes('telegram') || (activeUrl || '').includes('t.me') || (activeUrl || '').includes('telesco.pe');
   const isArchiveMovies = plugin.id?.includes('archive') || (activeUrl || '').includes('archive.org');
   const isRadio = plugin.id?.includes('radio') || (activeUrl || '').includes('radio');
 
   const categories = isPornhub
     ? ['All', 'Trending HD', 'Top Rated', '4K Ultra', 'Verified Amateurs', 'VR / 60fps']
-    : isTelegraph
-    ? ['All', 'Photography', 'Galleries & Albums', 'Digital Art', 'High-Res Nature', 'Architecture']
+    : isTelegram
+    ? ['All', 'Channel Videos', 'HD Clips', 'Wallpapers & Photos', 'Audio & Voice', 'Media Files']
     : isArchiveMovies
     ? ['All', 'Sci-Fi & Horror', 'Classics', 'Documentaries', 'Silent Film', '1080p Remasters']
     : ['All', 'Top Stations', 'Chillout & Ambient', 'Jazz & Blues', 'Electronic Dance', 'Rock Classics'];
@@ -361,7 +361,50 @@ export default function PluginTabContainer({
             }
           });
 
-          // Check for Telegraph/Image articles
+          // Check for Telegram posts/videos/photos
+          const tgMessages = document.querySelectorAll('.tgme_widget_message_wrap');
+          tgMessages.forEach((msg, i) => {
+            const vid = msg.querySelector('video');
+            const photo = msg.querySelector('.tgme_widget_message_photo_wrap');
+            const textEl = msg.querySelector('.tgme_widget_message_text');
+            const durEl = msg.querySelector('.message_video_duration');
+            const viewsEl = msg.querySelector('.tgme_widget_message_views');
+            const linkEl = msg.querySelector('.tgme_widget_message_date');
+
+            let videoSrc = vid ? vid.getAttribute('src') : null;
+            let photoSrc = '';
+            if (photo) {
+              const bg = photo.style.backgroundImage || '';
+              const m = bg.match(/url\(["\x27]?(.*?)[\"\x27]?\)/);
+              if (m) photoSrc = m[1];
+            }
+
+            if (!videoSrc && !photoSrc) return;
+            const key = videoSrc || photoSrc;
+            if (seen.has(key)) return;
+            seen.add(key);
+
+            const title = textEl ? textEl.textContent.trim().substring(0, 90) : (videoSrc ? 'Telegram Video Post' : 'Telegram Photo Post');
+            items.push({
+              id: 'tg-live-' + i + '-' + Date.now().toString(36),
+              title,
+              thumbnail: photoSrc || '',
+              imageUrl: photoSrc || null,
+              mediaType: videoSrc ? 'video' : 'image',
+              formatType: videoSrc ? 'VIDEO' : 'IMAGE',
+              duration: durEl ? durEl.textContent.trim() : (videoSrc ? 'HD Video' : 'Original Photo'),
+              quality: '1080p HD',
+              views: viewsEl ? viewsEl.textContent.trim() + ' views' : 'Telegram Post',
+              rating: '99%',
+              author: 'Telegram Channel',
+              url: linkEl?.href || window.location.href,
+              streamUrl: videoSrc || null,
+              directStreamUrl: videoSrc || null,
+              ext: videoSrc ? '.mp4' : '.jpg'
+            });
+          });
+
+          // Check for article images
           const articleImages = document.querySelectorAll('article img, figure img, .tl_article img');
           articleImages.forEach((img, i) => {
             const src = img.getAttribute('src') || '';
@@ -539,7 +582,16 @@ export default function PluginTabContainer({
     e?.preventDefault();
     if (!inputUrl.trim()) return;
     let url = resolveDomainAlias(inputUrl.trim());
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    if (isTelegram || url.includes('t.me') || url.startsWith('@')) {
+      if (url.startsWith('@')) {
+        url = 'https://t.me/s/' + url.substring(1);
+      } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://t.me/s/' + url;
+      }
+      if (/^https?:\/\/t\.me\/[a-zA-Z0-9_]+$/.test(url) && !url.includes('/s/')) {
+        url = url.replace('t.me/', 't.me/s/');
+      }
+    } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
     setActiveUrl(url);
@@ -902,7 +954,7 @@ export default function PluginTabContainer({
           <form onSubmit={handleNavigate} style={{ display: 'flex', gap: '8px' }}>
             <input
               type="text"
-              placeholder={isTelegraph ? "Enter Telegra.ph or Telegram post URL..." : "Search videos or enter portal link..."}
+              placeholder={isTelegram ? "Enter Telegram channel or post URL (e.g. https://t.me/s/telegram or @channel)..." : "Search videos or enter portal link..."}
               value={inputUrl}
               onChange={(e) => setInputUrl(e.target.value)}
               style={{
@@ -1718,7 +1770,7 @@ export default function PluginTabContainer({
             </div>
             {!isIndexing && (
               <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                {isTelegraph ? 'Click to inspect & zoom • Press Ctrl to multi-select' : 'Click to play • Press Ctrl to multi-select'}
+                {isTelegram ? 'Click to play / preview • Press Ctrl to multi-select' : 'Click to play • Press Ctrl to multi-select'}
               </span>
             )}
           </div>

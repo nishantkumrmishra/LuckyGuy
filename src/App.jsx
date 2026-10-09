@@ -17,31 +17,138 @@ import { Play, Pause, SkipForward, Maximize2 } from 'lucide-react';
 import { CustomIcon } from './components/DuoIcons';
 
 
-// Helper: Universal track deduplication (by path and normalized title+artist)
+// Helper: Universal track deduplication (by path, id, and normalized title+artist)
 const deduplicateTracks = (trackList) => {
   if (!Array.isArray(trackList)) return [];
   const seenPaths = new Set();
   const seenKeys = new Set();
+  const seenIds = new Set();
   const result = [];
   for (const t of trackList) {
     if (!t) continue;
     if (t.title === "4tHJc5agHg9LVsijAwtooy" || /^[a-zA-Z0-9]{20,}$/.test(t.title)) continue;
 
-    const pathKey = (t.filePath || t.destinationPath || "").toLowerCase().trim();
+    const rawPath = (t.filePath || t.destinationPath || "").replace(/[\\/]+/g, "/").toLowerCase().trim();
+    const idKey = t.id ? String(t.id).trim() : "";
     const titleKey = (t.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
     const artistKey = (t.artist && t.artist !== "Unknown Artist" && t.artist !== "Various Artists")
       ? (t.artist || "").toLowerCase().replace(/[^a-z0-9]/g, "")
       : "";
     const songKey = `${titleKey}__${artistKey}`;
 
-    if (pathKey && seenPaths.has(pathKey)) continue;
+    if (rawPath && seenPaths.has(rawPath)) continue;
+    if (idKey && seenIds.has(idKey)) continue;
     if (titleKey.length >= 2 && seenKeys.has(songKey)) continue;
 
-    if (pathKey) seenPaths.add(pathKey);
+    if (rawPath) seenPaths.add(rawPath);
+    if (idKey) seenIds.add(idKey);
     if (titleKey.length >= 2) seenKeys.add(songKey);
     result.push(t);
   }
   return result;
+};
+
+const defaultTelegramExtension = {
+  id: "luckyguy-ext-telegram",
+  name: "Telegram",
+  version: "1.0.0",
+  type: "hybrid",
+  rating: "all",
+  description: "Download original high-speed videos, voice notes, photos, and media from Telegram channels, posts, and bots.",
+  author: "LuckyGuy Community",
+  category: "Video & Media Downloader",
+  entry: "index.js",
+  mediaTypes: ["video", "image", "audio", "document"],
+  tab: {
+    title: "Telegram",
+    icon: "Send",
+    url: "https://t.me/s/telegram",
+    defaultUrl: "https://t.me/s/telegram",
+    badge: "MEDIA",
+    viewLayout: "grid",
+    themeColor: "#229ED9"
+  },
+  settings: {
+    title: "Telegram Settings",
+    description: "Authenticate via Telegram Bot Token or configure public channel streaming and download directories.",
+    fields: [
+      {
+        id: "botToken",
+        label: "Telegram Bot Token",
+        type: "password",
+        placeholder: "123456789:ABCdefGhIJKlmNoPQRstuVWXyz",
+        description: "Optional: Bot token from @BotFather to download files directly from bot chats or private channels"
+      },
+      {
+        id: "defaultChannel",
+        label: "Default Channel / Post Link",
+        type: "text",
+        placeholder: "https://t.me/s/telegram or @channelname",
+        defaultValue: "https://t.me/s/telegram",
+        description: "Public channel username or web preview link to index on startup"
+      },
+      {
+        id: "mediaFilter",
+        label: "Media Extraction Filter",
+        type: "select",
+        defaultValue: "all",
+        options: [
+          { label: "All Media (Videos, Photos & Audio)", value: "all" },
+          { label: "Videos Only (MP4 HD)", value: "videos" },
+          { label: "Photos & Wallpapers Only", value: "photos" }
+        ],
+        description: "Filter the types of media retrieved from channels"
+      },
+      {
+        id: "videoQuality",
+        label: "Video Resolution & Quality",
+        type: "select",
+        defaultValue: "1080p",
+        options: [
+          { label: "Original 1080p Full Quality", value: "1080p" },
+          { label: "Optimized 720p HD", value: "720p" },
+          { label: "Compressed 480p (Fast Download)", value: "480p" }
+        ],
+        description: "Preferred video download bitrate and resolution"
+      },
+      {
+        id: "customFolder",
+        label: "Dedicated Download Directory",
+        type: "folder",
+        placeholder: "Default Music/Videos folder",
+        description: "Destination directory where Telegram videos and files are saved"
+      },
+      {
+        id: "customCode",
+        label: "Custom Webhook or Extractor Script (JavaScript)",
+        type: "code",
+        placeholder: "// Optional Telegram custom post parser or webhook hook\nfunction onMessage(msg) {\n  return msg;\n}",
+        description: "Custom JavaScript hook for transforming Telegram payloads or injecting headers"
+      }
+    ]
+  },
+  capabilities: [
+    "stream",
+    "crawlPage",
+    "download",
+    "videoPlayer",
+    "imageGallery"
+  ],
+  supportedUrls: [
+    "*://t.me/*",
+    "*://*.t.me/*",
+    "*://telegram.me/*",
+    "*://*.telegram.me/*",
+    "*://api.telegram.org/*",
+    "*://web.telegram.org/*",
+    "*://cdn*.telesco.pe/*"
+  ],
+  domainAliases: [
+    { from: "telegram.me", to: "t.me" }
+  ],
+  enabled: true,
+  downloadUrl: "https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/telegram/manifest.json",
+  repoUrl: "https://github.com/nishantkumrmishra/LuckyGuy--extensions/tree/main/extensions/telegram"
 };
 
 export default function App() {

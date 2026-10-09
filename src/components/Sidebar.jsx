@@ -21,7 +21,8 @@ import {
   SlidersHorizontal,
   Film,
   DownloadCloud,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Send
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -150,6 +151,9 @@ export default function Sidebar({
   const getPluginIcon = (iconName, isActive) => {
     const color = isActive ? 'var(--primary, #7c5cbf)' : 'var(--duo-stroke, currentColor)';
     const name = (iconName || '').toLowerCase();
+    if (name.includes('telegram') || name.includes('send') || name.includes('paper-plane') || name.includes('plane')) {
+      return <Send size={17} color={color} />;
+    }
     if (name.includes('download')) return <DownloadCloud size={17} color={color} />;
     if (name.includes('image') || name.includes('photo')) return <ImageIcon size={17} color={color} />;
     if (name.includes('film') || name.includes('video')) return <Film size={17} color={color} />;
@@ -367,7 +371,7 @@ export default function Sidebar({
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '20px' }}>
                           <SlidersHorizontal size={16} color={isSelected ? 'var(--primary, #7c5cbf)' : 'var(--duo-stroke, currentColor)'} />
                         </div>
-                        <span style={labelStyle}>{plugin.name}</span>
+                        <span style={labelStyle}>{(plugin.name || "").split(/\s+/).slice(0, 2).join(" ")}</span>
                       </div>
                     </div>
                   );
@@ -497,7 +501,8 @@ export default function Sidebar({
                 {pluginTabs.map((plugin) => {
                   const tabId = 'plugin-' + plugin.id;
                   const isTabActive = activeTab === tabId;
-                  const tabTitle = plugin.tab?.title || plugin.name;
+                  const rawTitle = plugin.tab?.title || plugin.name || "";
+                  const tabTitle = rawTitle.split(/\s+/).slice(0, 2).join(" ");
                   return (
                     <div
                       key={plugin.id}
@@ -505,13 +510,13 @@ export default function Sidebar({
                       onClick={() => setActiveTab(tabId)}
                       title={isMini ? tabTitle : ''}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1, overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '20px', flexShrink: 0 }}>
                           {getPluginIcon(plugin.tab?.icon, isTabActive)}
                         </div>
-                        <span style={labelStyle}>{tabTitle}</span>
+                        <span style={{ ...labelStyle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{tabTitle}</span>
                       </div>
-                      {plugin.rating && !isMini && (
+                      {plugin.rating && plugin.rating !== "all" && !isMini && (
                         <span
                           style={{
                             fontSize: '9px',

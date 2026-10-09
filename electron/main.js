@@ -395,6 +395,50 @@ ipcMain.handle('crawl-portal', async (event, targetUrl) => {
                   });
                 }
               });
+              
+              // Telegram Channel & Post Crawler
+              const tgNodes = document.querySelectorAll(".tgme_widget_message_wrap");
+              tgNodes.forEach((msg, i) => {
+                const vid = msg.querySelector("video");
+                const photo = msg.querySelector(".tgme_widget_message_photo_wrap");
+                const textEl = msg.querySelector(".tgme_widget_message_text");
+                const durEl = msg.querySelector(".message_video_duration");
+                const viewsEl = msg.querySelector(".tgme_widget_message_views");
+                const linkEl = msg.querySelector(".tgme_widget_message_date");
+
+                let videoSrc = vid ? vid.getAttribute("src") : null;
+                let photoSrc = "";
+                if (photo) {
+                  const bg = photo.style.backgroundImage || "";
+                  const m = bg.match(/url\(["\x27]?(.*?)[\"\x27]?\)/);
+                  if (m) photoSrc = m[1];
+                }
+
+                if (!videoSrc && !photoSrc) return;
+                const key = videoSrc || photoSrc;
+                if (seen.has(key)) return;
+                seen.add(key);
+
+                const title = textEl ? textEl.textContent.trim().substring(0, 90) : (videoSrc ? "Telegram Video Post" : "Telegram Photo Post");
+                items.push({
+                  id: "tg-" + i + "-" + Date.now().toString(36),
+                  title,
+                  thumbnail: photoSrc || "",
+                  imageUrl: photoSrc || null,
+                  mediaType: videoSrc ? "video" : "image",
+                  formatType: videoSrc ? "VIDEO" : "IMAGE",
+                  duration: durEl ? durEl.textContent.trim() : (videoSrc ? "HD Video" : "Original Photo"),
+                  quality: "1080p HD",
+                  views: viewsEl ? viewsEl.textContent.trim() + " views" : "Telegram Post",
+                  rating: "99%",
+                  author: "Telegram Channel",
+                  url: linkEl?.href || window.location.href,
+                  streamUrl: videoSrc || null,
+                  directStreamUrl: videoSrc || null,
+                  ext: videoSrc ? ".mp4" : ".jpg"
+                });
+              });
+
               return items.slice(0, 48);
             })()
           `);
