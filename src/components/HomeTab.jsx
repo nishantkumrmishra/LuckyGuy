@@ -148,11 +148,11 @@ export default function HomeTab({
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        padding: '28px 36px 20px 36px',
+        padding: '24px 32px 20px 32px',
         backgroundColor: 'var(--bg-main)',
         fontFamily: 'inherit',
         overflow: 'hidden', // Root stays fixed so top cards remain pinned
-        gap: '24px',
+        gap: '20px',
         height: '100%',
         minHeight: 0,
       }}
@@ -161,8 +161,8 @@ export default function HomeTab({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '16px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '12px',
           width: '100%',
           flexShrink: 0,
         }}
@@ -172,20 +172,20 @@ export default function HomeTab({
           onClick={onNavigateToLibrary}
           style={{
             backgroundColor: 'var(--bg-card)',
-            borderRadius: '14px',
-            padding: '18px 20px',
+            borderRadius: '12px',
+            padding: '14px 16px',
             border: '1px solid var(--border-medium)',
             cursor: 'pointer',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            gap: '16px',
+            gap: '12px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-            transition: 'all 0.18s ease',
+            transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.08)';
             e.currentTarget.style.borderColor = 'var(--primary)';
           }}
           onMouseLeave={(e) => {
@@ -197,9 +197,9 @@ export default function HomeTab({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div
               style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '10px',
+                width: '34px',
+                height: '34px',
+                borderRadius: '8px',
                 backgroundColor: 'rgba(124, 92, 191, 0.1)',
                 display: 'flex',
                 alignItems: 'center',
@@ -207,15 +207,15 @@ export default function HomeTab({
                 color: 'var(--primary)',
               }}
             >
-              <Folder size={18} />
+              <Folder size={17} />
             </div>
-            <ArrowRight size={15} color="var(--text-muted)" />
+            <ArrowRight size={14} color="var(--text-muted)" />
           </div>
           <div>
-            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
               Music Library
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
               {songs.length} tracks available
             </div>
           </div>
@@ -226,20 +226,20 @@ export default function HomeTab({
           onClick={onNavigateToLiked}
           style={{
             backgroundColor: 'var(--bg-card)',
-            borderRadius: '14px',
-            padding: '18px 20px',
+            borderRadius: '12px',
+            padding: '14px 16px',
             border: '1px solid var(--border-medium)',
             cursor: 'pointer',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            gap: '16px',
+            gap: '12px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-            transition: 'all 0.18s ease',
+            transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.08)';
             e.currentTarget.style.borderColor = 'var(--primary)';
           }}
           onMouseLeave={(e) => {
@@ -251,9 +251,9 @@ export default function HomeTab({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div
               style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '10px',
+                width: '34px',
+                height: '34px',
+                borderRadius: '8px',
                 backgroundColor: 'rgba(239, 68, 68, 0.1)',
                 display: 'flex',
                 alignItems: 'center',
@@ -261,15 +261,15 @@ export default function HomeTab({
                 color: '#ef4444',
               }}
             >
-              <Heart size={18} fill="#ef4444" />
+              <Heart size={17} fill="#ef4444" />
             </div>
-            <ArrowRight size={15} color="var(--text-muted)" />
+            <ArrowRight size={14} color="var(--text-muted)" />
           </div>
           <div>
-            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
               Liked Songs
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
               {likedTracks.length} {likedTracks.length === 1 ? 'favorite track' : 'favorite tracks'}
             </div>
           </div>
@@ -280,20 +280,20 @@ export default function HomeTab({
           onClick={onNavigateToPlaylists}
           style={{
             backgroundColor: 'var(--bg-card)',
-            borderRadius: '14px',
-            padding: '18px 20px',
+            borderRadius: '12px',
+            padding: '14px 16px',
             border: '1px solid var(--border-medium)',
             cursor: 'pointer',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            gap: '16px',
+            gap: '12px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-            transition: 'all 0.18s ease',
+            transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.08)';
             e.currentTarget.style.borderColor = 'var(--primary)';
           }}
           onMouseLeave={(e) => {
@@ -305,9 +305,9 @@ export default function HomeTab({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div
               style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '10px',
+                width: '34px',
+                height: '34px',
+                borderRadius: '8px',
                 backgroundColor: 'rgba(14, 165, 233, 0.1)',
                 display: 'flex',
                 alignItems: 'center',
@@ -315,15 +315,15 @@ export default function HomeTab({
                 color: '#0ea5e9',
               }}
             >
-              <ListMusic size={18} />
+              <ListMusic size={17} />
             </div>
-            <ArrowRight size={15} color="var(--text-muted)" />
+            <ArrowRight size={14} color="var(--text-muted)" />
           </div>
           <div>
-            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
               Playlists
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
               {playlists.length} {playlists.length === 1 ? 'playlist' : 'playlists'}
             </div>
           </div>
@@ -334,20 +334,20 @@ export default function HomeTab({
           onClick={onNavigateToDownloads}
           style={{
             backgroundColor: 'var(--bg-card)',
-            borderRadius: '14px',
-            padding: '18px 20px',
+            borderRadius: '12px',
+            padding: '14px 16px',
             border: '1px solid var(--border-medium)',
             cursor: 'pointer',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            gap: '16px',
+            gap: '12px',
             boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-            transition: 'all 0.18s ease',
+            transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.08)';
             e.currentTarget.style.borderColor = 'var(--primary)';
           }}
           onMouseLeave={(e) => {
@@ -359,9 +359,9 @@ export default function HomeTab({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div
               style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '10px',
+                width: '34px',
+                height: '34px',
+                borderRadius: '8px',
                 backgroundColor: 'rgba(16, 185, 129, 0.1)',
                 display: 'flex',
                 alignItems: 'center',
@@ -369,15 +369,15 @@ export default function HomeTab({
                 color: '#10b981',
               }}
             >
-              <ArrowDownToLine size={18} />
+              <ArrowDownToLine size={17} />
             </div>
-            <ArrowRight size={15} color="var(--text-muted)" />
+            <ArrowRight size={14} color="var(--text-muted)" />
           </div>
           <div>
-            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
               Downloads
             </div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
               Extension & URL Streamer
             </div>
           </div>
@@ -402,7 +402,7 @@ export default function HomeTab({
             flex: 1,
             overflowY: 'auto',
             overflowX: 'hidden',
-            paddingRight: '24px',
+            paddingRight: '20px',
             paddingBottom: '32px',
             scrollbarWidth: 'none',
             msOverflowStyle: 'none',
@@ -411,7 +411,7 @@ export default function HomeTab({
           }}
         >
           {folderSections.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
               {folderSections.map((sec) => {
                 const isExpanded = !!expandedSections[sec.name];
                 const visibleTracks = isExpanded ? sec.tracks : sec.tracks.slice(0, 20);
@@ -423,7 +423,7 @@ export default function HomeTab({
                     style={{
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '16px',
+                      gap: '14px',
                     }}
                   >
                     {/* Top bar with lining: Music Type, File Location Beside It, View All */}
@@ -433,7 +433,7 @@ export default function HomeTab({
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         borderBottom: '1px solid var(--border-medium)',
-                        paddingBottom: '12px',
+                        paddingBottom: '10px',
                         gap: '12px',
                         flexWrap: 'wrap',
                       }}
@@ -441,10 +441,10 @@ export default function HomeTab({
                       {/* Left: Music Type & Plain Text File Location (Click opens File Explorer) */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Disc3 size={18} color="var(--primary, #7c5cbf)" style={{ flexShrink: 0 }} />
+                          <Disc3 size={17} color="var(--primary, #7c5cbf)" style={{ flexShrink: 0 }} />
                           <h2
                             style={{
-                              fontSize: '18px',
+                              fontSize: '17px',
                               fontWeight: 700,
                               color: 'var(--text-primary)',
                               margin: 0,
@@ -453,18 +453,31 @@ export default function HomeTab({
                           >
                             {sec.name}
                           </h2>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              padding: '2px 8px',
+                              borderRadius: '999px',
+                              backgroundColor: 'var(--bg-card)',
+                              color: 'var(--text-secondary)',
+                              border: '1px solid var(--border-medium)',
+                            }}
+                          >
+                            {sec.tracks.length}
+                          </span>
                         </div>
 
                         {/* Plain Text File Location */}
                         <span
                           onClick={() => handleOpenFolder(sec.folderPath)}
                           style={{
-                            fontSize: '12.5px',
+                            fontSize: '12px',
                             color: 'var(--text-muted)',
                             cursor: 'pointer',
                             transition: 'color 0.15s ease',
                             textDecoration: 'none',
-                            maxWidth: '500px',
+                            maxWidth: '460px',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
@@ -491,19 +504,19 @@ export default function HomeTab({
                             display: 'flex',
                             alignItems: 'center',
                             gap: '5px',
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--primary, #7c5cbf)',
-                            fontSize: '12.5px',
-                            fontWeight: 600,
+                            backgroundColor: 'var(--bg-card)',
+                            border: '1px solid var(--border-medium)',
+                            color: 'var(--text-primary)',
+                            fontSize: '12px',
+                            fontWeight: 500,
                             cursor: 'pointer',
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            transition: 'background-color 0.15s ease',
+                            padding: '4px 10px',
+                            borderRadius: '16px',
+                            transition: 'all 0.15s ease',
                           }}
                         >
                           <span>{isExpanded ? 'Show less' : `View all (${sec.tracks.length})`}</span>
-                          {isExpanded ? <ChevronDown size={14} /> : <ArrowRight size={14} />}
+                          {isExpanded ? <ChevronDown size={13} /> : <ArrowRight size={13} />}
                         </button>
                       ) : onNavigateToLibrary ? (
                         <button
@@ -529,7 +542,7 @@ export default function HomeTab({
                       ) : null}
                     </div>
 
-                    {/* Down: Horizontally scrollable 1-row shelf with smooth left/right arrow controls or full grid when expanded */}
+                    {/* Down: Horizontally scrollable 1-row shelf or full grid when expanded (Matching 130px Playlist Card sizing) */}
                     <div style={{ position: 'relative', width: '100%' }}>
                       <div
                         id={`shelf-row-${sec.name}`}
@@ -538,14 +551,14 @@ export default function HomeTab({
                           isExpanded
                             ? {
                                 display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-                                gap: '16px',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                                gap: '12px',
                                 width: '100%',
                               }
                             : {
                                 display: 'flex',
                                 flexDirection: 'row',
-                                gap: '16px',
+                                gap: '12px',
                                 width: '100%',
                                 overflowX: 'auto',
                                 overflowY: 'hidden',
@@ -573,31 +586,38 @@ export default function HomeTab({
                                 border: isCurrent
                                   ? '1px solid var(--primary, #7c5cbf)'
                                   : '1px solid var(--border-medium)',
-                                padding: '12px',
+                                padding: '10px',
                                 display: 'flex',
                                 flexDirection: 'column',
+                                gap: '10px',
                                 cursor: 'pointer',
                                 position: 'relative',
-                                transition: 'all 0.18s ease',
-                                flex: isExpanded ? 'none' : '0 0 160px',
-                                width: isExpanded ? 'auto' : '160px',
+                                transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
+                                flex: isExpanded ? 'none' : '0 0 130px',
+                                width: isExpanded ? 'auto' : '130px',
                                 boxShadow: isCurrent
                                   ? '0 4px 14px rgba(124, 92, 191, 0.18)'
-                                  : '0 2px 6px rgba(0,0,0,0.02)',
+                                  : '0 2px 8px rgba(0,0,0,0.03)',
                               }}
                               onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = 'translateY(-3px)';
+                                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.12)';
                                 if (!isCurrent) e.currentTarget.style.borderColor = 'var(--text-muted)';
                                 const playBtn = e.currentTarget.querySelector('.card-play-btn');
                                 if (playBtn) playBtn.style.opacity = '1';
                               }}
                               onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = 'none';
+                                e.currentTarget.style.boxShadow = isCurrent
+                                  ? '0 4px 14px rgba(124, 92, 191, 0.18)'
+                                  : '0 2px 8px rgba(0,0,0,0.03)';
                                 if (!isCurrent) e.currentTarget.style.borderColor = 'var(--border-medium)';
                                 const playBtn = e.currentTarget.querySelector('.card-play-btn');
                                 if (playBtn && !isTrackPlaying) playBtn.style.opacity = '0';
                               }}
                               title={`${track.title} • ${track.artist || 'Unknown'}`}
                             >
-                              {/* Square Album Artwork */}
+                              {/* Square Album Artwork (Exact 1:1 ratio matching playlists) */}
                               <div
                                 style={{
                                   width: '100%',
@@ -619,7 +639,7 @@ export default function HomeTab({
                                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                   />
                                 ) : (
-                                  <Music size={32} color="var(--primary)" style={{ opacity: 0.6 }} />
+                                  <Music size={26} color="var(--primary)" style={{ opacity: 0.6 }} />
                                 )}
 
                                 {/* Hover Play Button on Artwork */}
@@ -631,10 +651,10 @@ export default function HomeTab({
                                   }}
                                   style={{
                                     position: 'absolute',
-                                    bottom: '8px',
-                                    right: '8px',
-                                    width: '36px',
-                                    height: '36px',
+                                    bottom: '6px',
+                                    right: '6px',
+                                    width: '32px',
+                                    height: '32px',
                                     borderRadius: '50%',
                                     backgroundColor: 'var(--primary, #7c5cbf)',
                                     color: '#ffffff',
@@ -645,45 +665,43 @@ export default function HomeTab({
                                     cursor: 'pointer',
                                     boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
                                     opacity: isTrackPlaying ? 1 : 0,
-                                    transition: 'all 0.15s ease',
+                                    transition: 'opacity 0.15s ease',
                                     zIndex: 2,
                                   }}
                                 >
                                   {isTrackPlaying ? (
-                                    <Pause size={16} />
+                                    <Pause size={14} />
                                   ) : (
-                                    <Play size={16} style={{ marginLeft: '1px' }} />
+                                    <Play size={14} style={{ marginLeft: '1px' }} />
                                   )}
                                 </button>
                               </div>
 
-                              {/* Title */}
-                              <div
-                                style={{
-                                  fontSize: '13.5px',
-                                  fontWeight: 600,
-                                  color: isCurrent ? 'var(--primary)' : 'var(--text-primary)',
-                                  marginTop: '10px',
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                }}
-                              >
-                                {track.title}
-                              </div>
-
-                              {/* Artist */}
-                              <div
-                                style={{
-                                  fontSize: '12px',
-                                  color: 'var(--text-secondary)',
-                                  marginTop: '3px',
-                                  whiteSpace: 'nowrap',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                }}
-                              >
-                                {track.artist || 'Unknown Artist'}
+                              {/* Title & Artist Info */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                                <div
+                                  style={{
+                                    fontSize: '13.5px',
+                                    fontWeight: 600,
+                                    color: isCurrent ? 'var(--primary)' : 'var(--text-primary)',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                  }}
+                                >
+                                  {track.title}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: '12px',
+                                    color: 'var(--text-secondary)',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                  }}
+                                >
+                                  {track.artist || 'Unknown Artist'}
+                                </div>
                               </div>
                             </div>
                           );
@@ -696,69 +714,52 @@ export default function HomeTab({
                           <button
                             onClick={() => {
                               const el = document.getElementById(`shelf-row-${sec.name}`);
-                              if (el) el.scrollBy({ left: -360, behavior: 'smooth' });
+                              if (el) el.scrollBy({ left: -280, behavior: 'smooth' });
                             }}
                             style={{
                               position: 'absolute',
                               left: '-14px',
-                              top: '40%',
+                              top: '42%',
+                              transform: 'translateY(-50%)',
                               width: '30px',
                               height: '30px',
                               borderRadius: '50%',
                               backgroundColor: 'var(--bg-card)',
                               border: '1px solid var(--border-medium)',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               cursor: 'pointer',
-                              color: 'var(--text-primary)',
                               zIndex: 10,
-                              transition: 'all 0.15s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = 'var(--primary)';
-                              e.currentTarget.style.color = '#fff';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'var(--bg-card)';
-                              e.currentTarget.style.color = 'var(--text-primary)';
+                              color: 'var(--text-primary)',
                             }}
                             title="Scroll left"
                           >
                             <ChevronRight size={16} style={{ transform: 'rotate(180deg)' }} />
                           </button>
-
                           <button
                             onClick={() => {
                               const el = document.getElementById(`shelf-row-${sec.name}`);
-                              if (el) el.scrollBy({ left: 360, behavior: 'smooth' });
+                              if (el) el.scrollBy({ left: 280, behavior: 'smooth' });
                             }}
                             style={{
                               position: 'absolute',
                               right: '-14px',
-                              top: '40%',
+                              top: '42%',
+                              transform: 'translateY(-50%)',
                               width: '30px',
                               height: '30px',
                               borderRadius: '50%',
                               backgroundColor: 'var(--bg-card)',
                               border: '1px solid var(--border-medium)',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               cursor: 'pointer',
-                              color: 'var(--text-primary)',
                               zIndex: 10,
-                              transition: 'all 0.15s ease',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = 'var(--primary)';
-                              e.currentTarget.style.color = '#fff';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'var(--bg-card)';
-                              e.currentTarget.style.color = 'var(--text-primary)';
+                              color: 'var(--text-primary)',
                             }}
                             title="Scroll right"
                           >
@@ -774,108 +775,106 @@ export default function HomeTab({
           ) : (
             <div
               style={{
-                flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flex: 1,
                 minHeight: '260px',
-                padding: '40px 20px',
-                backgroundColor: 'var(--bg-card)',
-                borderRadius: '16px',
-                border: '1px solid var(--border-medium)',
-                textAlign: 'center',
                 gap: '12px',
               }}
             >
-              <Music2 size={44} color="var(--primary)" style={{ opacity: 0.8 }} />
-              <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                No tracks found in library
+              <Music2 size={36} color="var(--primary)" />
+              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                No Tracks in Library
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '360px' }}>
-                Scan your music folder from the Library tab or download tracks using extension URLs.
+              <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                Download music or scan folders in your Music directory.
               </div>
             </div>
           )}
         </div>
 
-        {/* Center-Positioned Spring-Back Slider Pill (Only Controls Albums Section) */}
-        <div
-          onMouseEnter={() => setIsHoveringTrack(true)}
-          onMouseLeave={() => setIsHoveringTrack(false)}
-          style={{
-            position: 'absolute',
-            top: 0,
-            bottom: '20px',
-            right: 0,
-            width: '16px',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 50,
-            pointerEvents: 'auto',
-          }}
-        >
-          {/* Subtle Vertical Guide Track Line */}
+        {/* Dedicated Center Slider Rail & Pill (Isolated on Right Side of Albums Only) */}
+        {folderSections.length > 1 && (
           <div
-            style={{
-              position: 'absolute',
-              top: '10px',
-              bottom: '10px',
-              width: '3px',
-              borderRadius: '2px',
-              backgroundColor: isDragging || isHoveringTrack ? 'rgba(124, 92, 191, 0.25)' : 'rgba(0, 0, 0, 0.05)',
-              transition: 'background-color 0.2s ease',
-            }}
-          />
-
-          {/* Custom SVG Center Pill Slider */}
-          <div
-            onMouseDown={handleThumbMouseDown}
             style={{
               position: 'relative',
-              transform: `translateY(${thumbOffset}px)`,
-              width: isDragging || isHoveringTrack ? '13px' : '9px',
-              height: '68px',
-              borderRadius: '7px',
-              backgroundColor: isDragging
-                ? 'var(--primary, #7c5cbf)'
-                : isHoveringTrack
-                ? 'rgba(124, 92, 191, 0.85)'
-                : 'rgba(124, 92, 191, 0.55)',
-              boxShadow: isDragging
-                ? '0 6px 16px rgba(124, 92, 191, 0.45)'
-                : '0 2px 8px rgba(0,0,0,0.12)',
-              cursor: isDragging ? 'grabbing' : 'grab',
+              width: '28px',
+              height: '100%',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: isSnapping
-                ? 'transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.15s ease, background-color 0.2s ease'
-                : 'width 0.15s ease, background-color 0.2s ease',
-              zIndex: 51,
+              flexShrink: 0,
+              userSelect: 'none',
             }}
-            title="Drag up or down to scroll album shelves, springs back to center on release"
           >
-            {/* Custom SVG Gripper Icon */}
-            <svg
-              width="8"
-              height="20"
-              viewBox="0 0 8 20"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
+            {/* Subtle Vertical Rail Line */}
+            <div
               style={{
-                opacity: isDragging || isHoveringTrack ? 0.95 : 0.7,
-                transition: 'opacity 0.2s ease',
+                position: 'absolute',
+                top: '20px',
+                bottom: '20px',
+                width: '3px',
+                borderRadius: '999px',
+                backgroundColor: 'var(--border-medium)',
+                opacity: 0.7,
               }}
+            />
+
+            {/* Centered Spring-Back Slider Pill Handle */}
+            <div
+              onMouseDown={handleThumbMouseDown}
+              style={{
+                position: 'relative',
+                transform: `translateY(${thumbOffset}px)`,
+                transition: isSnapping ? 'transform 0.42s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : 'none',
+                width: '22px',
+                height: '48px',
+                borderRadius: '12px',
+                backgroundColor: isDragging ? 'var(--primary)' : 'var(--bg-card)',
+                border: isDragging ? '1px solid var(--primary)' : '1px solid var(--border-medium)',
+                boxShadow: isDragging
+                  ? '0 6px 18px rgba(124, 92, 191, 0.35)'
+                  : '0 2px 8px rgba(0,0,0,0.1)',
+                cursor: isDragging ? 'grabbing' : 'grab',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '3px',
+                zIndex: 20,
+              }}
+              title="Drag up or down to scroll albums (Springs back on release)"
             >
-              <circle cx="4" cy="3.5" r="1.3" fill="#ffffff" />
-              <circle cx="4" cy="10" r="1.3" fill="#ffffff" />
-              <circle cx="4" cy="16.5" r="1.3" fill="#ffffff" />
-            </svg>
+              <div
+                style={{
+                  width: '10px',
+                  height: '2px',
+                  borderRadius: '1px',
+                  backgroundColor: isDragging ? '#ffffff' : 'var(--text-muted)',
+                }}
+              />
+              <div
+                style={{
+                  width: '10px',
+                  height: '2px',
+                  borderRadius: '1px',
+                  backgroundColor: isDragging ? '#ffffff' : 'var(--text-muted)',
+                }}
+              />
+              <div
+                style={{
+                  width: '10px',
+                  height: '2px',
+                  borderRadius: '1px',
+                  backgroundColor: isDragging ? '#ffffff' : 'var(--text-muted)',
+                }}
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

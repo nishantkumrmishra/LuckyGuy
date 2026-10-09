@@ -10,7 +10,7 @@ const { DownloadManager } = require('./downloader');
 const { embedId3Metadata } = require('./id3Tagger');
 const LibraryManager = require('./libraryManager');
 const HistoryManager = require('./historyManager');
-const { fetchEnrichedMetadata } = require('./metadataEnricher');
+const { fetchEnrichedMetadata, normalizeGenre } = require('./metadataEnricher');
 
 let mainWindow = null;
 const userDataDir = path.join(app.getPath('userData'), 'LocalGuy');
@@ -222,7 +222,8 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     enriched = await fetchEnrichedMetadata(taskConfig.title, taskConfig.artist);
   } catch (e) {}
 
-  const genre = enriched?.genre || taskConfig.genre || '';
+  const rawGenre = enriched?.genre || taskConfig.genre || '';
+  const genre = normalizeGenre(rawGenre, taskConfig.artist, taskConfig.title);
   const album = enriched?.album || taskConfig.album || 'Downloaded Master';
   const year = enriched?.releaseDate || taskConfig.year || '';
   const itunesArtwork = enriched?.artworkUrl || '';
@@ -277,6 +278,19 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
       } catch (tagErr) {
         console.warn('Failed to embed ID3 tags into MP3:', tagErr.message);
       }
+    }
+
+    const activeArtwork = artworkUrl || snap.artworkUrl;
+    if (activeArtwork && activeArtwork.startsWith('http')) {
+      try {
+        const folderCover = path.join(targetDir, 'folder.jpg');
+        if (!fs.existsSync(folderCover)) {
+          const { fetchBuffer } = require('./id3Tagger');
+          fetchBuffer(activeArtwork).then(res => {
+            if (res && res.buffer) fs.writeFileSync(folderCover, res.buffer);
+          }).catch(() => {});
+        }
+      } catch (coverErr) {}
     }
 
     let finalSize = snap.downloadedBytes;

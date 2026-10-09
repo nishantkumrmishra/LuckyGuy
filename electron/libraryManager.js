@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { extractId3Artwork, embedId3Metadata, fetchBuffer } = require('./id3Tagger');
-const { fetchEnrichedMetadata } = require('./metadataEnricher');
+const { fetchEnrichedMetadata, normalizeGenre } = require('./metadataEnricher');
 
 class LibraryManager {
   constructor(userDataDir) {
@@ -57,7 +57,7 @@ class LibraryManager {
               }
             } catch(e) {}
 
-            discoveredPlaylists.push({
+            discoveredPlaylists.push({\
               id: 'pl-' + Buffer.from(entry.name).toString('base64').replace(/=/g, ''),
               name: entry.name,
               title: entry.name,
@@ -133,25 +133,25 @@ class LibraryManager {
   saveLibrary() {
     try {
       fs.writeFileSync(this.libraryFile, JSON.stringify(this.songs, null, 2));
-    } catch (e) {}
+    } catch (e) {}\
   }
 
   savePlaylists() {
     try {
       fs.writeFileSync(this.playlistsFile, JSON.stringify(this.playlists, null, 2));
-    } catch (e) {}
+    } catch (e) {}\
   }
 
   saveLedger() {
     try {
       fs.writeFileSync(this.ledgerFile, JSON.stringify(this.ledger, null, 2));
-    } catch (e) {}
+    } catch (e) {}\
   }
 
   saveBookmarks() {
     try {
       fs.writeFileSync(this.bookmarksFile, JSON.stringify(this.bookmarks, null, 2));
-    } catch (e) {}
+    } catch (e) {}\
   }
 
   findDirectoryCover(filePath) {
@@ -164,7 +164,7 @@ class LibraryManager {
           return 'file:///' + full.replace(/\\/g, '/');
         }
       }
-    } catch (e) {}
+    } catch (e) {}\
     return '';
   }
 
@@ -210,14 +210,16 @@ class LibraryManager {
               }
 
               const parentFolder = path.basename(path.dirname(fullPath));
-              const genreName = parentFolder !== 'Music' ? parentFolder : 'Pop';
+              let genreName = parentFolder !== 'Music' ? parentFolder : 'Pop';
+              genreName = normalizeGenre(genreName, artist, title);
+
               discovered.push({
                 id: Buffer.from(fullPath).toString('base64').replace(/=/g, ''),
                 title,
                 artist,
                 album: parentFolder,
                 genre: genreName,
-                folder: parentFolder,
+                folder: genreName,
                 durationSeconds: Math.round(stat.size / (160 * 128)), // estimate or placeholder
                 durationFormatted: '3:45',
                 fileSize: stat.size,
@@ -231,7 +233,7 @@ class LibraryManager {
             }
           }
         }
-      } catch (err) {}
+      } catch (err) {}\
     };
 
     for (const d of directories) {
@@ -294,372 +296,394 @@ class LibraryManager {
 
   // --- Bookkeeping & Ledger ---
   recordDownloadTransaction(item) {
-    const entry = {
-      id: item.id || `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      timestamp: Date.now(),
-      dateFormatted: new Date().toLocaleString(),
-      title: item.title,
-      artist: item.artist || 'Unknown',
-      platform: item.platform || 'Direct',
-      formatType: item.formatType || 'AUDIO',
-      quality: item.qualityLabel || 'High',
-      fileSize: item.fileSize || item.downloadedBytes || 0,
-      filePath: item.filePath || item.destinationPath || '',
-      artworkUrl: item.artworkUrl || '',
-      status: item.status || 'COMPLETED',
-      speedAvg: item.speedBytesPerSec || 0
-    };
+    const entry = {\
+      id: item.id || `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`,\
+      timestamp: Date.now(),\
+      dateFormatted: new Date().toLocaleString(),\
+      title: item.title,\
+      artist: item.artist || 'Unknown',\
+      platform: item.platform || 'Direct',\
+      formatType: item.formatType || 'AUDIO',\
+      quality: item.qualityLabel || 'High',\
+      fileSize: item.fileSize || item.downloadedBytes || 0,\
+      filePath: item.filePath || item.destinationPath || '',\
+      artworkUrl: item.artworkUrl || '',\
+      status: item.status || 'COMPLETED',\
+      speedAvg: item.speedBytesPerSec || 0\
+    };\
 
     this.ledger.unshift(entry);
     this.saveLedger();
     return entry;
   }
 
-  getBookkeepingStats() {
-    let totalBytesDownloaded = 0;
-    let completedCount = 0;
-    let failedCount = 0;
-    const formatBreakdown = {};
-    const platformBreakdown = {};
+  getBookkeepingStats() {\
+    let totalBytesDownloaded = 0;\
+    let completedCount = 0;\
+    let failedCount = 0;\
+    const formatBreakdown = {};\
+    const platformBreakdown = {};\
 
-    for (const entry of this.ledger) {
-      totalBytesDownloaded += entry.fileSize || 0;
-      if (entry.status === 'COMPLETED') completedCount++;
-      else if (entry.status === 'ERROR') failedCount++;
+    for (const entry of this.ledger) {\
+      totalBytesDownloaded += entry.fileSize || 0;\
+      if (entry.status === 'COMPLETED') completedCount++;\
+      else if (entry.status === 'ERROR') failedCount++;\
 
-      const fmt = (entry.formatType || 'AUDIO').toUpperCase();
-      formatBreakdown[fmt] = (formatBreakdown[fmt] || 0) + (entry.fileSize || 0);
+      const fmt = (entry.formatType || 'AUDIO').toUpperCase();\
+      formatBreakdown[fmt] = (formatBreakdown[fmt] || 0) + (entry.fileSize || 0);\
 
-      const plat = (entry.platform || 'Direct').toUpperCase();
-      platformBreakdown[plat] = (platformBreakdown[plat] || 0) + 1;
-    }
+      const plat = (entry.platform || 'Direct').toUpperCase();\
+      platformBreakdown[plat] = (platformBreakdown[plat] || 0) + 1;\
+    }\
 
-    const duplicates = this.findDuplicates();
-    const reclaimableBytes = duplicates.reduce((acc, d) => acc + (d.reclaimableBytes || 0), 0);
+    const duplicates = this.findDuplicates();\
+    const reclaimableBytes = duplicates.reduce((acc, d) => acc + (d.reclaimableBytes || 0), 0);\
 
-    return {
-      totalTransactions: this.ledger.length,
-      completedCount,
-      failedCount,
-      totalBytesDownloaded,
-      formatBreakdown,
-      platformBreakdown,
-      duplicateCount: duplicates.length,
-      reclaimableBytes
-    };
-  }
+    return {\
+      totalTransactions: this.ledger.length,\
+      completedCount,\
+      failedCount,\
+      totalBytesDownloaded,\
+      formatBreakdown,\
+      platformBreakdown,\
+      duplicateCount: duplicates.length,\
+      reclaimableBytes\
+    };\
+  }\
 
-  exportLedgerCsv() {
-    const headers = ['ID', 'Date', 'Title', 'Artist', 'Platform', 'Format', 'Quality', 'Bytes', 'File Path', 'Status'];
-    const rows = this.ledger.map(e => [
-      `"${e.id}"`,
-      `"${e.dateFormatted}"`,
-      `"${(e.title || '').replace(/"/g, '""')}"`,
-      `"${(e.artist || '').replace(/"/g, '""')}"`,
-      `"${e.platform || ''}"`,
-      `"${e.formatType || ''}"`,
-      `"${e.quality || ''}"`,
-      e.fileSize || 0,
-      `"${(e.filePath || '').replace(/"/g, '""')}"`,
-      `"${e.status || ''}"`
-    ]);
+  exportLedgerCsv() {\
+    const headers = ['ID', 'Date', 'Title', 'Artist', 'Platform', 'Format', 'Quality', 'Bytes', 'File Path', 'Status'];\
+    const rows = this.ledger.map(e => [\
+      `\"${e.id}\"`,\
+      `\"${e.dateFormatted}\"`,\
+      `\"${(e.title || '').replace(/\"/g, '\"\"')}\"`,\
+      `\"${(e.artist || '').replace(/\"/g, '\"\"')}\"`,\
+      `\"${e.platform || ''}\"`,\
+      `\"${e.formatType || ''}\"`,\
+      `\"${e.quality || ''}\"`,\
+      e.fileSize || 0,\
+      `\"${(e.filePath || '').replace(/\"/g, '\"\"')}\"`,\
+      `\"${e.status || ''}\"`\
+    ]);\
 
-    return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-  }
+    return [headers.join(','), ...rows.map(r => r.join(','))].join('\\n');\
+  }\
 
   // --- Bookmarks / Saved links queue ---
-  addBookmark(bookmark) {
-    const item = {
-      id: `BM-${Date.now()}`,
-      url: bookmark.url,
-      title: bookmark.title || bookmark.url,
-      platform: bookmark.platform || 'Auto',
-      addedAt: Date.now()
-    };
-    this.bookmarks.unshift(item);
-    this.saveBookmarks();
-    return item;
-  }
+  addBookmark(bookmark) {\
+    const item = {\
+      id: `BM-${Date.now()}`,\
+      url: bookmark.url,\
+      title: bookmark.title || bookmark.url,\
+      platform: bookmark.platform || 'Auto',\
+      addedAt: Date.now()\
+    };\
+    this.bookmarks.unshift(item);\
+    this.saveBookmarks();\
+    return item;\
+  }\
 
-  removeBookmark(id) {
-    this.bookmarks = this.bookmarks.filter(b => b.id !== id);
-    this.saveBookmarks();
-    return this.bookmarks;
-  }
+  removeBookmark(id) {\
+    this.bookmarks = this.bookmarks.filter(b => b.id !== id);\
+    this.saveBookmarks();\
+    return this.bookmarks;\
+  }\
 
   // --- Playlists ---
-  createPlaylist(title) {
-    const plDir = this.getPlaylistsDir();
-    const folderPath = path.join(plDir, title);
-    if (!fs.existsSync(folderPath)) {
-      try { fs.mkdirSync(folderPath, { recursive: true }); } catch(e) {}
-    }
-    const pl = {
-      id: 'pl-' + Buffer.from(title).toString('base64').replace(/=/g, ''),
-      name: title,
-      title,
-      folderPath,
-      tracks: [],
-      trackCount: 0,
-      createdAt: Date.now()
-    };
-    this.playlists = this.playlists.filter(p => p.name !== title && p.title !== title);
-    this.playlists.push(pl);
-    this.savePlaylists();
-    return pl;
-  }
+  createPlaylist(title) {\
+    const plDir = this.getPlaylistsDir();\
+    const folderPath = path.join(plDir, title);\
+    if (!fs.existsSync(folderPath)) {\
+      try { fs.mkdirSync(folderPath, { recursive: true }); } catch(e) {}\
+    }\
+    const pl = {\
+      id: 'pl-' + Buffer.from(title).toString('base64').replace(/=/g, ''),\
+      name: title,\
+      title,\
+      folderPath,\
+      tracks: [],\
+      trackCount: 0,\
+      createdAt: Date.now()\
+    };\
+    this.playlists = this.playlists.filter(p => p.name !== title && p.title !== title);\
+    this.playlists.push(pl);\
+    this.savePlaylists();\
+    return pl;\
+  }\
 
-  addToPlaylist(playlistId, trackOrPath) {
-    const pl = this.playlists.find(p => p.id === playlistId || p.name === playlistId);
-    if (pl) {
-      let srcPath = typeof trackOrPath === 'string' ? trackOrPath : (trackOrPath.filePath || trackOrPath.id);
-      if (srcPath && fs.existsSync(srcPath) && pl.folderPath && fs.existsSync(pl.folderPath)) {
-        try {
-          const dest = path.join(pl.folderPath, path.basename(srcPath));
-          if (!fs.existsSync(dest)) {
-            fs.copyFileSync(srcPath, dest);
-          }
-          if (!pl.tracks) pl.tracks = [];
-          if (!pl.tracks.includes(dest)) pl.tracks.push(dest);
-          pl.trackCount = pl.tracks.length;
-          this.savePlaylists();
-        } catch(e) {}
-      }
-    }
-    return this.playlists;
-  }
+  addToPlaylist(playlistId, trackOrPath) {\
+    const pl = this.playlists.find(p => p.id === playlistId || p.name === playlistId);\
+    if (pl) {\
+      let srcPath = typeof trackOrPath === 'string' ? trackOrPath : (trackOrPath.filePath || trackOrPath.id);\
+      if (srcPath && fs.existsSync(srcPath) && pl.folderPath && fs.existsSync(pl.folderPath)) {\
+        try {\
+          const dest = path.join(pl.folderPath, path.basename(srcPath));\
+          if (!fs.existsSync(dest)) {\
+            fs.copyFileSync(srcPath, dest);\
+          }\
+          if (!pl.tracks) pl.tracks = [];\
+          if (!pl.tracks.includes(dest)) pl.tracks.push(dest);\
+          pl.trackCount = pl.tracks.length;\
+          this.savePlaylists();\
+        } catch(e) {}\
+      }\
+    }\
+    return this.playlists;\
+  }\
 
-  removeFromPlaylist(playlistId, songId) {
-    const pl = this.playlists.find(p => p.id === playlistId);
-    if (pl) {
-      pl.songIds = pl.songIds.filter(id => id !== songId);
-      this.savePlaylists();
-    }
-    return this.playlists;
-  }
+  removeFromPlaylist(playlistId, songId) {\
+    const pl = this.playlists.find(p => p.id === playlistId);\
+    if (pl) {\
+      pl.songIds = pl.songIds.filter(id => id !== songId);\
+      this.savePlaylists();\
+    }\
+    return this.playlists;\
+  }\
 
-  deletePlaylist(playlistId) {
-    const pl = this.playlists.find(p => p.id === playlistId || p.name === playlistId);
-    if (pl && pl.folderPath && fs.existsSync(pl.folderPath)) {
-      try { fs.rmSync(pl.folderPath, { recursive: true, force: true }); } catch(e) {}
-    }
-    this.playlists = this.playlists.filter(p => p.id !== playlistId && p.name !== playlistId);
-    this.savePlaylists();
-    return this.playlists;
-  }
+  deletePlaylist(playlistId) {\
+    const pl = this.playlists.find(p => p.id === playlistId || p.name === playlistId);\
+    if (pl && pl.folderPath && fs.existsSync(pl.folderPath)) {\
+      try { fs.rmSync(pl.folderPath, { recursive: true, force: true }); } catch(e) {}\
+    }\
+    this.playlists = this.playlists.filter(p => p.id !== playlistId && p.name !== playlistId);\
+    this.savePlaylists();\
+    return this.playlists;\
+  }\
 
-  // --- Song metadata edit ---
-  updateSongMetadata(songId, updates) {
-    const song = this.songs.find(s => s.id === songId);
-    if (song) {
-      Object.assign(song, updates);
-      this.saveLibrary();
-    }
-    return song;
-  }
+  renamePlaylist(playlistId, newName) {\
+    const pl = this.playlists.find(p => p.id === playlistId || p.name === playlistId);\
+    if (pl && newName && newName.trim()) {\
+      const trimmed = newName.trim();\
+      const plDir = this.getPlaylistsDir();\
+      const oldFolder = pl.folderPath;\
+      const newFolder = path.join(plDir, trimmed);\
+      if (oldFolder && fs.existsSync(oldFolder)) {\
+        try {\
+          fs.renameSync(oldFolder, newFolder);\
+          pl.folderPath = newFolder;\
+        } catch(e) {}\
+      }\
+      pl.name = trimmed;\
+      pl.title = trimmed;\
+      this.savePlaylists();\
+    }\
+    return this.playlists;\
+  }\
 
-  removeSong(songId, filePath) {
-    const beforeCount = this.songs.length;
-    this.songs = this.songs.filter(s => {
-      if (songId && s.id === songId) return false;
-      if (filePath && s.filePath === filePath) return false;
-      return true;
-    });
-    if (this.songs.length !== beforeCount) {
-      this.saveLibrary();
-    }
-    return this.songs;
-  }
+  updatePlaylistCover(playlistId, coverUrl) {\
+    const pl = this.playlists.find(p => p.id === playlistId || p.name === playlistId);\
+    if (pl) {\
+      pl.coverArt = coverUrl;\
+      this.savePlaylists();\
+    }\
+    return this.playlists;\
+  }\
 
-    async organizeAndFixLibrary(baseMusicDir) {
-    const musicDir = baseMusicDir || path.join(os.homedir(), 'Music');
-    if (!fs.existsSync(musicDir)) return { success: false, error: 'Music directory not found' };
+  deleteSongPermanently(filePath, songId) {\
+    if (filePath && fs.existsSync(filePath)) {\
+      try { fs.unlinkSync(filePath); } catch (e) {}\
+    }\
+    this.songs = this.songs.filter(s => s.id !== songId && s.filePath !== filePath);\
+    this.saveLibrary();\
+    return this.songs;\
+  }\
 
-    let movedCount = 0;
-    let renamedCount = 0;
-    let taggedCount = 0;
-    let updatedArtworkCount = 0;
-    let repairedAudioCount = 0;
+  async organizeAndFixLibrary(baseMusicDir) {\
+    const musicDir = baseMusicDir || path.join(os.homedir(), 'Music');\
+    if (!fs.existsSync(musicDir)) return { success: false, error: 'Music directory not found' };\
 
-    const downloadStream = (url, dest) => {
-      return new Promise((resolve, reject) => {
-        const fileStream = fs.createWriteStream(dest);
-        const client = url.startsWith('https') ? https : http;
-        client.get(url, (response) => {
-          if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-            return downloadStream(response.headers.location, dest).then(resolve).catch(reject);
-          }
-          if (response.statusCode !== 200) {
-            return reject(new Error('HTTP ' + response.statusCode));
-          }
-          response.pipe(fileStream);
-          fileStream.on('finish', () => fileStream.close(() => resolve(true)));
-        }).on('error', (err) => {
-          try { fs.unlinkSync(dest); } catch(e) {}
-          reject(err);
-        });
-      });
-    };
+    let movedCount = 0;\
+    let renamedCount = 0;\
+    let taggedCount = 0;\
+    let updatedArtworkCount = 0;\
+    let repairedAudioCount = 0;\
 
-    const isStubFile = (filePath) => {
-      try {
-        if (!fs.existsSync(filePath)) return true;
-        const stat = fs.statSync(filePath);
-        if (stat.size < 50000) return true;
-        const fd = fs.openSync(filePath, 'r');
-        const header = Buffer.alloc(10);
-        fs.readSync(fd, header, 0, 10, 0);
-        fs.closeSync(fd);
-        if (header.slice(0, 3).toString('ascii') === 'ID3') {
-          const tagSize = ((header[6] & 0x7f) << 21) | ((header[7] & 0x7f) << 14) | ((header[8] & 0x7f) << 7) | (header[9] & 0x7f);
-          const audioBytes = stat.size - (10 + tagSize);
-          return audioBytes <= 102400;
-        }
-        return stat.size < 200000;
-      } catch(e) {
-        return true;
-      }
-    };
+    const downloadStream = (url, dest) => {\
+      return new Promise((resolve, reject) => {\
+        const fileStream = fs.createWriteStream(dest);\
+        const client = url.startsWith('https') ? https : http;\
+        client.get(url, (response) => {\
+          if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {\
+            return downloadStream(response.headers.location, dest).then(resolve).catch(reject);\
+          }\
+          if (response.statusCode !== 200) {\
+            return reject(new Error('HTTP ' + response.statusCode));\
+          }\
+          response.pipe(fileStream);\
+          fileStream.on('finish', () => fileStream.close(() => resolve(true)));\
+        }).on('error', (err) => {\
+          try { fs.unlinkSync(dest); } catch(e) {}\
+          reject(err);\
+        });\
+      });\
+    };\
 
-    // Scan all audio files across library
-    const allFiles = [];
-    const scanRecursive = (dir) => {
-      try {
-        const entries = fs.readdirSync(dir, { withFileTypes: true });
-        for (const entry of entries) {
-          const full = path.join(dir, entry.name);
-          if (entry.isDirectory() && entry.name !== 'Playlists') {
-            scanRecursive(full);
-          } else if (entry.isFile()) {
-            const ext = path.extname(entry.name).toLowerCase();
-            if (['.mp3', '.m4a', '.flac'].includes(ext)) {
-              allFiles.push({ full, name: entry.name, dir });
-            }
-          }
-        }
-      } catch(e) {}
-    };
-    scanRecursive(musicDir);
+    const isStubFile = (filePath) => {\
+      try {\
+        if (!fs.existsSync(filePath)) return true;\
+        const stat = fs.statSync(filePath);\
+        if (stat.size < 50000) return true;\
+        const fd = fs.openSync(filePath, 'r');\
+        const header = Buffer.alloc(10);\
+        fs.readSync(fd, header, 0, 10, 0);\
+        fs.closeSync(fd);\
+        if (header.slice(0, 3).toString('ascii') === 'ID3') {\
+          const tagSize = ((header[6] & 0x7f) << 21) | ((header[7] & 0x7f) << 14) | ((header[8] & 0x7f) << 7) | (header[9] & 0x7f);\
+          const audioBytes = stat.size - (10 + tagSize);\
+          return audioBytes <= 102400;\
+        }\
+        return stat.size < 200000;\
+      } catch(e) {\
+        return true;\
+      }\
+    };\
 
-    for (const fileItem of allFiles) {
-      let workingPath = fileItem.full;
-      const ext = path.extname(fileItem.name).toLowerCase();
+    // Scan all audio files across library\
+    const allFiles = [];\
+    const scanRecursive = (dir) => {\
+      try {\
+        const entries = fs.readdirSync(dir, { withFileTypes: true });\
+        for (const entry of entries) {\
+          const full = path.join(dir, entry.name);\
+          if (entry.isDirectory() && entry.name !== 'Playlists') {\
+            scanRecursive(full);\
+          } else if (entry.isFile()) {\
+            const ext = path.extname(entry.name).toLowerCase();\
+            if (['.mp3', '.m4a', '.flac'].includes(ext)) {\
+              allFiles.push({ full, name: entry.name, dir });\
+            }\
+          }\
+        }\
+      } catch(e) {}\
+    };\
+    scanRecursive(musicDir);\
 
-      // 1. Clean filename
-      let cleanName = fileItem.name.replace(/\u00A0/g, ' ')
-        .replace(/Intro_\s*/g, 'Intro - ')
-        .replace(/_Dhurandhar The Revenge_/g, 'Dhurandhar The Revenge')
-        .replace(/_Dhurandhar_/g, 'Dhurandhar')
-        .replace(/Games_\s*/g, 'Games - ')
-        .replace(/Spider-Verse\)\s*_\s*/g, 'Spider-Verse) - ')
-        .replace(/Spider-Man_\s*/g, 'Spider-Man - ')
-        .replace(/5_30/g, '5.30');
+    for (const fileItem of allFiles) {\
+      let workingPath = fileItem.full;\
+      const ext = path.extname(fileItem.name).toLowerCase();\
 
-      if (cleanName !== fileItem.name) {
-        const renamedPath = path.join(fileItem.dir, cleanName);
-        try {
-          fs.renameSync(workingPath, renamedPath);
-          workingPath = renamedPath;
-          renamedCount++;
-        } catch(e) {}
-      }
+      // 1. Clean filename\
+      let cleanName = fileItem.name.replace(/\\u00A0/g, ' ')\
+        .replace(/Intro_\\s*/g, 'Intro - ')\
+        .replace(/_Dhurandhar The Revenge_/g, 'Dhurandhar The Revenge')\
+        .replace(/_Dhurandhar_/g, 'Dhurandhar')\
+        .replace(/Games_\\s*/g, 'Games - ')\
+        .replace(/Spider-Verse\\)\\s*_\\s*/g, 'Spider-Verse) - ')\
+        .replace(/Spider-Man_\\s*/g, 'Spider-Man - ')\
+        .replace(/5_30/g, '5.30');\
 
-      // 2. Read ID3 tags
-      let title = '', artist = '', album = '', genre = '';
-      try {
-        const fd = fs.openSync(workingPath, 'r');
-        const header = Buffer.alloc(10);
-        fs.readSync(fd, header, 0, 10, 0);
-        if (header.slice(0, 3).toString('ascii') === 'ID3') {
-          const tagSize = ((header[6] & 0x7f) << 21) | ((header[7] & 0x7f) << 14) | ((header[8] & 0x7f) << 7) | (header[9] & 0x7f);
-          const tagBuf = Buffer.alloc(Math.min(tagSize, 2 * 1024 * 1024));
-          fs.readSync(fd, tagBuf, 0, tagBuf.length, 10);
-          fs.closeSync(fd);
+      if (cleanName !== fileItem.name) {\
+        const renamedPath = path.join(fileItem.dir, cleanName);\
+        try {\
+          fs.renameSync(workingPath, renamedPath);\
+          workingPath = renamedPath;\
+          renamedCount++;\
+        } catch(e) {}\
+      }\
 
-          let off = 0;
-          while (off < tagBuf.length - 10) {
-            const fid = tagBuf.slice(off, off + 4).toString('ascii');
-            const fsz = tagBuf.readUInt32BE(off + 4);
-            if (fsz <= 0 || fsz > tagBuf.length - off) break;
-            const fdata = tagBuf.slice(off + 10, off + 10 + fsz);
-            if (fid === 'TIT2') title = fdata.slice(1).toString('utf8').trim();
-            if (fid === 'TPE1') artist = fdata.slice(1).toString('utf8').trim();
-            if (fid === 'TALB') album = fdata.slice(1).toString('utf8').trim();
-            if (fid === 'TCON') genre = fdata.slice(1).toString('utf8').trim();
-            off += 10 + fsz;
-          }
-        } else {
-          fs.closeSync(fd);
-        }
-      } catch(e) {}
+      // 2. Read ID3 tags\
+      let title = '', artist = '', album = '', genre = '';\
+      try {\
+        const fd = fs.openSync(workingPath, 'r');\
+        const header = Buffer.alloc(10);\
+        fs.readSync(fd, header, 0, 10, 0);\
+        if (header.slice(0, 3).toString('ascii') === 'ID3') {\
+          const tagSize = ((header[6] & 0x7f) << 21) | ((header[7] & 0x7f) << 14) | ((header[8] & 0x7f) << 7) | (header[9] & 0x7f);\
+          const tagBuf = Buffer.alloc(Math.min(tagSize, 2 * 1024 * 1024));\
+          fs.readSync(fd, tagBuf, 0, tagBuf.length, 10);\
+          fs.closeSync(fd);\
 
-      // Fallback title/artist from file name
-      if (!title || !artist) {
-        const base = path.basename(workingPath, ext);
-        const parts = base.split(' - ');
-        if (parts.length > 1) {
-          artist = artist || parts[0].trim();
-          title = title || parts.slice(1).join(' - ').trim();
-        } else {
-          title = title || base;
-          artist = artist || 'Unknown Artist';
-        }
-      }
+          let off = 0;\
+          while (off < tagBuf.length - 10) {\
+            const fid = tagBuf.slice(off, off + 4).toString('ascii');\
+            const fsz = tagBuf.readUInt32BE(off + 4);\
+            if (fsz <= 0 || fsz > tagBuf.length - off) break;\
+            const fdata = tagBuf.slice(off + 10, off + 10 + fsz);\
+            if (fid === 'TIT2') title = fdata.slice(1).toString('utf8').trim();\
+            if (fid === 'TPE1') artist = fdata.slice(1).toString('utf8').trim();\
+            if (fid === 'TALB') album = fdata.slice(1).toString('utf8').trim();\
+            if (fid === 'TCON') genre = fdata.slice(1).toString('utf8').trim();\
+            off += 10 + fsz;\
+          }\
+        } else {\
+          fs.closeSync(fd);\
+        }\
+      } catch(e) {}\
 
-      // 3. Metadata enrichment if genre is missing
-      let artworkUrl = null;
-      if (!genre || genre === 'Music' || !album) {
-        try {
-          const enriched = await fetchEnrichedMetadata(title, artist);
-          if (enriched) {
-            genre = (genre && genre !== 'Music') ? genre : (enriched.genre || 'Other');
-            album = album || enriched.album;
-            artworkUrl = enriched.artworkUrl;
-          }
-        } catch(e) {}
-      }
+      // Fallback title/artist from file name\
+      if (!title || !artist) {\
+        const base = path.basename(workingPath, ext);\
+        const parts = base.split(' - ');\
+        if (parts.length > 1) {\
+          artist = artist || parts[0].trim();\
+          title = title || parts.slice(1).join(' - ').trim();\
+        } else {\
+          title = title || base;\
+          artist = artist || 'Unknown Artist';\
+        }\
+      }\
+
+      // 3. Metadata enrichment if genre or artwork is missing\
+      let artworkUrl = null;\
+      if (!genre || genre === 'Music' || !album) {\
+        try {\
+          const enriched = await fetchEnrichedMetadata(title, artist);\
+          if (enriched) {\
+            genre = (genre && genre !== 'Music') ? genre : (enriched.genre || 'Other');\
+            album = album || enriched.album;\
+            artworkUrl = enriched.artworkUrl;\
+          }\
+        } catch(e) {}\
+      }\
       if (!genre || genre === 'Music') genre = 'Pop';
+      genre = normalizeGenre(genre, artist, title);
 
       // 4. Download audio payload if file is a 0-audio stub
-      if (isStubFile(workingPath)) {
-        const query = [title || '', (artist && artist !== 'Unknown Artist') ? artist : ''].join(' ').trim();
-        if (query) {
-          try {
-            const jioMatch = await jiosaavnExtractor.searchTrack(query);
-            if (jioMatch && jioMatch.streamUrl) {
-              const tmpDest = workingPath + '.repair.tmp';
-              await downloadStream(jioMatch.streamUrl, tmpDest);
-              await embedId3Metadata(tmpDest, {
-                title: jioMatch.title || title,
-                artist: jioMatch.artist || artist,
-                album: jioMatch.album || album || 'Single Master',
-                genre,
-                artworkUrl: jioMatch.cover || artworkUrl || undefined
-              });
-              try { fs.unlinkSync(workingPath); } catch(e) {}
-              fs.renameSync(tmpDest, workingPath);
-              repairedAudioCount++;
-            }
-          } catch(e) {}
-        }
-      }
+      if (isStubFile(workingPath)) {\
+        const query = [title || '', (artist && artist !== 'Unknown Artist') ? artist : ''].join(' ').trim();\
+        if (query) {\
+          try {\
+            const jioMatch = await jiosaavnExtractor.searchTrack(query);\
+            if (jioMatch && jioMatch.streamUrl) {\
+              const tmpDest = workingPath + '.repair.tmp';\
+              await downloadStream(jioMatch.streamUrl, tmpDest);\
+              await embedId3Metadata(tmpDest, {\
+                title: jioMatch.title || title,\
+                artist: jioMatch.artist || artist,\
+                album: jioMatch.album || album || 'Single Master',\
+                genre,\
+                artworkUrl: jioMatch.cover || artworkUrl || undefined\
+              });\
+              try { fs.unlinkSync(workingPath); } catch(e) {}\
+              fs.renameSync(tmpDest, workingPath);\
+              repairedAudioCount++;\
+            }\
+          } catch(e) {}\
+        }\
+      }\
 
-      // 5. Move root-level files into their genre directory
-      if (path.dirname(workingPath) === musicDir) {
-        const safeGenre = genre.replace(/[\/\\?%*:|<>]/g, '_');
-        const targetFolder = path.join(musicDir, safeGenre);
+      // 5. Move files into their normalized genre directory
+      const safeGenre = genre.replace(/[\/\\?%*:|<>]/g, '_');
+      const targetFolder = path.join(musicDir, safeGenre);
+      if (path.dirname(workingPath) !== targetFolder && path.dirname(workingPath).startsWith(musicDir)) {
         if (!fs.existsSync(targetFolder)) {
           try { fs.mkdirSync(targetFolder, { recursive: true }); } catch(e) {}
         }
         const finalPath = path.join(targetFolder, path.basename(workingPath));
+        const oldDir = path.dirname(workingPath);
         try {
           fs.renameSync(workingPath, finalPath);
           workingPath = finalPath;
           movedCount++;
+          try {
+            if (fs.readdirSync(oldDir).length === 0) {
+              fs.rmdirSync(oldDir);
+            }
+          } catch(e) {}
         } catch(e) {}
       }
 
-      // 6. Ensure ID3 tags updated
+      // 6. Ensure ID3 tags updated with metadata & artwork
       try {
         await embedId3Metadata(workingPath, {
           title,
@@ -683,17 +707,7 @@ class LibraryManager {
       taggedCount,
       updatedArtworkCount,
       repairedAudioCount,
-      totalSongs: this.songs.length
     };
-  }
-
-  pruneMissingFiles() {
-    const beforeCount = this.songs.length;
-    this.songs = this.songs.filter(s => s.filePath && fs.existsSync(s.filePath));
-    if (this.songs.length !== beforeCount) {
-      this.saveLibrary();
-    }
-    return this.songs;
   }
 }
 

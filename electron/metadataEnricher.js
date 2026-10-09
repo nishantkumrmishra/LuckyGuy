@@ -57,15 +57,85 @@ function searchItunes(term, expectedArtist = '', limit = 5) {
 function cleanQueryText(text) {
   if (!text) return '';
   return text
-    .replace(/[_ ]/g, ' ')
+    .replace(/[_\u00a0]/g, ' ')
     .replace(/\(.*?\)/g, '')
     .replace(/\[.*?\]/g, '')
+    .replace(/\{.*?\}/g, '')
+    .replace(/official\s*(music\s*)?(video|mv|audio)/gi, '')
+    .replace(/lyric(s)?(\s*video)?/gi, '')
+    .replace(/full\s*(video|song|audio)/gi, '')
+    .replace(/visualizer/gi, '')
+    .replace(/4k|1080p|720p|hd|uhd/gi, '')
     .replace(/feat\..*$/i, '')
     .replace(/ft\..*$/i, '')
-    .replace(/from ".*?"/gi, '')
+    .replace(/from \".*?\"/gi, '')
     .replace(/from Dhurandhar.*?$/gi, '')
+    .replace(/[\"\'\`]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Intelligent Genre Normalization
+ * Resolves K-Pop, unifies Indian/Bollywood fragmentation, and ensures clean neat folder categories.
+ */
+function normalizeGenre(rawGenre, artist = '', title = '') {
+  const g = (rawGenre || '').toLowerCase().trim();
+  const a = (artist || '').toLowerCase().trim();
+  const t = (title || '').toLowerCase().trim();
+  const aClean = a.replace(/[^a-z0-9]/g, '');
+  const tClean = t.replace(/[^a-z0-9]/g, '');
+
+  // 1. K-Pop (BTS, Blackpink, Stray Kids, TXT, NewJeans, Twice, Jung Kook, etc. NEVER Indian!)
+  const isKpop =
+    g.includes('k-pop') || g.includes('kpop') || g.includes('korean') ||
+    a.includes('bts') || a.includes('blackpink') || a.includes('bangtan') ||
+    aClean.includes('jungkook') || aClean.includes('jimin') || aClean.includes('agustd') ||
+    aClean.includes('suga') || a.includes('twice') || aClean.includes('straykids') ||
+    aClean.includes('newjeans') || a.includes('seventeen') || a.includes('enhypen') ||
+    a.includes('exo') || aClean.includes('tomorrowxtogether') || a.includes('txt') ||
+    aClean.includes('lesserafim') || a.includes('aespa') || a.includes('itzy') ||
+    tClean.includes('kpop');
+
+  if (isKpop) {
+    return 'K-Pop';
+  }
+
+  // 2. Indian & Bollywood unification
+  // Eliminates splintered "Indian" vs "Bollywood" folders into clean "Bollywood"
+  if (
+    g.includes('bollywood') || g.includes('hindi') || g.includes('indian pop') ||
+    g === 'indian' || g.includes('filmi') ||
+    (g.includes('soundtrack') && (a.includes('arijit') || a.includes('pritam') || a.includes('shreya') || a.includes('rahman') || a.includes('badshah')))
+  ) {
+    return 'Bollywood';
+  }
+
+  // 3. Regional Indian music
+  if (g.includes('punjabi') || a.includes('diljit') || a.includes('sidhu') || a.includes('ap dhillon') || a.includes('karan aujla')) {
+    return 'Punjabi';
+  }
+  if (g.includes('tamil') || g.includes('telugu') || g.includes('malayalam') || g.includes('kannada') || g.includes('tollywood') || g.includes('kollywood')) {
+    return 'South Indian';
+  }
+
+  // 4. Western & Global Genres
+  if (g.includes('hip-hop') || g.includes('hip hop') || g.includes('rap')) return 'Hip-Hop';
+  if (g.includes('rock') || g.includes('metal') || g.includes('punk') || g.includes('alternative')) return 'Rock';
+  if (g.includes('electronic') || g.includes('edm') || g.includes('dance') || g.includes('house') || g.includes('techno')) return 'Electronic';
+  if (g.includes('lo-fi') || g.includes('lofi') || g.includes('chill')) return 'Lo-Fi';
+  if (g.includes('acoustic') || g.includes('folk')) return 'Acoustic';
+  if (g.includes('r&b') || g.includes('soul')) return 'R&B';
+  if (g.includes('jazz') || g.includes('blues')) return 'Jazz';
+  if (g.includes('classical')) return 'Classical';
+  if (g.includes('pop')) return 'Pop';
+
+  // 5. Default fallback
+  if (!rawGenre || g === 'music' || g === 'other' || g === 'unknown' || g === 'undefined') {
+    return 'Pop';
+  }
+
+  return rawGenre.charAt(0).toUpperCase() + rawGenre.slice(1);
 }
 
 async function fetchEnrichedMetadata(title, artist) {
@@ -87,8 +157,19 @@ async function fetchEnrichedMetadata(title, artist) {
     meta = await searchItunes(cleanTitle, cleanArtist);
   }
 
-  // 3. Fallback to JioSaavn if iTunes returned no artwork or nothing
-  if ((!meta || !meta.artworkUrl) && jiosaavnExtractor) {
+  // 3. If still not found and artist/query looks Indian, try JioSaavn
+  const isLikelyIndian = !meta && jiosaavnExtractor && (
+    cleanArtist.toLowerCase().includes('singh') ||
+    cleanArtist.toLowerCase().includes('kumar') ||
+    cleanArtist.toLowerCase().includes('shreya') ||
+    cleanArtist.toLowerCase().includes('arijit') ||
+    cleanArtist.toLowerCase().includes('pritam') ||
+    cleanArtist.toLowerCase().includes('badshah') ||
+    cleanArtist.toLowerCase().includes('diljit') ||
+    cleanArtist.toLowerCase().includes('rahman')
+  );
+
+  if ((!meta || !meta.artworkUrl) && isLikelyIndian && jiosaavnExtractor) {
     try {
       const jio = await jiosaavnExtractor.searchTrack(query || cleanTitle);
       if (jio && jio.artworkUrl) {
@@ -97,7 +178,7 @@ async function fetchEnrichedMetadata(title, artist) {
           track: jio.title || meta?.track || title,
           artist: jio.artist || meta?.artist || artist,
           album: jio.album || meta?.album || 'Single Master',
-          genre: meta?.genre || 'Indian',
+          genre: 'Bollywood', // Unified Bollywood instead of generic Indian
           releaseDate: meta?.releaseDate || '',
           artworkUrl: jio.artworkUrl
         };
@@ -105,10 +186,15 @@ async function fetchEnrichedMetadata(title, artist) {
     } catch (e) {}
   }
 
+  if (meta) {
+    meta.genre = normalizeGenre(meta.genre, meta.artist || artist, meta.title || title);
+  }
+
   return meta;
 }
 
 module.exports = {
   fetchEnrichedMetadata,
-  searchItunes
+  searchItunes,
+  normalizeGenre,
 };
