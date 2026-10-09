@@ -140,15 +140,23 @@ app.on('window-all-closed', () => {
 });
 
 // Window controls
-ipcMain.on('window-minimize', () => mainWindow?.minimize());
-ipcMain.on('window-maximize', () => {
-  if (!mainWindow) return;
-  if (mainWindow.isMaximized()) mainWindow.unmaximize();
-  else mainWindow.maximize();
+ipcMain.on('window-minimize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  win?.minimize();
 });
-ipcMain.on('window-close', () => mainWindow?.close());
-ipcMain.handle('window-get-state', () => {
-  return { isMaximized: mainWindow ? mainWindow.isMaximized() : false };
+ipcMain.on('window-maximize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  if (!win) return;
+  if (win.isMaximized()) win.unmaximize();
+  else win.maximize();
+});
+ipcMain.on('window-close', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  win?.close();
+});
+ipcMain.handle('window-get-state', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  return { isMaximized: win ? win.isMaximized() : false };
 });
 
 // URL Extractor & Resolver

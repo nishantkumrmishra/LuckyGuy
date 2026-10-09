@@ -28,6 +28,7 @@ export const WindowControls = () => {
   }, [hasAPI]);
 
   const handleMinimize = (e) => {
+    e?.preventDefault();
     e?.stopPropagation();
     if (window.electronAPI?.minimize) {
       window.electronAPI.minimize();
@@ -37,6 +38,7 @@ export const WindowControls = () => {
   };
 
   const handleMaximize = (e) => {
+    e?.preventDefault();
     e?.stopPropagation();
     if (window.electronAPI?.maximize) {
       window.electronAPI.maximize();
@@ -46,6 +48,7 @@ export const WindowControls = () => {
   };
 
   const handleClose = (e) => {
+    e?.preventDefault();
     e?.stopPropagation();
     if (window.electronAPI?.close) {
       window.electronAPI.close();
@@ -55,44 +58,54 @@ export const WindowControls = () => {
   };
 
   return (
-    <div className="window-controls-container" style={{ WebkitAppRegion: 'no-drag', zIndex: 9999 }}>
+    <div
+      className="window-controls-container"
+      style={{
+        WebkitAppRegion: 'no-drag',
+        zIndex: 9999,
+        pointerEvents: 'auto',
+      }}
+    >
       <button
+        type="button"
         className="window-control-btn minimize"
         onClick={handleMinimize}
         title="Minimize"
         aria-label="Minimize"
-        style={{ WebkitAppRegion: 'no-drag' }}
+        style={{ WebkitAppRegion: 'no-drag', pointerEvents: 'auto' }}
       >
-        <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor">
+        <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor" style={{ pointerEvents: 'none' }}>
           <rect width="10" height="1" />
         </svg>
       </button>
       <button
+        type="button"
         className="window-control-btn maximize"
         onClick={handleMaximize}
         title={isMaximized ? "Restore" : "Maximize"}
         aria-label={isMaximized ? "Restore" : "Maximize"}
-        style={{ WebkitAppRegion: 'no-drag' }}
+        style={{ WebkitAppRegion: 'no-drag', pointerEvents: 'auto' }}
       >
         {isMaximized ? (
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1" style={{ pointerEvents: 'none' }}>
             <rect x="2.5" y="0.5" width="7" height="7" />
             <path d="M0.5 2.5 V9.5 H7.5" />
           </svg>
         ) : (
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1" style={{ pointerEvents: 'none' }}>
             <rect x="0.5" y="0.5" width="9" height="9" />
           </svg>
         )}
       </button>
       <button
+        type="button"
         className="window-control-btn close"
         onClick={handleClose}
         title="Close"
         aria-label="Close"
-        style={{ WebkitAppRegion: 'no-drag' }}
+        style={{ WebkitAppRegion: 'no-drag', pointerEvents: 'auto' }}
       >
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" style={{ pointerEvents: 'none' }}>
           <path d="M1 1 L9 9 M9 1 L1 9" />
         </svg>
       </button>
