@@ -303,7 +303,25 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     try { fs.mkdirSync(targetDir, { recursive: true }); } catch (e) {}
   }
 
-  const targetPath = taskConfig.destinationPath || path.join(targetDir, `${cleanArtist}${cleanTitle}${ext}`);
+  // Auto-organize into genre subfolder
+  const cleanGenre = (genre && genre !== 'Music') ? genre.replace(/[\/\\?%*:|"<>]/g, '_') : 'Pop';
+  targetDir = path.join(preferences.downloadFolder, cleanGenre);
+  if (!fs.existsSync(targetDir)) {
+    try { fs.mkdirSync(targetDir, { recursive: true }); } catch (e) {}
+  }
+
+  let targetPath;
+  if (taskConfig.destinationPath) {
+    const parentDir = path.resolve(path.dirname(taskConfig.destinationPath));
+    const rootDownloadDir = path.resolve(preferences.downloadFolder);
+    if (parentDir === rootDownloadDir) {
+      targetPath = path.join(targetDir, path.basename(taskConfig.destinationPath));
+    } else {
+      targetPath = taskConfig.destinationPath;
+    }
+  } else {
+    targetPath = path.join(targetDir, `${cleanArtist}${cleanTitle}${ext}`);
+  }
 
   downloadManager.addTask({
     ...taskConfig,
@@ -364,6 +382,28 @@ downloadManager.on('completed', async (snap) => {
       });
     } catch (tagErr) {
       console.warn('Failed to embed metadata tags:', tagErr.message);
+    }
+  }
+
+  // Guarantee file is moved into its genre directory if currently in root
+  if (targetPath && fs.existsSync(targetPath)) {
+    const parentDir = path.resolve(path.dirname(targetPath));
+    const rootDownloadDir = path.resolve(preferences.downloadFolder);
+    const resolvedGenre = snap.genre || 'Pop';
+    const cleanGenre = resolvedGenre.replace(/[/\\?%*:|"<>]/g, '_');
+    const expectedGenreDir = path.join(preferences.downloadFolder, cleanGenre);
+    if (!fs.existsSync(expectedGenreDir)) {
+      try { fs.mkdirSync(expectedGenreDir, { recursive: true }); } catch (e) {}
+    }
+
+    if (parentDir === rootDownloadDir) {
+      const destinationInGenre = path.join(expectedGenreDir, path.basename(targetPath));
+      try {
+        fs.renameSync(targetPath, destinationInGenre);
+        targetPath = destinationInGenre;
+      } catch (moveErr) {
+        console.warn('Could not move file to genre folder:', moveErr.message);
+      }
     }
   }
 
@@ -496,6 +536,23 @@ ipcMain.handle('check-file-exists', async (event, filePath) => {
   if (fs.existsSync(altM4a)) return true;
   const altMp3 = filePath.replace(/\.m4a$/i, '.mp3');
   if (fs.existsSync(altMp3)) return true;
+
+  // Also check if the filename exists in any genre subfolder
+  const baseNoExt = path.basename(filePath, path.extname(filePath));
+  const rootDir = preferences.downloadFolder || path.dirname(filePath);
+  try {
+    if (fs.existsSync(rootDir)) {
+      const subdirs = fs.readdirSync(rootDir, { withFileTypes: true });
+      for (const d of subdirs) {
+        if (d.isDirectory()) {
+          const subM4a = path.join(rootDir, d.name, baseNoExt + '.m4a');
+          const subMp3 = path.join(rootDir, d.name, baseNoExt + '.mp3');
+          if (fs.existsSync(subM4a) || fs.existsSync(subMp3)) return true;
+        }
+      }
+    }
+  } catch (e) {}
+
   return false;
 });
 

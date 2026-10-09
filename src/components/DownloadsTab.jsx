@@ -295,7 +295,7 @@ export default function DownloadsTab({
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        padding: '24px 32px 100px 32px',
+        padding: '24px 32px 160px 32px',
         boxSizing: 'border-box',
         maxHeight: '100%',
         scrollBehavior: 'smooth',

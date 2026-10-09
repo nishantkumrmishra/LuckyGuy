@@ -58,6 +58,146 @@ async function getSpotifyApiToken(clientId, clientSecret) {
   return null;
 }
 
+
+// Full 200+ tracks playlist extraction via native offscreen Spotify session
+async function fetchFullSpotifyPlaylistBrowser(playlistId) {
+  let BrowserWindow;
+  let electronApp;
+  try {
+    const electron = require('electron');
+    BrowserWindow = electron.BrowserWindow;
+    electronApp = electron.app;
+  } catch (e) {
+    return null;
+  }
+  if (!BrowserWindow) return null;
+
+  if (electronApp && !electronApp.isReady()) {
+    await electronApp.whenReady();
+  }
+
+  let win = null;
+  try {
+    win = new BrowserWindow({
+      show: false,
+      width: 800,
+      height: 600,
+      webPreferences: { offscreen: true }
+    });
+
+    let capturedHeaders = null;
+    const filter = { urls: ['https://api-partner.spotify.com/*'] };
+
+    win.webContents.session.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+      if (details.method === 'POST' && details.requestHeaders['authorization'] && details.requestHeaders['client-token']) {
+        capturedHeaders = details.requestHeaders;
+      }
+      callback({ requestHeaders: details.requestHeaders });
+    });
+
+    win.loadURL(`https://open.spotify.com/playlist/${playlistId}`);
+
+    // Wait up to 10s for authorization and client token
+    for (let i = 0; i < 50; i++) {
+      await new Promise(r => setTimeout(r, 200));
+      if (capturedHeaders) break;
+    }
+
+    if (!capturedHeaders || !capturedHeaders.authorization) {
+      console.warn('[Spotify] Could not capture web player tokens for playlist:', playlistId);
+      return null;
+    }
+
+    let offset = 0;
+    const limit = 50;
+    const allTracks = [];
+    let playlistTitle = 'Spotify Playlist';
+    let playlistCover = '';
+
+    while (true) {
+      const body = {
+        variables: {
+          uri: `spotify:playlist:${playlistId}`,
+          offset,
+          limit
+        },
+        operationName: 'queryPlaylist',
+        extensions: {
+          persistedQuery: {
+            version: 1,
+            sha256Hash: 'c685ca91fb0019c87ff1225f84e1d85b26cd631fa6187f3f0900da182cb0953d'
+          }
+        }
+      };
+
+      const resp = await fetch('https://api-partner.spotify.com/pathfinder/v2/query', {
+        method: 'POST',
+        headers: {
+          'authorization': capturedHeaders.authorization,
+          'client-token': capturedHeaders['client-token'] || '',
+          'content-type': 'application/json;charset=UTF-8',
+          'accept': 'application/json',
+          'Origin': 'https://open.spotify.com',
+          'Referer': 'https://open.spotify.com/'
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!resp.ok) break;
+      const json = await resp.json();
+      const plData = json?.data?.playlistV2;
+      if (!plData) break;
+
+      if (offset === 0) {
+        playlistTitle = plData.name || playlistTitle;
+        playlistCover = plData.images?.items?.[0]?.sources?.[0]?.url || '';
+      }
+
+      const items = plData.content?.items || [];
+      const totalCount = plData.content?.totalCount || 0;
+
+      for (const item of items) {
+        const itemData = item.itemV2?.data;
+        if (!itemData) continue;
+        const title = itemData.name;
+        const artist = itemData.artists?.items?.map(a => a.profile?.name).filter(Boolean).join(', ') || 'Unknown Artist';
+        const album = itemData.albumOfTrack?.name || '';
+        const cover = itemData.albumOfTrack?.coverArt?.sources?.[0]?.url || '';
+        const durationMs = itemData.trackDuration?.totalMilliseconds || 0;
+        allTracks.push({
+          id: itemData.uri?.split(':')?.[2] || Math.random().toString(36).substring(7),
+          title,
+          artist,
+          album,
+          coverUrl: cover,
+          durationMs
+        });
+      }
+
+      offset += items.length;
+      if (offset >= totalCount || items.length === 0) break;
+    }
+
+    if (allTracks.length > 0) {
+      return {
+        type: 'playlist',
+        id: playlistId,
+        title: playlistTitle,
+        artworkUrl: playlistCover,
+        itemCount: allTracks.length,
+        tracks: allTracks
+      };
+    }
+  } catch (err) {
+    console.warn('[Spotify] Pathfinder browser fetch failed:', err.message);
+  } finally {
+    if (win && !win.isDestroyed()) {
+      try { win.destroy(); } catch (e) {}
+    }
+  }
+  return null;
+}
+
 async function fetchFullSpotifyPlaylist(playlistId, token) {
   let tracks = [];
   let offset = 0;
@@ -190,7 +330,19 @@ async function extractSpotifyEntity(url, preferences = {}) {
     }
   }
 
-  // 2. Public Embed fallback
+  // 2. Automated Full 200+ Tracks Playlist Extraction via Pathfinder GraphQL
+  if (parsed.type === 'playlist') {
+    try {
+      const fullPlaylist = await fetchFullSpotifyPlaylistBrowser(parsed.id);
+      if (fullPlaylist && fullPlaylist.tracks && fullPlaylist.tracks.length > 0) {
+        return fullPlaylist;
+      }
+    } catch (browserErr) {
+      console.warn('[Spotify] Browser extraction fallback to embed:', browserErr.message);
+    }
+  }
+
+  // 3. Public Embed fallback
   try {
     const embedUrl = `https://open.spotify.com/embed/${parsed.type}/${parsed.id}`;
     const resp = await fetch(embedUrl, {

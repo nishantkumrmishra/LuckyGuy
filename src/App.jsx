@@ -444,7 +444,7 @@ export default function App() {
         const tCleanArtist = (itemArtist && itemArtist !== 'Unknown Artist')
           ? itemArtist.replace(/[\/\\?%*:|"<>]/g, '_') + ' - '
           : '';
-        const tDestinationPath = musicDir + '\\' + tCleanArtist + tCleanTitle + '.m4a';
+        const tSampleFilename = `${tCleanArtist}${tCleanTitle}.m4a`;
 
         const tTaskId = 'dl-' + Date.now() + '-' + Math.random().toString(36).substring(7);
         tasksToQueue.push({
@@ -459,7 +459,8 @@ export default function App() {
           speed: 'Waiting in queue...',
           progress: 0,
           status: 'queued',
-          destinationPath: tDestinationPath,
+          destinationPath: null,
+          sampleFilename: tSampleFilename,
         });
       }
 
@@ -484,9 +485,10 @@ export default function App() {
             if (cancelledTaskIdsRef.current.has(task.id)) continue;
 
             try {
-              // Check if file is already on device
+              // Check if file is already on device in any genre subfolder
               if (window.electronAPI?.checkFileExists) {
-                const exists = await window.electronAPI.checkFileExists(task.destinationPath);
+                const samplePath = musicDir + '\\' + (task.sampleFilename || (task.title + '.m4a'));
+                const exists = await window.electronAPI.checkFileExists(samplePath);
                 if (exists) {
                   setActiveDownloads((prev) => prev.filter((item) => item.id !== task.id));
                   continue;
@@ -574,7 +576,7 @@ export default function App() {
                   album: tAlbum,
                   artworkUrl: tArtwork,
                   duration: task.duration,
-                  destinationPath: task.destinationPath,
+                  destinationPath: null, // Auto-organizes into genre subfolder!
                   formatType: 'AUDIO',
                   qualityLabel: tBitrate,
                 });
@@ -622,7 +624,7 @@ export default function App() {
       progress: 5,
       status: 'downloading',
       streamUrl,
-      destinationPath,
+      destinationPath: null,
     };
 
     setActiveDownloads((prev) => [newTask, ...prev]);
@@ -638,7 +640,7 @@ export default function App() {
           album,
           artworkUrl,
           duration,
-          destinationPath,
+          destinationPath: null, // Auto-organizes into genre subfolder!
           formatType: 'AUDIO',
           qualityLabel: resolvedTrack.bitrate || '320kbps',
         });

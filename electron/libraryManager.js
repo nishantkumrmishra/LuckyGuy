@@ -168,10 +168,60 @@ class LibraryManager {
     return '';
   }
 
+  organizeRootFiles(musicDir) {
+    if (!musicDir || !fs.existsSync(musicDir)) return;
+    const validExts = new Set(['.mp3', '.m4a', '.flac', '.wav', '.aac', '.ogg']);
+    try {
+      const entries = fs.readdirSync(musicDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isFile()) {
+          const ext = path.extname(entry.name).toLowerCase();
+          if (validExts.has(ext)) {
+            const fullPath = path.join(musicDir, entry.name);
+            const basename = path.basename(entry.name, ext);
+            const parts = basename.split(' - ');
+            const artist = parts.length > 1 ? parts[0].trim() : '';
+            const title = parts.length > 1 ? parts.slice(1).join(' - ').trim() : basename;
+
+            let genre = 'Pop';
+            try {
+              if (ext === '.m4a') {
+                const buf = fs.readFileSync(fullPath);
+                const genIdx = buf.indexOf(Buffer.from([0xa9, 0x67, 0x65, 0x6e]));
+                if (genIdx !== -1) {
+                  const dataIdx = buf.indexOf(Buffer.from('data'), genIdx);
+                  if (dataIdx !== -1 && dataIdx < genIdx + 30) {
+                    const len = buf.readUInt32BE(dataIdx - 4);
+                    const val = buf.toString('utf8', dataIdx + 8, dataIdx - 4 + len).trim();
+                    if (val) genre = val;
+                  }
+                }
+              }
+            } catch (e) {}
+
+            genre = normalizeGenre(genre, artist, title);
+            const targetFolder = path.join(musicDir, genre.replace(/[\/\\?%*:|"<>]/g, '_'));
+            if (!fs.existsSync(targetFolder)) {
+              fs.mkdirSync(targetFolder, { recursive: true });
+            }
+            const destPath = path.join(targetFolder, entry.name);
+            try {
+              fs.renameSync(fullPath, destPath);
+            } catch (e) {}
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
   // --- Scan Local Directories ---
   scanDirectories(directories) {
     const validExts = new Set(['.mp3', '.m4a', '.flac', '.wav', '.aac', '.ogg', '.mp4', '.mkv', '.webm']);
     const discovered = [];
+
+    for (const d of directories) {
+      this.organizeRootFiles(d);
+    }
 
     const walk = (dir) => {
       if (!fs.existsSync(dir)) return;
