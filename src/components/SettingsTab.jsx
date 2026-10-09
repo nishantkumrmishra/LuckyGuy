@@ -360,22 +360,75 @@ ishant\\Music');
         return;
       }
 
-      let extName = 'Custom Extension';
-      let extDesc = 'Custom media resolver plugin loaded from extension URL.';
-      let extVersion = '1.0.0';
-      let extCategory = 'Extension Engine';
-
       let manifestObj = {};
       try {
         const resp = await fetch(trimmed);
         if (resp.ok) {
           manifestObj = await resp.json();
-          if (manifestObj.name) extName = manifestObj.name;
-          if (manifestObj.description) extDesc = manifestObj.description;
-          if (manifestObj.version) extVersion = manifestObj.version;
-          if (manifestObj.category) extCategory = manifestObj.category;
         }
-      } catch (e) {}
+      } catch (e) {
+        setInstallError('Failed to fetch from URL: ' + e.message);
+        return;
+      }
+
+      // Check if this is a Master Registry Index containing multiple extensions
+      const extList = (manifestObj && Array.isArray(manifestObj.extensions))
+        ? manifestObj.extensions
+        : (Array.isArray(manifestObj) ? manifestObj : null);
+
+      if (extList && extList.length > 0) {
+        let addedCount = 0;
+        let updatedCount = 0;
+        let nextExtensions = [...customExtensions];
+
+        for (const item of extList) {
+          const id = item.id || ('ext-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6));
+          const source = item.downloadUrl || item.source || trimmed;
+          const existingIdx = nextExtensions.findIndex((e) => e.id === id || e.source === source);
+
+          const extData = {
+            id,
+            name: item.name || 'Unnamed Extension',
+            category: item.category || 'Extension Engine',
+            description: item.description || '',
+            source,
+            version: item.version || '1.0.0',
+            author: item.author || parsed.hostname,
+            rating: item.rating || 'all',
+            tab: item.tab || null,
+            capabilities: item.capabilities || [],
+            adBlockRules: item.adBlockRules || [],
+            // Preserve user's toggle state if already installed, otherwise default to false (disabled)
+            enabled: existingIdx !== -1 ? nextExtensions[existingIdx].enabled : (item.enabled === true ? true : false),
+          };
+
+          if (existingIdx !== -1) {
+            nextExtensions[existingIdx] = extData;
+            updatedCount++;
+          } else {
+            nextExtensions.unshift(extData);
+            addedCount++;
+          }
+        }
+
+        setCustomExtensions(nextExtensions);
+        try {
+          localStorage.setItem('luckyguy-extensions', JSON.stringify(nextExtensions));
+        } catch (e) {}
+        if (onUpdateExtensions) onUpdateExtensions(nextExtensions);
+
+        setExtensionUrl('');
+        setInstallSuccess(`Master Registry indexed! Loaded ${addedCount} new & updated ${updatedCount} extensions. Toggle each one ON/OFF as desired below.`);
+        flashSaved();
+        setTimeout(() => setInstallSuccess(''), 4500);
+        return;
+      }
+
+      // Standalone single extension manifest
+      let extName = manifestObj.name || 'Custom Extension';
+      let extDesc = manifestObj.description || 'Custom media resolver plugin loaded from extension URL.';
+      let extVersion = manifestObj.version || '1.0.0';
+      let extCategory = manifestObj.category || 'Extension Engine';
 
       const newExt = {
         id: manifestObj.id || ('ext-' + Date.now()),
@@ -1356,6 +1409,7 @@ ishant\\Music');
             </p>
 
             {activeInputMode === 'url' ? (
+              <>
               <form onSubmit={handleInstallExtension} style={{ display: 'flex', gap: '8px' }}>
                 <input
                   type="text"
@@ -1399,6 +1453,29 @@ ishant\\Music');
                   <span>Install Plugin</span>
                 </button>
               </form>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Master Registry:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExtensionUrl('https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/index.json');
+                    setInstallError('');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--primary, #7c5cbf)',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    padding: 0,
+                    textDecoration: 'underline',
+                  }}
+                >
+                  ⚡ Index All Official Extensions (1 URL: index.json)
+                </button>
+              </div>
+              </>
             ) : (
               <form onSubmit={handleInstallSnippet} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <textarea
