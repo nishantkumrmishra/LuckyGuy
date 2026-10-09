@@ -425,7 +425,7 @@ export default function App() {
       for (const t of resolvedTrack.tracks) {
         const itemTitle = t.title || 'Track';
         const itemArtist = t.artist || resolvedTrack.artist || 'Unknown Artist';
-        const itemCover = t.coverUrl || resolvedTrack.artworkUrl || '';
+        const itemCover = t.coverUrl || '';
 
         const tCleanTitle = itemTitle.replace(/[\/\\?%*:|"<>]/g, '_');
         const tCleanArtist = (itemArtist && itemArtist !== 'Unknown Artist')
@@ -442,64 +442,110 @@ export default function App() {
           artworkUrl: itemCover,
           duration: Math.round((t.durationMs || 215000) / 1000),
           format: 'MP3 320k',
-          size: 'Queued',
-          speed: 'Starting...',
-          progress: 1,
-          status: 'downloading',
+          size: 'In Queue',
+          speed: 'Waiting in queue...',
+          progress: 0,
+          status: 'queued',
           destinationPath: tDestinationPath,
         });
       }
 
-      // Instantly populate the Downloads Manager UI table with artwork & info!
+      // Instantly populate the Downloads Manager UI table so user sees all items in queue!
       setActiveDownloads((prev) => [...tasksToQueue, ...prev]);
 
-      // Concurrently resolve & download tracks
+      // Controlled queue worker: 2 tracks processed in parallel with individual artwork scanning and polite pacing
       (async () => {
-        for (const task of tasksToQueue) {
-          try {
-            // Check if file is already on device
-            if (window.electronAPI?.checkFileExists) {
-              const exists = await window.electronAPI.checkFileExists(task.destinationPath);
-              if (exists) {
-                setActiveDownloads((prev) => prev.filter((item) => item.id !== task.id));
-                continue;
-              }
-            }
+        const CONCURRENCY = 2;
+        let queueIndex = 0;
 
-            let tStreamUrl = null;
-            let tBitrate = '320kbps';
-            if (window.electronAPI?.searchJioSaavn) {
-              const jioMatch = await window.electronAPI.searchJioSaavn(`${task.title} ${task.artist}`);
-              if (jioMatch && jioMatch.streamUrl) {
-                tStreamUrl = jioMatch.streamUrl;
-                tBitrate = jioMatch.bitrate || '320kbps';
-              }
-            }
+        const worker = async () => {
+          while (queueIndex < tasksToQueue.length) {
+            const task = tasksToQueue[queueIndex++];
+            if (!task) break;
 
-            if (tStreamUrl && window.electronAPI?.startDownload) {
-              await window.electronAPI.startDownload({
-                id: task.id,
-                url: tStreamUrl,
-                title: task.title,
-                artist: task.artist,
-                album: task.album,
-                artworkUrl: task.artworkUrl,
-                duration: task.duration,
-                destinationPath: task.destinationPath,
-                formatType: 'AUDIO',
-                qualityLabel: tBitrate,
-              });
-            } else if (!tStreamUrl) {
+            try {
+              // Check if file is already on device
+              if (window.electronAPI?.checkFileExists) {
+                const exists = await window.electronAPI.checkFileExists(task.destinationPath);
+                if (exists) {
+                  setActiveDownloads((prev) => prev.filter((item) => item.id !== task.id));
+                  continue;
+                }
+              }
+
+              // Update status to scanning & resolving individual artwork
               setActiveDownloads((prev) =>
                 prev.map((item) =>
-                  item.id === task.id ? { ...item, status: 'failed', speed: 'Stream not found' } : item
+                  item.id === task.id
+                    ? {
+                        ...item,
+                        status: 'downloading',
+                        speed: 'Scanning & resolving artwork...',
+                        progress: 2,
+                      }
+                    : item
                 )
               );
+
+              // 1. Search JioSaavn / iTunes for real high-fidelity stream & authentic individual song artwork
+              let tStreamUrl = null;
+              let tBitrate = '320kbps';
+              let tArtwork = task.artworkUrl;
+              let tAlbum = task.album;
+
+              if (window.electronAPI?.searchJioSaavn) {
+                try {
+                  const jioMatch = await window.electronAPI.searchJioSaavn(`${task.title} ${task.artist}`);
+                  if (jioMatch && jioMatch.streamUrl) {
+                    tStreamUrl = jioMatch.streamUrl;
+                    tBitrate = jioMatch.bitrate || '320kbps';
+                    if (jioMatch.artworkUrl) tArtwork = jioMatch.artworkUrl;
+                    if (jioMatch.album) tAlbum = jioMatch.album;
+                  }
+                } catch (e) {}
+              }
+
+              // Update task with the real individual artwork and album
+              setActiveDownloads((prev) =>
+                prev.map((item) =>
+                  item.id === task.id
+                    ? {
+                        ...item,
+                        artworkUrl: tArtwork || item.artworkUrl,
+                        album: tAlbum || item.album,
+                        speed: tStreamUrl ? 'Starting download...' : 'Stream not found',
+                        progress: tStreamUrl ? 5 : 0,
+                        status: tStreamUrl ? 'downloading' : 'failed',
+                      }
+                    : item
+                )
+              );
+
+              if (tStreamUrl && window.electronAPI?.startDownload) {
+                await window.electronAPI.startDownload({
+                  id: task.id,
+                  url: tStreamUrl,
+                  title: task.title,
+                  artist: task.artist,
+                  album: tAlbum,
+                  artworkUrl: tArtwork,
+                  duration: task.duration,
+                  destinationPath: task.destinationPath,
+                  formatType: 'AUDIO',
+                  qualityLabel: tBitrate,
+                });
+              }
+
+              // Polite pacing before next track to avoid rate limits
+              await new Promise((r) => setTimeout(r, 600));
+            } catch (err) {
+              console.error('Track queue error:', err);
             }
-          } catch (e) {
-            console.error('Track queue error:', e);
           }
-        }
+        };
+
+        const workers = Array(CONCURRENCY).fill(null).map(() => worker());
+        await Promise.all(workers);
       })();
 
       return;
@@ -1079,6 +1125,13 @@ export default function App() {
                 onUpdateSong={handleUpdateSong}
                 onAddToPlaylist={handleAddTrackToPlaylist}
                 downloadFolder={preferences?.downloadFolder || 'C:\\Users\\nishant\\Music'}
+                preferences={preferences}
+                onSavePreferences={(newPrefs) => {
+                  setPreferences((prev) => ({ ...prev, ...newPrefs }));
+                  if (window.electronAPI?.savePreferences) {
+                    window.electronAPI.savePreferences(newPrefs);
+                  }
+                }}
                 currentTrack={currentTrack}
                 isPlaying={isPlaying}
                 onNavigateToHome={() => setActiveTab('home')}

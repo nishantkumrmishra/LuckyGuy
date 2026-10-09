@@ -152,7 +152,7 @@ ipcMain.handle('extract-url', async (event, url) => {
 
   // 1. Spotify
   if (spotifyExtractor.isSpotifyUrl(trimmed)) {
-    const entity = await spotifyExtractor.extractSpotifyEntity(trimmed);
+    const entity = await spotifyExtractor.extractSpotifyEntity(trimmed, preferences);
     if (entity) {
       return {
         platform: 'Spotify',

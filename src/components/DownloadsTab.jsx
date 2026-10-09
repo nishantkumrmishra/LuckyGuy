@@ -16,7 +16,9 @@ import {
   Film,
   Image as ImageIcon,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Clock,
+  Key
 } from 'lucide-react';
 
 export default function DownloadsTab({
@@ -35,12 +37,30 @@ export default function DownloadsTab({
   downloadFolder = 'C:\\Users\\nishant\\Music',
   onNavigateToHome,
   onNavigateToLibrary,
+  preferences = {},
+  onSavePreferences,
 }) {
   const [urlInput, setUrlInput] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState('MP3 320k');
   const [selectedQuality, setSelectedQuality] = useState('320kbps');
   const [showConfig, setShowConfig] = useState(false);
+  const [spotifyClientId, setSpotifyClientId] = useState(preferences?.spotifyClientId || '');
+  const [spotifyClientSecret, setSpotifyClientSecret] = useState(preferences?.spotifyClientSecret || '');
+
+  useEffect(() => {
+    setSpotifyClientId(preferences?.spotifyClientId || '');
+    setSpotifyClientSecret(preferences?.spotifyClientSecret || '');
+  }, [preferences?.spotifyClientId, preferences?.spotifyClientSecret]);
+
+  const handleSaveSpotifyCreds = () => {
+    if (onSavePreferences) {
+      onSavePreferences({
+        spotifyClientId: spotifyClientId.trim(),
+        spotifyClientSecret: spotifyClientSecret.trim(),
+      });
+    }
+  };
   const [filterTab, setFilterTab] = useState('all'); // 'all' | 'downloading' | 'completed'
 
   // Multi-selection state
@@ -569,6 +589,73 @@ export default function DownloadsTab({
                 </span>
               </button>
             )}
+
+            {/* Spotify Web API Integration for 200+ Track Playlists */}
+            <div
+              style={{
+                width: '100%',
+                paddingTop: '10px',
+                borderTop: '1px dashed var(--border-light)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                flexWrap: 'wrap',
+                fontSize: '11.5px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#1db954', fontWeight: 600 }}>
+                <Key size={13} />
+                <span>Spotify API (for 200+ track playlists):</span>
+              </div>
+              <input
+                type="text"
+                placeholder="Client ID"
+                value={spotifyClientId}
+                onChange={(e) => setSpotifyClientId(e.target.value)}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-medium)',
+                  backgroundColor: 'var(--bg-main)',
+                  color: 'var(--text-primary)',
+                  fontSize: '11px',
+                  width: '140px',
+                }}
+              />
+              <input
+                type="password"
+                placeholder="Client Secret"
+                value={spotifyClientSecret}
+                onChange={(e) => setSpotifyClientSecret(e.target.value)}
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-medium)',
+                  backgroundColor: 'var(--bg-main)',
+                  color: 'var(--text-primary)',
+                  fontSize: '11px',
+                  width: '140px',
+                }}
+              />
+              <button
+                onClick={handleSaveSpotifyCreds}
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  backgroundColor: 'var(--bg-main)',
+                  border: '1px solid var(--border-medium)',
+                  color: 'var(--text-primary)',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Save
+              </button>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                Optional: developer.spotify.com credentials to fetch over 100 tracks
+              </span>
+            </div>
           </div>
         )}
       </div>
@@ -852,6 +939,7 @@ export default function DownloadsTab({
                 const isTaskActive = item.isActive;
                 const isPaused = item.status === 'paused';
                 const isFailed = item.status === 'failed';
+                const isQueued = item.status === 'queued';
                 const media = getMediaType(item);
                 const MediaIcon = media.Icon;
 
@@ -992,7 +1080,7 @@ export default function DownloadsTab({
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11.5px' }}>
                           <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                            {isTaskActive ? (downloadedStr + ' / ' + totalStr) : totalStr}
+                            {isQueued ? 'In Queue' : isTaskActive ? (downloadedStr + ' / ' + totalStr) : totalStr}
                           </span>
                           <span style={{ fontWeight: 600, color: isPaused ? '#f59e0b' : 'var(--primary, #7c5cbf)' }}>
                             {pct + '%'}
@@ -1062,6 +1150,24 @@ export default function DownloadsTab({
                         >
                           <Pause size={11} />
                           <span>Paused</span>
+                        </span>
+                      ) : isQueued ? (
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            backgroundColor: 'var(--bg-main)',
+                            border: '1px solid var(--border-medium)',
+                            color: 'var(--text-secondary)',
+                          }}
+                        >
+                          <Clock size={11} />
+                          <span>Queued</span>
                         </span>
                       ) : isTaskActive ? (
                         <span
