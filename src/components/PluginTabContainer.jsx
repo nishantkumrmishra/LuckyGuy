@@ -63,36 +63,6 @@ export default function PluginTabContainer({
     return resolved;
   }, [plugin.domainAliases]);
 
-  // Register navigation controls with mainframe TitleBar
-  useEffect(() => {
-    if (onNavRegister) {
-      onNavRegister({
-        url: activeUrl,
-        viewMode: viewMode,
-        onBack: handleWebBack,
-        onForward: handleWebForward,
-        onReload: handleWebReload,
-        onNavigate: (newUrl) => {
-          let resolved = resolveDomainAlias(newUrl);
-          if (!resolved.startsWith('http://') && !resolved.startsWith('https://')) {
-            resolved = 'https://www.pornhub.org/video/search?search=' + encodeURIComponent(resolved);
-          }
-          setActiveUrl(resolved);
-          setInputUrl(resolved);
-          if (webviewRef.current) {
-            try { webviewRef.current.loadURL(resolved); } catch(e) {}
-          }
-        },
-        onToggleViewMode: (mode) => {
-          setViewMode(mode);
-          if (mode === 'grid') {
-            extractVideosFromWebview();
-          }
-        }
-      });
-    }
-  }, [activeUrl, viewMode, onNavRegister, resolveDomainAlias, handleWebBack, handleWebForward, handleWebReload]);
-
   const [activeUrl, setActiveUrl] = useState(() => {
     let url = plugin.tab?.url || plugin.tab?.defaultUrl || '';
     return resolveDomainAlias(url);
@@ -486,6 +456,37 @@ export default function PluginTabContainer({
     }
     return false;
   };
+
+  // Register navigation controls with mainframe TitleBar
+  useEffect(() => {
+    if (onNavRegister) {
+      onNavRegister({
+        url: activeUrl,
+        viewMode: viewMode,
+        onBack: handleWebBack,
+        onForward: handleWebForward,
+        onReload: handleWebReload,
+        onNavigate: (newUrl) => {
+          let resolved = resolveDomainAlias(newUrl);
+          if (!resolved.startsWith('http://') && !resolved.startsWith('https://')) {
+            resolved = 'https://www.pornhub.org/video/search?search=' + encodeURIComponent(resolved);
+          }
+          setActiveUrl(resolved);
+          setInputUrl(resolved);
+          if (webviewRef.current) {
+            try { webviewRef.current.loadURL(resolved); } catch(e) {}
+          }
+        },
+        onToggleViewMode: (mode) => {
+          setViewMode(mode);
+          if (mode === 'grid') {
+            extractVideosFromWebview();
+          }
+        }
+      });
+    }
+  }, [activeUrl, viewMode, onNavRegister, resolveDomainAlias, handleWebBack, handleWebForward, handleWebReload]);
+
 
   // Initial Indexing on load or category change
   useEffect(() => {
