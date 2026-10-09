@@ -1,3 +1,10 @@
+// Benign navigation interruption handler (suppresses ERR_ABORTED -3 when switching tabs/categories)
+process.on("unhandledRejection", (reason) => {
+  if (reason && (String(reason).includes("ERR_ABORTED") || String(reason).includes("(-3)"))) {
+    return;
+  }
+  console.warn("Unhandled Rejection:", reason);
+});
 const { app, BrowserWindow, ipcMain, dialog, shell, globalShortcut, session } = require('electron');
 const path = require('path');
 const os = require('os');
@@ -64,6 +71,15 @@ if (libraryManager.songs.length === 0) {
   ];
   libraryManager.scanDirectories(defaultMusicDirs);
 }
+
+
+app.on("web-contents-created", (event, contents) => {
+  contents.on("did-fail-load", (e, errorCode) => {
+    if (errorCode === -3) { // ERR_ABORTED
+      return;
+    }
+  });
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -557,29 +573,31 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
   // Auto-organize into genre subfolder when enabled
   const shouldOrganize = preferences.autoOrganizeByGenre !== false;
   
-  if (taskConfig.formatType === "VIDEO") {
+  const userVideosDir = path.join(os.homedir(), "Videos");
+  const userPicturesDir = path.join(os.homedir(), "Pictures");
+
+  if (taskConfig.customFolder && typeof taskConfig.customFolder === "string" && taskConfig.customFolder.trim()) {
+    targetDir = taskConfig.customFolder.trim();
+  } else if (taskConfig.formatType === "VIDEO") {
     ext = ".mp4";
-    targetDir = path.join(preferences.downloadFolder, "Videos");
-    if (!fs.existsSync(targetDir)) {
-      try { fs.mkdirSync(targetDir, { recursive: true }); } catch (e) {}
-    }
+    targetDir = userVideosDir;
+  } else if (taskConfig.formatType === "IMAGE") {
+    ext = ".jpg";
+    targetDir = userPicturesDir;
   } else if (shouldOrganize) {
-    const cleanGenre = (genre && genre !== 'Music') ? genre.replace(/[\/\\?%*:|"<>]/g, '_') : 'Pop';
+    const cleanGenre = (genre && genre !== "Music") ? genre.replace(/[\/\\?%*:|"<>]/g, "_") : "Pop";
     targetDir = path.join(preferences.downloadFolder, cleanGenre);
+  } else {
+    targetDir = preferences.downloadFolder;
   }
+
   if (!fs.existsSync(targetDir)) {
     try { fs.mkdirSync(targetDir, { recursive: true }); } catch (e) {}
   }
 
   let targetPath;
   if (taskConfig.destinationPath) {
-    const parentDir = path.resolve(path.dirname(taskConfig.destinationPath));
-    const rootDownloadDir = path.resolve(preferences.downloadFolder);
-    if (parentDir === rootDownloadDir) {
-      targetPath = path.join(targetDir, path.basename(taskConfig.destinationPath));
-    } else {
-      targetPath = taskConfig.destinationPath;
-    }
+    targetPath = taskConfig.destinationPath;
   } else {
     targetPath = path.join(targetDir, `${cleanArtist}${cleanTitle}${ext}`);
   }

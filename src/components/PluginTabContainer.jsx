@@ -107,6 +107,17 @@ export default function PluginTabContainer({
   const [copiedId, setCopiedId] = useState(null);
   const [downloadSuccessMsg, setDownloadSuccessMsg] = useState('');
   const [ageVerificationBypassed, setAgeVerificationBypassed] = useState(true);
+  const [selectedQuality, setSelectedQuality] = useState('1080p');
+  const [customDownloadFolder, setCustomDownloadFolder] = useState(() => {
+    try {
+      const saved = localStorage.getItem('luckyguy-plugin-folder-' + plugin.id);
+      if (saved) return saved;
+      const settings = JSON.parse(localStorage.getItem('luckyguy-plugin-settings-' + plugin.id) || '{}');
+      return settings.customFolder || '';
+    } catch {
+      return '';
+    }
+  });
   
   const containerRef = useRef(null);
   const iframeRef = useRef(null);
@@ -612,8 +623,8 @@ export default function PluginTabContainer({
 
       setActiveUrl(targetCatUrl);
       setInputUrl(targetCatUrl);
-      if (webviewRef.current?.loadURL) {
-        webviewRef.current.loadURL(targetCatUrl);
+      if (viewMode === 'web' && webviewRef.current?.loadURL) {
+        try { webviewRef.current.loadURL(targetCatUrl); } catch (e) {}
       }
     }
   };
@@ -653,17 +664,38 @@ export default function PluginTabContainer({
     }
   };
 
-  const handleDownloadSingle = (item) => {
+  const handlePickCustomFolder = async () => {
+    if (window.electronAPI?.pickFolder) {
+      try {
+        const folder = await window.electronAPI.pickFolder();
+        if (folder) {
+          setCustomDownloadFolder(folder);
+          try {
+            localStorage.setItem('luckyguy-plugin-folder-' + plugin.id, folder);
+          } catch (e) {}
+        }
+      } catch (e) {}
+    }
+  };
+
+  const handleDownloadSingle = (item, qualityOverride) => {
     if (!onStartDownload) return;
     const isImg = item.mediaType === 'image' || (!item.streamUrl && item.imageUrl);
     const downloadTarget = isImg ? (item.imageUrl || item.thumbnail) : (item.url || item.streamUrl);
+    const chosenQuality = qualityOverride || selectedQuality || item.quality || (isImg ? 'Original' : '1080p');
     
     onStartDownload(downloadTarget, {
-      format: isImg ? 'JPG Original' : 'MP4 1080p',
-      quality: isImg ? 'Original' : '1080p',
-      title: item.title
+      format: isImg ? 'JPG ' + chosenQuality : 'MP4 ' + chosenQuality,
+      formatType: isImg ? 'IMAGE' : 'VIDEO',
+      mediaType: isImg ? 'image' : 'video',
+      quality: chosenQuality,
+      qualityLabel: chosenQuality,
+      title: item.title,
+      author: item.author || plugin.name,
+      thumbnail: item.thumbnail || item.imageUrl || '',
+      customFolder: customDownloadFolder || (plugin.id?.includes('telegram') ? preferences?.telegramDownloadFolder : null)
     });
-    setDownloadSuccessMsg(`Queued "${item.title}" for download!`);
+    setDownloadSuccessMsg(`Queued "${item.title}" (${chosenQuality}) for download!`);
     setTimeout(() => setDownloadSuccessMsg(''), 3500);
   };
 
@@ -672,10 +704,17 @@ export default function PluginTabContainer({
     const toDownload = crawledMedia.filter(m => selectedIds.has(m.id));
     toDownload.forEach(m => {
       const isImg = m.mediaType === 'image' || (!m.streamUrl && m.imageUrl);
+      const chosenQuality = selectedQuality || (isImg ? 'Original' : '1080p');
       onStartDownload(isImg ? (m.imageUrl || m.thumbnail) : (m.url || m.streamUrl), {
-        format: isImg ? 'JPG Original' : 'MP4 1080p',
-        quality: isImg ? 'Original' : '1080p',
-        title: m.title
+        format: isImg ? 'JPG ' + chosenQuality : 'MP4 ' + chosenQuality,
+        formatType: isImg ? 'IMAGE' : 'VIDEO',
+        mediaType: isImg ? 'image' : 'video',
+        quality: chosenQuality,
+        qualityLabel: chosenQuality,
+        title: m.title,
+        author: m.author || plugin.name,
+        thumbnail: m.thumbnail || m.imageUrl || '',
+        customFolder: customDownloadFolder || null
       });
     });
     setDownloadSuccessMsg(`Queued ${toDownload.length} items for batch download!`);
@@ -1148,7 +1187,59 @@ export default function PluginTabContainer({
               {activePlayerVideo.title}
             </span>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              {/* Quality Selector */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'var(--bg-main)', padding: '2px 8px', borderRadius: '6px', border: '1px solid var(--border-medium)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>Quality:</span>
+                <select
+                  value={selectedQuality}
+                  onChange={(e) => setSelectedQuality(e.target.value)}
+                  style={{
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-primary)',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    outline: 'none',
+                    padding: '4px 2px',
+                  }}
+                >
+                  <option value="1080p">1080p Full HD</option>
+                  <option value="720p">720p HD</option>
+                  <option value="480p">480p SD</option>
+                  <option value="Original">Original Source</option>
+                </select>
+              </div>
+
+              {/* Folder Selector / Badge */}
+              <button
+                type="button"
+                onClick={handlePickCustomFolder}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '6px 10px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-medium)',
+                  backgroundColor: 'var(--bg-main)',
+                  color: customDownloadFolder ? 'var(--primary, #7c5cbf)' : 'var(--text-secondary)',
+                  fontSize: '11.5px',
+                  cursor: 'pointer',
+                  maxWidth: '180px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+                title={customDownloadFolder ? 'Saving to: ' + customDownloadFolder : (plugin.id?.includes('telegram') ? 'Choose Telegram Save Location' : 'Default folder: Videos')}
+              >
+                <FolderOpen size={13} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {customDownloadFolder ? customDownloadFolder.split(/[\\/]/).pop() : (plugin.id?.includes('telegram') ? 'Save to...' : 'Videos Folder')}
+                </span>
+              </button>
+
               <button
                 onClick={() => handleCopyLink(activePlayerVideo)}
                 style={{
@@ -1167,24 +1258,26 @@ export default function PluginTabContainer({
                 {copiedId === activePlayerVideo.id ? <Check size={12} /> : <Copy size={12} />}
                 <span>{copiedId === activePlayerVideo.id ? 'Copied' : 'Copy Link'}</span>
               </button>
+
               <button
-                onClick={() => handleDownloadSingle(activePlayerVideo)}
+                onClick={() => handleDownloadSingle(activePlayerVideo, selectedQuality)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  padding: '6px 14px',
+                  padding: '6px 16px',
                   borderRadius: '6px',
                   border: 'none',
                   backgroundColor: 'var(--primary, #7c5cbf)',
                   color: '#ffffff',
-                  fontSize: '11.5px',
+                  fontSize: '12px',
                   fontWeight: 600,
                   cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(124, 92, 191, 0.25)',
                 }}
               >
-                <Download size={13} />
-                <span>Download Media</span>
+                <Download size={14} />
+                <span>Download {selectedQuality}</span>
               </button>
             </div>
           </div>
@@ -1310,19 +1403,21 @@ export default function PluginTabContainer({
                       <span>{activePlayerVideo.rating || '96%'} Rating</span>
                     </span>
 
-                    <span
-                      style={{
-                        padding: '6px 10px',
-                        borderRadius: '6px',
-                        backgroundColor: 'var(--bg-card)',
-                        border: '1px solid var(--border-medium)',
-                        fontSize: '11.5px',
-                        fontWeight: 600,
-                        color: '#f59e0b',
-                      }}
-                    >
-                      {activePlayerVideo.quality || '1080p 60fps'}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          backgroundColor: 'var(--bg-card)',
+                          border: '1px solid var(--border-medium)',
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          color: '#f59e0b',
+                        }}
+                      >
+                        {selectedQuality} Full HD Stream
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -1639,8 +1734,8 @@ export default function PluginTabContainer({
       {/* ========================================================================= */}
       {/* 3. DIRECT WEB FRAME (when ViewMode is 'web') */}
       {/* ========================================================================= */}
-      {!activePlayerVideo && (
-        <div style={{ flex: 1, minHeight: '520px', display: viewMode === 'web' ? 'flex' : 'none', flexDirection: 'column', backgroundColor: '#09090b' }}>
+      {!activePlayerVideo && viewMode === 'web' && (
+        <div style={{ flex: 1, minHeight: '520px', display: 'flex', flexDirection: 'column', backgroundColor: '#09090b' }}>
           <div
             style={{
               display: 'flex',
