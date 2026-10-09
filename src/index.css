@@ -5080,17 +5080,13 @@ h6 {
   100% { height: 14px; }
 }
 
-/* Horizontally scrollable music shelf */
+/* Horizontally scrollable music shelf - completely clean & hidden scrollbar line */
+.shelf-row-container {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
 .shelf-row-container::-webkit-scrollbar {
-  height: 6px;
-}
-.shelf-row-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-.shelf-row-container::-webkit-scrollbar-thumb {
-  background-color: var(--border-medium, rgba(0, 0, 0, 0.15));
-  border-radius: 999px;
-}
-.shelf-row-container::-webkit-scrollbar-thumb:hover {
-  background-color: var(--primary, #7c5cbf);
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }

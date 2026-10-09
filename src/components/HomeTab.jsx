@@ -353,8 +353,8 @@ export default function HomeTab({
                     flexWrap: 'wrap',
                   }}
                 >
-                  {/* Left: Music Type & File Location Beside That */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', minWidth: 0 }}>
+                  {/* Left: Music Type & Plain Text File Location (Click opens File Explorer) */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Disc3 size={18} color="var(--primary, #7c5cbf)" style={{ flexShrink: 0 }} />
                       <h2
@@ -370,59 +370,31 @@ export default function HomeTab({
                       </h2>
                     </div>
 
-                    {/* File Location Beside That with folder icon */}
-                    <div
+                    {/* Plain Text File Location without unnecessary boxes */}
+                    <span
                       onClick={() => handleOpenFolder(sec.folderPath)}
                       style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        backgroundColor: 'var(--bg-card)',
-                        border: '1px solid var(--border-medium)',
-                        fontSize: '11.5px',
+                        fontSize: '12.5px',
                         color: 'var(--text-muted)',
                         cursor: 'pointer',
-                        maxWidth: '380px',
-                        transition: 'all 0.15s ease',
+                        transition: 'color 0.15s ease',
+                        textDecoration: 'none',
+                        maxWidth: '500px',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = 'var(--primary)';
-                        e.currentTarget.style.color = 'var(--text-primary)';
+                        e.currentTarget.style.color = 'var(--primary, #7c5cbf)';
+                        e.currentTarget.style.textDecoration = 'underline';
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = 'var(--border-medium)';
                         e.currentTarget.style.color = 'var(--text-muted)';
+                        e.currentTarget.style.textDecoration = 'none';
                       }}
-                      title={`Open folder: ${sec.folderPath}`}
+                      title={`Open folder in File Explorer: ${sec.folderPath}`}
                     >
-                      <Folder size={12} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                      <span
-                        style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          direction: 'rtl',
-                          textAlign: 'left',
-                        }}
-                      >
-                        {sec.folderPath}
-                      </span>
-                    </div>
-
-                    <span
-                      style={{
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        padding: '2px 8px',
-                        borderRadius: '999px',
-                        backgroundColor: 'rgba(124, 92, 191, 0.08)',
-                        color: 'var(--primary, #7c5cbf)',
-                        border: '1px solid rgba(124, 92, 191, 0.16)',
-                      }}
-                    >
-                      {sec.tracks.length} {sec.tracks.length === 1 ? 'track' : 'tracks'}
+                      {sec.folderPath}
                     </span>
                   </div>
 
@@ -472,9 +444,14 @@ export default function HomeTab({
                   ) : null}
                 </div>
 
-                {/* Down: Scrollable 1-row shelf (up to 20 entries) or full grid when expanded */}
+                {/* Down: Horizontally scrollable 1-row shelf (wheel scrolls side-wise) or full grid when expanded */}
                 <div
                   className="shelf-row-container"
+                  onWheel={(e) => {
+                    if (!isExpanded && e.deltaY !== 0) {
+                      e.currentTarget.scrollLeft += e.deltaY;
+                    }
+                  }}
                   style={
                     isExpanded
                       ? {
@@ -490,9 +467,9 @@ export default function HomeTab({
                           width: '100%',
                           overflowX: 'auto',
                           overflowY: 'hidden',
-                          paddingBottom: '8px',
-                          scrollbarWidth: 'thin',
-                          scrollbarColor: 'var(--border-medium) transparent',
+                          paddingBottom: '4px',
+                          scrollbarWidth: 'none',
+                          msOverflowStyle: 'none',
                         }
                   }
                 >
@@ -526,17 +503,11 @@ export default function HomeTab({
                             : '0 2px 6px rgba(0,0,0,0.02)',
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-3px)';
-                          e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.08)';
-                          if (!isCurrent) e.currentTarget.style.borderColor = 'var(--primary)';
+                          if (!isCurrent) e.currentTarget.style.borderColor = 'var(--text-muted)';
                           const playBtn = e.currentTarget.querySelector('.card-play-btn');
                           if (playBtn) playBtn.style.opacity = '1';
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'none';
-                          e.currentTarget.style.boxShadow = isCurrent
-                            ? '0 4px 14px rgba(124, 92, 191, 0.18)'
-                            : '0 2px 6px rgba(0,0,0,0.02)';
                           if (!isCurrent) e.currentTarget.style.borderColor = 'var(--border-medium)';
                           const playBtn = e.currentTarget.querySelector('.card-play-btn');
                           if (playBtn && !isTrackPlaying) playBtn.style.opacity = '0';
