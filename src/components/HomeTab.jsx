@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Folder,
   Heart,
@@ -8,13 +8,13 @@ import {
   Pause,
   ArrowRight,
   Music2,
-  Clock,
+  FolderOpen,
   Disc3,
   Layers,
   Sparkles,
-  Headphones,
-  Radio,
-  FolderTree
+  ChevronRight,
+  ChevronDown,
+  Music
 } from 'lucide-react';
 import { CustomIcon } from './DuoIcons';
 
@@ -31,58 +31,57 @@ export default function HomeTab({
   onNavigateToLiked,
   onNavigateToDownloads,
 }) {
-  const formatTime = (secs) => {
-    if (!secs || isNaN(secs)) return '3:20';
-    const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    return m + ':' + (s < 10 ? '0' : '') + s;
+  const [expandedSections, setExpandedSections] = useState({});
+
+  const toggleSection = (sectionName) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [sectionName]: !prev[sectionName],
+    }));
   };
 
-  const getDisplayPath = (filePath) => {
-    if (!filePath) return 'Music';
-    const normalized = filePath.replace(/\\/g, '/');
-    const parts = normalized.split('/');
-    if (parts.length >= 2) {
-      const folder = parts[parts.length - 2];
-      return folder !== 'Music' ? `Music > ${folder}` : 'Music';
-    }
-    return 'Music';
-  };
-
-  const recentTracks = useMemo(() => songs.slice(0, 7), [songs]);
-
-  // Aggregate music categories / sections
-  const musicSections = useMemo(() => {
+  // Group songs into folder / category sections
+  const folderSections = useMemo(() => {
     const map = {};
     songs.forEach((s) => {
-      let g = s.genre;
-      if (!g || g === 'undefined' || g === 'Music') {
+      let folderName = s.folder || s.genre;
+      if (!folderName || folderName === 'undefined' || folderName === 'Music') {
         const parts = (s.filePath || '').split(/[\\/]/);
         if (parts.length >= 2 && parts[parts.length - 2] !== 'Music') {
-          g = parts[parts.length - 2];
+          folderName = parts[parts.length - 2];
         }
       }
-      g = g || 'Pop';
-      if (!map[g]) {
-        map[g] = { name: g, count: 0, sampleTracks: [] };
+      folderName = folderName || 'Other';
+
+      let folderPath = '';
+      if (s.filePath) {
+        const lastSlash = Math.max(s.filePath.lastIndexOf('\\'), s.filePath.lastIndexOf('/'));
+        if (lastSlash !== -1) {
+          folderPath = s.filePath.substring(0, lastSlash);
+        }
       }
-      map[g].count++;
-      if (map[g].sampleTracks.length < 4) {
-        map[g].sampleTracks.push(s);
+      if (!folderPath) {
+        folderPath = `C:\\Users\\nishant\\Music\\${folderName}`;
       }
+
+      if (!map[folderName]) {
+        map[folderName] = {
+          name: folderName,
+          folderPath,
+          tracks: [],
+        };
+      }
+      map[folderName].tracks.push(s);
     });
-    return Object.values(map).sort((a, b) => b.count - a.count);
+
+    return Object.values(map).sort((a, b) => b.tracks.length - a.tracks.length);
   }, [songs]);
 
-  const categoryIcons = [
-    { icon: Sparkles, bg: 'rgba(124, 92, 191, 0.12)', color: '#7c5cbf' },
-    { icon: Headphones, bg: 'rgba(239, 68, 68, 0.12)', color: '#ef4444' },
-    { icon: Disc3, bg: 'rgba(14, 165, 233, 0.12)', color: '#0ea5e9' },
-    { icon: Radio, bg: 'rgba(16, 185, 129, 0.12)', color: '#10b981' },
-    { icon: Layers, bg: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b' },
-    { icon: Music2, bg: 'rgba(168, 85, 247, 0.12)', color: '#a855f7' },
-    { icon: FolderTree, bg: 'rgba(236, 72, 153, 0.12)', color: '#ec4899' },
-  ];
+  const handleOpenFolder = (folderPath) => {
+    if (window.electronAPI?.openInFolder && folderPath) {
+      window.electronAPI.openInFolder(folderPath);
+    }
+  };
 
   return (
     <div
@@ -91,11 +90,11 @@ export default function HomeTab({
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        padding: '28px 36px 40px 36px',
+        padding: '28px 36px 48px 36px',
         backgroundColor: 'var(--bg-main)',
         fontFamily: 'inherit',
         overflowY: 'auto',
-        gap: '28px',
+        gap: '32px',
       }}
     >
       {/* 1. Quick Access Dashboard Cards */}
@@ -324,378 +323,328 @@ export default function HomeTab({
         </div>
       </div>
 
-      {/* 2. Main Tracks Table with Clean Aligned Layout */}
-      {songs.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                Recent Tracks
-              </h2>
-              <span
-                style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  padding: '2px 8px',
-                  borderRadius: '999px',
-                  backgroundColor: 'var(--bg-card)',
-                  color: 'var(--text-muted)',
-                  border: '1px solid var(--border-medium)',
-                }}
-              >
-                {songs.length} indexed
-              </span>
-            </div>
-            {onNavigateToLibrary && (
-              <button
-                onClick={onNavigateToLibrary}
+      {/* 2. Endless Folder / Category Sections with 2-Row Grids & Expandable View All */}
+      {folderSections.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }}>
+          {folderSections.map((sec) => {
+            const isExpanded = !!expandedSections[sec.name];
+            // 2 rows in responsive grid is ~10 cards
+            const visibleTracks = isExpanded ? sec.tracks : sec.tracks.slice(0, 10);
+            const canExpand = sec.tracks.length > 10;
+
+            return (
+              <section
+                key={sec.name}
                 style={{
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--primary)',
-                  fontSize: '12.5px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  padding: 0,
+                  flexDirection: 'column',
+                  gap: '16px',
                 }}
               >
-                <span>View all</span>
-                <ArrowRight size={14} />
-              </button>
-            )}
-          </div>
-
-          <div
-            style={{
-              backgroundColor: 'var(--bg-card)',
-              borderRadius: '12px',
-              border: '1px solid var(--border-medium)',
-              overflow: 'hidden',
-              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.02)',
-            }}
-          >
-            <table
-              className="tracks-table"
-              style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                tableLayout: 'fixed',
-              }}
-            >
-              <thead>
-                <tr
+                {/* Top bar with lining: Music Type, File Location Beside It, View All */}
+                <div
                   style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
                     borderBottom: '1px solid var(--border-medium)',
-                    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+                    paddingBottom: '12px',
+                    gap: '12px',
+                    flexWrap: 'wrap',
                   }}
                 >
-                  <th style={{ width: '44px', textAlign: 'center', padding: '12px 0', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>#</th>
-                  <th style={{ width: '28%', textAlign: 'left', padding: '12px 14px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>TITLE</th>
-                  <th style={{ width: '15%', textAlign: 'left', padding: '12px 12px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>CATEGORY</th>
-                  <th style={{ width: '23%', textAlign: 'left', padding: '12px 12px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>SCANNED PATH</th>
-                  <th style={{ width: '18%', textAlign: 'left', padding: '12px 12px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>ARTIST</th>
-                  <th style={{ width: '65px', textAlign: 'center', padding: '12px 6px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    <Clock size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />
-                  </th>
-                  <th style={{ width: '50px', textAlign: 'center', padding: '12px 8px', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>PLAY</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentTracks.map((track, idx) => {
-                  const isCurrent =
-                    currentTrack &&
-                    (currentTrack.id === track.id || currentTrack.filePath === track.filePath);
-                  const isTrackPlaying = isCurrent && isPlaying;
-                  const art = track.artworkUrl || track.coverArt;
-                  const categoryName = track.genre || track.folder || 'Pop';
-                  const pathDisplay = getDisplayPath(track.filePath);
+                  {/* Left: Music Type & File Location Beside That */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Disc3 size={18} color="var(--primary, #7c5cbf)" style={{ flexShrink: 0 }} />
+                      <h2
+                        style={{
+                          fontSize: '18px',
+                          fontWeight: 700,
+                          color: 'var(--text-primary)',
+                          margin: 0,
+                          letterSpacing: '-0.01em',
+                        }}
+                      >
+                        {sec.name}
+                      </h2>
+                    </div>
 
-                  return (
-                    <tr
-                      key={track.id || track.filePath || idx}
-                      className={isCurrent ? 'playing-row' : ''}
+                    {/* File Location Beside That with folder icon */}
+                    <div
+                      onClick={() => handleOpenFolder(sec.folderPath)}
                       style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        backgroundColor: 'var(--bg-card)',
+                        border: '1px solid var(--border-medium)',
+                        fontSize: '11.5px',
+                        color: 'var(--text-muted)',
                         cursor: 'pointer',
-                        borderBottom: '1px solid var(--border-medium)',
-                        backgroundColor: isCurrent ? 'rgba(124, 92, 191, 0.08)' : 'transparent',
-                        transition: 'background-color 0.12s ease',
+                        maxWidth: '380px',
+                        transition: 'all 0.15s ease',
                       }}
-                      onClick={() => onPlaySong && onPlaySong(track, songs)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--primary)';
+                        e.currentTarget.style.color = 'var(--text-primary)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--border-medium)';
+                        e.currentTarget.style.color = 'var(--text-muted)';
+                      }}
+                      title={`Open folder: ${sec.folderPath}`}
                     >
-                      {/* # Index or Equalizer */}
-                      <td style={{ textAlign: 'center', color: isCurrent ? 'var(--primary)' : 'var(--text-muted)', padding: '10px 0' }}>
-                        {isTrackPlaying ? (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', height: '14px' }}>
-                            <span style={{ width: '3px', height: '14px', backgroundColor: 'var(--primary, #7c5cbf)', borderRadius: '2px', animation: 'bounce 0.8s infinite alternate' }} />
-                            <span style={{ width: '3px', height: '10px', backgroundColor: 'var(--primary, #7c5cbf)', borderRadius: '2px', animation: 'bounce 0.8s infinite alternate 0.2s' }} />
-                            <span style={{ width: '3px', height: '12px', backgroundColor: 'var(--primary, #7c5cbf)', borderRadius: '2px', animation: 'bounce 0.8s infinite alternate 0.4s' }} />
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: '12.5px', fontWeight: 500 }}>{idx + 1}</span>
-                        )}
-                      </td>
+                      <Folder size={12} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          direction: 'rtl',
+                          textAlign: 'left',
+                        }}
+                      >
+                        {sec.folderPath}
+                      </span>
+                    </div>
 
-                      {/* Title + Artwork */}
-                      <td style={{ padding: '10px 14px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-                          <div
+                    <span
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: '999px',
+                        backgroundColor: 'rgba(124, 92, 191, 0.08)',
+                        color: 'var(--primary, #7c5cbf)',
+                        border: '1px solid rgba(124, 92, 191, 0.16)',
+                      }}
+                    >
+                      {sec.tracks.length} {sec.tracks.length === 1 ? 'track' : 'tracks'}
+                    </span>
+                  </div>
+
+                  {/* Right: View All / Show Less Toggle Button */}
+                  {canExpand ? (
+                    <button
+                      onClick={() => toggleSection(sec.name)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--primary, #7c5cbf)',
+                        fontSize: '12.5px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        transition: 'background-color 0.15s ease',
+                      }}
+                    >
+                      <span>{isExpanded ? 'Show less' : `View all (${sec.tracks.length})`}</span>
+                      {isExpanded ? <ChevronDown size={14} /> : <ArrowRight size={14} />}
+                    </button>
+                  ) : onNavigateToLibrary ? (
+                    <button
+                      onClick={onNavigateToLibrary}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        padding: 0,
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                    >
+                      <span>Library</span>
+                      <ArrowRight size={13} />
+                    </button>
+                  ) : null}
+                </div>
+
+                {/* Down: Grid Pattern of Music Cards (2 rows by default, expandable) */}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                    gap: '16px',
+                    width: '100%',
+                  }}
+                >
+                  {visibleTracks.map((track) => {
+                    const isCurrent =
+                      currentTrack &&
+                      (currentTrack.id === track.id || currentTrack.filePath === track.filePath);
+                    const isTrackPlaying = isCurrent && isPlaying;
+                    const art = track.artworkUrl || track.coverArt;
+
+                    return (
+                      <div
+                        key={track.id || track.filePath}
+                        onClick={() => onPlaySong && onPlaySong(track, sec.tracks)}
+                        style={{
+                          backgroundColor: 'var(--bg-card)',
+                          borderRadius: '12px',
+                          border: isCurrent
+                            ? '1px solid var(--primary, #7c5cbf)'
+                            : '1px solid var(--border-medium)',
+                          padding: '12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          cursor: 'pointer',
+                          position: 'relative',
+                          transition: 'all 0.18s ease',
+                          boxShadow: isCurrent
+                            ? '0 4px 14px rgba(124, 92, 191, 0.18)'
+                            : '0 2px 6px rgba(0,0,0,0.02)',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-3px)';
+                          e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.08)';
+                          if (!isCurrent) e.currentTarget.style.borderColor = 'var(--primary)';
+                          const playBtn = e.currentTarget.querySelector('.card-play-btn');
+                          if (playBtn) playBtn.style.opacity = '1';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'none';
+                          e.currentTarget.style.boxShadow = isCurrent
+                            ? '0 4px 14px rgba(124, 92, 191, 0.18)'
+                            : '0 2px 6px rgba(0,0,0,0.02)';
+                          if (!isCurrent) e.currentTarget.style.borderColor = 'var(--border-medium)';
+                          const playBtn = e.currentTarget.querySelector('.card-play-btn');
+                          if (playBtn && !isTrackPlaying) playBtn.style.opacity = '0';
+                        }}
+                        title={`${track.title} • ${track.artist || 'Unknown'}`}
+                      >
+                        {/* Square Album Artwork */}
+                        <div
+                          style={{
+                            width: '100%',
+                            aspectRatio: '1 / 1',
+                            borderRadius: '8px',
+                            backgroundColor: 'var(--bg-main)',
+                            border: '1px solid var(--border-medium)',
+                            overflow: 'hidden',
+                            position: 'relative',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {art ? (
+                            <img
+                              src={art}
+                              alt=""
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          ) : (
+                            <Music size={32} color="var(--primary)" style={{ opacity: 0.6 }} />
+                          )}
+
+                          {/* Hover Play Button on Artwork */}
+                          <button
+                            className="card-play-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onPlaySong && onPlaySong(track, sec.tracks);
+                            }}
                             style={{
-                              width: '38px',
-                              height: '38px',
-                              borderRadius: '8px',
-                              backgroundColor: 'var(--bg-main)',
-                              border: '1px solid var(--border-medium)',
+                              position: 'absolute',
+                              bottom: '8px',
+                              right: '8px',
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              backgroundColor: 'var(--primary, #7c5cbf)',
+                              color: '#ffffff',
+                              border: 'none',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              overflow: 'hidden',
-                              flexShrink: 0,
-                              boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+                              cursor: 'pointer',
+                              boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+                              opacity: isTrackPlaying ? 1 : 0,
+                              transition: 'all 0.15s ease',
+                              zIndex: 2,
                             }}
                           >
-                            {art ? (
-                              <img src={art} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            {isTrackPlaying ? (
+                              <Pause size={16} />
                             ) : (
-                              <CustomIcon size={18} stroke="var(--primary)" />
+                              <Play size={16} style={{ marginLeft: '1px' }} />
                             )}
-                          </div>
-                          <span
-                            style={{
-                              fontWeight: 600,
-                              fontSize: '13px',
-                              color: isCurrent ? 'var(--primary)' : 'var(--text-primary)',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}
-                            title={track.title}
-                          >
-                            {track.title}
-                          </span>
+                          </button>
                         </div>
-                      </td>
 
-                      {/* Category Badge */}
-                      <td style={{ padding: '10px 12px' }}>
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            padding: '3px 9px',
-                            borderRadius: '6px',
-                            fontSize: '11.5px',
-                            fontWeight: 600,
-                            backgroundColor: 'rgba(124, 92, 191, 0.08)',
-                            color: 'var(--primary, #7c5cbf)',
-                            border: '1px solid rgba(124, 92, 191, 0.16)',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            maxWidth: '100%',
-                          }}
-                          title={categoryName}
-                        >
-                          {categoryName}
-                        </span>
-                      </td>
-
-                      {/* Scanned Folder Path */}
-                      <td style={{ padding: '10px 12px' }}>
+                        {/* Title */}
                         <div
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
+                            fontSize: '13.5px',
+                            fontWeight: 600,
+                            color: isCurrent ? 'var(--primary)' : 'var(--text-primary)',
+                            marginTop: '10px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {track.title}
+                        </div>
+
+                        {/* Artist */}
+                        <div
+                          style={{
                             fontSize: '12px',
                             color: 'var(--text-secondary)',
+                            marginTop: '3px',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                           }}
-                          title={track.filePath || pathDisplay}
-                        >
-                          <Folder size={13} style={{ flexShrink: 0, opacity: 0.65, color: 'var(--primary)' }} />
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {pathDisplay}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Artist */}
-                      <td style={{ padding: '10px 12px' }}>
-                        <span
-                          style={{
-                            color: 'var(--text-secondary)',
-                            fontSize: '12.5px',
-                            fontWeight: 500,
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            display: 'block',
-                          }}
-                          title={track.artist || 'Unknown Artist'}
                         >
                           {track.artist || 'Unknown Artist'}
-                        </span>
-                      </td>
-
-                      {/* Duration */}
-                      <td style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px', padding: '10px 6px' }}>
-                        {formatTime(track.durationSeconds || track.duration)}
-                      </td>
-
-                      {/* Play Action */}
-                      <td style={{ textAlign: 'center', padding: '10px 8px' }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onPlaySong && onPlaySong(track, songs);
-                          }}
-                          style={{
-                            background: isCurrent ? 'var(--primary, #7c5cbf)' : 'transparent',
-                            color: isCurrent ? '#ffffff' : 'var(--text-muted)',
-                            border: 'none',
-                            borderRadius: '50%',
-                            width: '28px',
-                            height: '28px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
-                          title={isTrackPlaying ? 'Pause' : 'Play'}
-                        >
-                          {isTrackPlaying ? <Pause size={14} /> : <Play size={14} style={{ marginLeft: '1px' }} />}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : null}
-
-      {/* 3. Bottom "Music Sections & Categories" Shelf with spacing */}
-      {musicSections.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Layers size={18} color="var(--primary, #7c5cbf)" />
-              <h2 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                Music Sections & Categories
-              </h2>
-            </div>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
-              {musicSections.length} Sections Available
-            </span>
-          </div>
-
-          {/* Bracket / Spaced Shelf of Category Cards (Matching user layout) */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-              gap: '14px',
-              width: '100%',
-            }}
-          >
-            {musicSections.slice(0, 10).map((sec, idx) => {
-              const iconMeta = categoryIcons[idx % categoryIcons.length];
-              const IconComp = iconMeta.icon;
-              const firstTrack = sec.sampleTracks[0];
-
-              return (
-                <div
-                  key={sec.name}
-                  onClick={() => {
-                    if (firstTrack && onPlaySong) {
-                      onPlaySong(firstTrack, songs);
-                    } else if (onNavigateToLibrary) {
-                      onNavigateToLibrary();
-                    }
-                  }}
-                  style={{
-                    backgroundColor: 'var(--bg-card)',
-                    borderRadius: '12px',
-                    padding: '16px 14px',
-                    border: '1px solid var(--border-medium)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    gap: '12px',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
-                    transition: 'all 0.18s ease',
-                    position: 'relative',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
-                    e.currentTarget.style.borderColor = 'var(--primary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'none';
-                    e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.02)';
-                    e.currentTarget.style.borderColor = 'var(--border-medium)';
-                  }}
-                  title={`Play ${sec.name} (${sec.count} tracks)`}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div
-                      style={{
-                        width: '36px',
-                        height: '36px',
-                        borderRadius: '9px',
-                        backgroundColor: iconMeta.bg,
-                        color: iconMeta.color,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <IconComp size={18} />
-                    </div>
-                    <div
-                      style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        backgroundColor: 'var(--bg-main)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'var(--text-muted)',
-                      }}
-                    >
-                      <Play size={10} style={{ marginLeft: '1px' }} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div
-                      style={{
-                        fontSize: '13.5px',
-                        fontWeight: 700,
-                        color: 'var(--text-primary)',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      {sec.name}
-                    </div>
-                    <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      {sec.count} {sec.count === 1 ? 'track' : 'tracks'}
-                    </div>
-                  </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </section>
+            );
+          })}
+        </div>
+      ) : (
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '260px',
+            padding: '40px 20px',
+            backgroundColor: 'var(--bg-card)',
+            borderRadius: '16px',
+            border: '1px solid var(--border-medium)',
+            textAlign: 'center',
+            gap: '12px',
+          }}
+        >
+          <Music2 size={44} color="var(--primary)" style={{ opacity: 0.8 }} />
+          <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
+            No tracks found in library
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '360px' }}>
+            Scan your music folder from the Library tab or download tracks using extension URLs.
           </div>
         </div>
       )}
