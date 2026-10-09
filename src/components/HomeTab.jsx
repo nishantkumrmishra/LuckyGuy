@@ -32,17 +32,16 @@ export default function HomeTab({
   onNavigateToDownloads,
 }) {
   const [expandedSections, setExpandedSections] = useState({});
-  const containerRef = useRef(null);
+  const albumsAreaRef = useRef(null);
 
   // Spring-back peek slider states (centered vertically at rest)
-  const [thumbOffset, setThumbOffset] = useState(0); // Offset in px relative to center (0 = center)
+  const [thumbOffset, setThumbOffset] = useState(0); // Offset in px relative to center
   const [isDragging, setIsDragging] = useState(false);
   const [isSnapping, setIsSnapping] = useState(false);
   const [isHoveringTrack, setIsHoveringTrack] = useState(false);
 
   const dragStartY = useRef(0);
   const dragStartScrollTop = useRef(0);
-  const trackRef = useRef(null);
 
   const toggleSection = (sectionName) => {
     setExpandedSections((prev) => ({
@@ -94,39 +93,39 @@ export default function HomeTab({
     }
   };
 
-  // Handle Dragging of the Center Slider Pill
+  // Handle Dragging of the Center Slider Pill (Only scrolls the albums area!)
   const handleThumbMouseDown = (e) => {
     e.preventDefault();
     setIsDragging(true);
     setIsSnapping(false);
     dragStartY.current = e.clientY;
-    dragStartScrollTop.current = containerRef.current ? containerRef.current.scrollTop : 0;
+    dragStartScrollTop.current = albumsAreaRef.current ? albumsAreaRef.current.scrollTop : 0;
   };
 
   useEffect(() => {
     if (!isDragging) return;
 
     const handleMouseMove = (e) => {
-      if (!containerRef.current) return;
+      if (!albumsAreaRef.current) return;
       const deltaY = e.clientY - dragStartY.current;
-      const { scrollHeight, clientHeight } = containerRef.current;
+      const { scrollHeight, clientHeight } = albumsAreaRef.current;
       const maxScroll = scrollHeight - clientHeight;
 
       if (maxScroll <= 0) return;
 
-      // Move the page smoothly as user drags down or up
-      const scrollSpeedMultiplier = 2.4; // Responsive scrolling feel
+      // Move ONLY the albums area smoothly as user drags down or up
+      const scrollSpeedMultiplier = 2.4;
       const newScrollTop = Math.max(0, Math.min(dragStartScrollTop.current + deltaY * scrollSpeedMultiplier, maxScroll));
-      containerRef.current.scrollTop = newScrollTop;
+      albumsAreaRef.current.scrollTop = newScrollTop;
 
-      // Allow pill to move up or down from the center with subtle boundary clamp (+/- 140px)
-      const clampedOffset = Math.max(-140, Math.min(140, deltaY * 0.7));
+      // Allow pill to move up or down from center with subtle clamp (+/- 120px)
+      const clampedOffset = Math.max(-120, Math.min(120, deltaY * 0.7));
       setThumbOffset(clampedOffset);
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
-      // Spring back: the scroll bar jumps/springs back to center, while the page stays right where it was scrolled
+      // Spring back: scrollbar jumps/springs back to center, but albums area stays at current position
       setIsSnapping(true);
       setThumbOffset(0);
       setTimeout(() => {
@@ -144,648 +143,662 @@ export default function HomeTab({
 
   return (
     <div
+      className="content-area fade-in"
       style={{
-        position: 'relative',
         flex: 1,
         display: 'flex',
-        minHeight: 0,
+        flexDirection: 'column',
+        padding: '28px 36px 20px 36px',
+        backgroundColor: 'var(--bg-main)',
+        fontFamily: 'inherit',
+        overflow: 'hidden', // Root stays fixed so top cards remain pinned
+        gap: '24px',
         height: '100%',
-        overflow: 'hidden',
+        minHeight: 0,
       }}
     >
-      {/* Scrollable Content Container */}
+      {/* 1. Quick Access Dashboard Cards (Pinned at Top, Not Moved by Slider) */}
       <div
-        ref={containerRef}
-        className="content-area fade-in"
         style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          padding: '28px 48px 48px 36px',
-          backgroundColor: 'var(--bg-main)',
-          fontFamily: 'inherit',
-          overflowY: 'auto',
-          gap: '32px',
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: '16px',
+          width: '100%',
+          flexShrink: 0,
         }}
       >
-        {/* 1. Quick Access Dashboard Cards */}
+        {/* Card 1: Music Library */}
         <div
+          onClick={onNavigateToLibrary}
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            backgroundColor: 'var(--bg-card)',
+            borderRadius: '14px',
+            padding: '18px 20px',
+            border: '1px solid var(--border-medium)',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
             gap: '16px',
-            width: '100%',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+            transition: 'all 0.18s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
+            e.currentTarget.style.borderColor = 'var(--primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'none';
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)';
+            e.currentTarget.style.borderColor = 'var(--border-medium)';
           }}
         >
-          {/* Card 1: Music Library */}
-          <div
-            onClick={onNavigateToLibrary}
-            style={{
-              backgroundColor: 'var(--bg-card)',
-              borderRadius: '14px',
-              padding: '18px 20px',
-              border: '1px solid var(--border-medium)',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              gap: '16px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-              transition: 'all 0.18s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
-              e.currentTarget.style.borderColor = 'var(--primary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'none';
-              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)';
-              e.currentTarget.style.borderColor = 'var(--border-medium)';
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '10px',
-                  backgroundColor: 'rgba(124, 92, 191, 0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--primary)',
-                }}
-              >
-                <Folder size={18} />
-              </div>
-              <ArrowRight size={15} color="var(--text-muted)" />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(124, 92, 191, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--primary)',
+              }}
+            >
+              <Folder size={18} />
             </div>
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                Music Library
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                {songs.length} tracks available
-              </div>
-            </div>
+            <ArrowRight size={15} color="var(--text-muted)" />
           </div>
-
-          {/* Card 2: Liked Songs */}
-          <div
-            onClick={onNavigateToLiked}
-            style={{
-              backgroundColor: 'var(--bg-card)',
-              borderRadius: '14px',
-              padding: '18px 20px',
-              border: '1px solid var(--border-medium)',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              gap: '16px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-              transition: 'all 0.18s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
-              e.currentTarget.style.borderColor = 'var(--primary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'none';
-              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)';
-              e.currentTarget.style.borderColor = 'var(--border-medium)';
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '10px',
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#ef4444',
-                }}
-              >
-                <Heart size={18} fill="#ef4444" />
-              </div>
-              <ArrowRight size={15} color="var(--text-muted)" />
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Music Library
             </div>
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                Liked Songs
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                {likedTracks.length} {likedTracks.length === 1 ? 'favorite track' : 'favorite tracks'}
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: Playlists */}
-          <div
-            onClick={onNavigateToPlaylists}
-            style={{
-              backgroundColor: 'var(--bg-card)',
-              borderRadius: '14px',
-              padding: '18px 20px',
-              border: '1px solid var(--border-medium)',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              gap: '16px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-              transition: 'all 0.18s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
-              e.currentTarget.style.borderColor = 'var(--primary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'none';
-              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)';
-              e.currentTarget.style.borderColor = 'var(--border-medium)';
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '10px',
-                  backgroundColor: 'rgba(14, 165, 233, 0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#0ea5e9',
-                }}
-              >
-                <ListMusic size={18} />
-              </div>
-              <ArrowRight size={15} color="var(--text-muted)" />
-            </div>
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                Playlists
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                {playlists.length} {playlists.length === 1 ? 'playlist' : 'playlists'}
-              </div>
-            </div>
-          </div>
-
-          {/* Card 4: Downloads */}
-          <div
-            onClick={onNavigateToDownloads}
-            style={{
-              backgroundColor: 'var(--bg-card)',
-              borderRadius: '14px',
-              padding: '18px 20px',
-              border: '1px solid var(--border-medium)',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              gap: '16px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-              transition: 'all 0.18s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
-              e.currentTarget.style.borderColor = 'var(--primary)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'none';
-              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)';
-              e.currentTarget.style.borderColor = 'var(--border-medium)';
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div
-                style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '10px',
-                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#10b981',
-                }}
-              >
-                <ArrowDownToLine size={18} />
-              </div>
-              <ArrowRight size={15} color="var(--text-muted)" />
-            </div>
-            <div>
-              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                Downloads
-              </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Extension & URL Streamer
-              </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+              {songs.length} tracks available
             </div>
           </div>
         </div>
 
-        {/* 2. Endless Folder / Category Sections with 1-Row Grid & Expandable View All */}
-        {folderSections.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }}>
-            {folderSections.map((sec) => {
-              const isExpanded = !!expandedSections[sec.name];
-              const visibleTracks = isExpanded ? sec.tracks : sec.tracks.slice(0, 20);
-              const canExpand = sec.tracks.length > 20;
+        {/* Card 2: Liked Songs */}
+        <div
+          onClick={onNavigateToLiked}
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            borderRadius: '14px',
+            padding: '18px 20px',
+            border: '1px solid var(--border-medium)',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: '16px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+            transition: 'all 0.18s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
+            e.currentTarget.style.borderColor = 'var(--primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'none';
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)';
+            e.currentTarget.style.borderColor = 'var(--border-medium)';
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ef4444',
+              }}
+            >
+              <Heart size={18} fill="#ef4444" />
+            </div>
+            <ArrowRight size={15} color="var(--text-muted)" />
+          </div>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Liked Songs
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+              {likedTracks.length} {likedTracks.length === 1 ? 'favorite track' : 'favorite tracks'}
+            </div>
+          </div>
+        </div>
 
-              return (
-                <section
-                  key={sec.name}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px',
-                  }}
-                >
-                  {/* Top bar with lining: Music Type, File Location Beside It, View All */}
-                  <div
+        {/* Card 3: Playlists */}
+        <div
+          onClick={onNavigateToPlaylists}
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            borderRadius: '14px',
+            padding: '18px 20px',
+            border: '1px solid var(--border-medium)',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: '16px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+            transition: 'all 0.18s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
+            e.currentTarget.style.borderColor = 'var(--primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'none';
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)';
+            e.currentTarget.style.borderColor = 'var(--border-medium)';
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#0ea5e9',
+              }}
+            >
+              <ListMusic size={18} />
+            </div>
+            <ArrowRight size={15} color="var(--text-muted)" />
+          </div>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Playlists
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+              {playlists.length} {playlists.length === 1 ? 'playlist' : 'playlists'}
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Downloads */}
+        <div
+          onClick={onNavigateToDownloads}
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            borderRadius: '14px',
+            padding: '18px 20px',
+            border: '1px solid var(--border-medium)',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: '16px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
+            transition: 'all 0.18s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.06)';
+            e.currentTarget.style.borderColor = 'var(--primary)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'none';
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)';
+            e.currentTarget.style.borderColor = 'var(--border-medium)';
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#10b981',
+              }}
+            >
+              <ArrowDownToLine size={18} />
+            </div>
+            <ArrowRight size={15} color="var(--text-muted)" />
+          </div>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Downloads
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+              Extension & URL Streamer
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Isolated Music & Albums Section with its own dedicated Right-Side Center Slider */}
+      <div
+        style={{
+          position: 'relative',
+          flex: 1,
+          display: 'flex',
+          minHeight: 0,
+          overflow: 'hidden',
+          width: '100%',
+        }}
+      >
+        {/* Scrollable Albums Container */}
+        <div
+          ref={albumsAreaRef}
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            paddingRight: '24px',
+            paddingBottom: '32px',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {folderSections.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '36px' }}>
+              {folderSections.map((sec) => {
+                const isExpanded = !!expandedSections[sec.name];
+                const visibleTracks = isExpanded ? sec.tracks : sec.tracks.slice(0, 20);
+                const canExpand = sec.tracks.length > 20;
+
+                return (
+                  <section
+                    key={sec.name}
                     style={{
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      borderBottom: '1px solid var(--border-medium)',
-                      paddingBottom: '12px',
-                      gap: '12px',
-                      flexWrap: 'wrap',
+                      flexDirection: 'column',
+                      gap: '16px',
                     }}
                   >
-                    {/* Left: Music Type & Plain Text File Location (Click opens File Explorer) */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Disc3 size={18} color="var(--primary, #7c5cbf)" style={{ flexShrink: 0 }} />
-                        <h2
-                          style={{
-                            fontSize: '18px',
-                            fontWeight: 700,
-                            color: 'var(--text-primary)',
-                            margin: 0,
-                            letterSpacing: '-0.01em',
-                          }}
-                        >
-                          {sec.name}
-                        </h2>
-                      </div>
-
-                      {/* Plain Text File Location without unnecessary boxes */}
-                      <span
-                        onClick={() => handleOpenFolder(sec.folderPath)}
-                        style={{
-                          fontSize: '12.5px',
-                          color: 'var(--text-muted)',
-                          cursor: 'pointer',
-                          transition: 'color 0.15s ease',
-                          textDecoration: 'none',
-                          maxWidth: '500px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.color = 'var(--primary, #7c5cbf)';
-                          e.currentTarget.style.textDecoration = 'underline';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color = 'var(--text-muted)';
-                          e.currentTarget.style.textDecoration = 'none';
-                        }}
-                        title={`Open folder in File Explorer: ${sec.folderPath}`}
-                      >
-                        {sec.folderPath}
-                      </span>
-                    </div>
-
-                    {/* Right: View All / Show Less Toggle Button */}
-                    {canExpand ? (
-                      <button
-                        onClick={() => toggleSection(sec.name)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--primary, #7c5cbf)',
-                          fontSize: '12.5px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          transition: 'background-color 0.15s ease',
-                        }}
-                      >
-                        <span>{isExpanded ? 'Show less' : `View all (${sec.tracks.length})`}</span>
-                        {isExpanded ? <ChevronDown size={14} /> : <ArrowRight size={14} />}
-                      </button>
-                    ) : onNavigateToLibrary ? (
-                      <button
-                        onClick={onNavigateToLibrary}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          background: 'none',
-                          border: 'none',
-                          color: 'var(--text-muted)',
-                          fontSize: '12px',
-                          fontWeight: 500,
-                          cursor: 'pointer',
-                          padding: 0,
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary)')}
-                        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
-                      >
-                        <span>Library</span>
-                        <ArrowRight size={13} />
-                      </button>
-                    ) : null}
-                  </div>
-
-                  {/* Down: Horizontally scrollable 1-row shelf or full grid when expanded */}
-                  <div
-                    className="shelf-row-container"
-                    onWheel={(e) => {
-                      if (!isExpanded && e.deltaY !== 0) {
-                        e.currentTarget.scrollLeft += e.deltaY;
-                      }
-                    }}
-                    style={
-                      isExpanded
-                        ? {
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-                            gap: '16px',
-                            width: '100%',
-                          }
-                        : {
-                            display: 'flex',
-                            flexDirection: 'row',
-                            gap: '16px',
-                            width: '100%',
-                            overflowX: 'auto',
-                            overflowY: 'hidden',
-                            paddingBottom: '4px',
-                            scrollbarWidth: 'none',
-                            msOverflowStyle: 'none',
-                          }
-                    }
-                  >
-                    {visibleTracks.map((track) => {
-                      const isCurrent =
-                        currentTrack &&
-                        (currentTrack.id === track.id || currentTrack.filePath === track.filePath);
-                      const isTrackPlaying = isCurrent && isPlaying;
-                      const art = track.artworkUrl || track.coverArt;
-
-                      return (
-                        <div
-                          key={track.id || track.filePath}
-                          onClick={() => onPlaySong && onPlaySong(track, sec.tracks)}
-                          style={{
-                            backgroundColor: 'var(--bg-card)',
-                            borderRadius: '12px',
-                            border: isCurrent
-                              ? '1px solid var(--primary, #7c5cbf)'
-                              : '1px solid var(--border-medium)',
-                            padding: '12px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            cursor: 'pointer',
-                            position: 'relative',
-                            transition: 'all 0.18s ease',
-                            flex: isExpanded ? 'none' : '0 0 160px',
-                            width: isExpanded ? 'auto' : '160px',
-                            boxShadow: isCurrent
-                              ? '0 4px 14px rgba(124, 92, 191, 0.18)'
-                              : '0 2px 6px rgba(0,0,0,0.02)',
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isCurrent) e.currentTarget.style.borderColor = 'var(--text-muted)';
-                            const playBtn = e.currentTarget.querySelector('.card-play-btn');
-                            if (playBtn) playBtn.style.opacity = '1';
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isCurrent) e.currentTarget.style.borderColor = 'var(--border-medium)';
-                            const playBtn = e.currentTarget.querySelector('.card-play-btn');
-                            if (playBtn && !isTrackPlaying) playBtn.style.opacity = '0';
-                          }}
-                          title={`${track.title} • ${track.artist || 'Unknown'}`}
-                        >
-                          {/* Square Album Artwork */}
-                          <div
+                    {/* Top bar with lining: Music Type, File Location Beside It, View All */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        borderBottom: '1px solid var(--border-medium)',
+                        paddingBottom: '12px',
+                        gap: '12px',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      {/* Left: Music Type & Plain Text File Location (Click opens File Explorer) */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Disc3 size={18} color="var(--primary, #7c5cbf)" style={{ flexShrink: 0 }} />
+                          <h2
                             style={{
-                              width: '100%',
-                              aspectRatio: '1 / 1',
-                              borderRadius: '8px',
-                              backgroundColor: 'var(--bg-main)',
-                              border: '1px solid var(--border-medium)',
-                              overflow: 'hidden',
-                              position: 'relative',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
+                              fontSize: '18px',
+                              fontWeight: 700,
+                              color: 'var(--text-primary)',
+                              margin: 0,
+                              letterSpacing: '-0.01em',
                             }}
                           >
-                            {art ? (
-                              <img
-                                src={art}
-                                alt=""
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                              />
-                            ) : (
-                              <Music size={32} color="var(--primary)" style={{ opacity: 0.6 }} />
-                            )}
+                            {sec.name}
+                          </h2>
+                        </div>
 
-                            {/* Hover Play Button on Artwork */}
-                            <button
-                              className="card-play-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onPlaySong && onPlaySong(track, sec.tracks);
-                              }}
+                        {/* Plain Text File Location */}
+                        <span
+                          onClick={() => handleOpenFolder(sec.folderPath)}
+                          style={{
+                            fontSize: '12.5px',
+                            color: 'var(--text-muted)',
+                            cursor: 'pointer',
+                            transition: 'color 0.15s ease',
+                            textDecoration: 'none',
+                            maxWidth: '500px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = 'var(--primary, #7c5cbf)';
+                            e.currentTarget.style.textDecoration = 'underline';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = 'var(--text-muted)';
+                            e.currentTarget.style.textDecoration = 'none';
+                          }}
+                          title={`Open folder in File Explorer: ${sec.folderPath}`}
+                        >
+                          {sec.folderPath}
+                        </span>
+                      </div>
+
+                      {/* Right: View All / Show Less Toggle Button */}
+                      {canExpand ? (
+                        <button
+                          onClick={() => toggleSection(sec.name)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--primary, #7c5cbf)',
+                            fontSize: '12.5px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            transition: 'background-color 0.15s ease',
+                          }}
+                        >
+                          <span>{isExpanded ? 'Show less' : `View all (${sec.tracks.length})`}</span>
+                          {isExpanded ? <ChevronDown size={14} /> : <ArrowRight size={14} />}
+                        </button>
+                      ) : onNavigateToLibrary ? (
+                        <button
+                          onClick={onNavigateToLibrary}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-muted)',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            padding: 0,
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--primary)')}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-muted)')}
+                        >
+                          <span>Library</span>
+                          <ArrowRight size={13} />
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {/* Down: Horizontally scrollable 1-row shelf or full grid when expanded */}
+                    <div
+                      className="shelf-row-container"
+                      onWheel={(e) => {
+                        if (!isExpanded && e.deltaY !== 0) {
+                          e.currentTarget.scrollLeft += e.deltaY;
+                        }
+                      }}
+                      style={
+                        isExpanded
+                          ? {
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                              gap: '16px',
+                              width: '100%',
+                            }
+                          : {
+                              display: 'flex',
+                              flexDirection: 'row',
+                              gap: '16px',
+                              width: '100%',
+                              overflowX: 'auto',
+                              overflowY: 'hidden',
+                              paddingBottom: '4px',
+                              scrollbarWidth: 'none',
+                              msOverflowStyle: 'none',
+                            }
+                      }
+                    >
+                      {visibleTracks.map((track) => {
+                        const isCurrent =
+                          currentTrack &&
+                          (currentTrack.id === track.id || currentTrack.filePath === track.filePath);
+                        const isTrackPlaying = isCurrent && isPlaying;
+                        const art = track.artworkUrl || track.coverArt;
+
+                        return (
+                          <div
+                            key={track.id || track.filePath}
+                            onClick={() => onPlaySong && onPlaySong(track, sec.tracks)}
+                            style={{
+                              backgroundColor: 'var(--bg-card)',
+                              borderRadius: '12px',
+                              border: isCurrent
+                                ? '1px solid var(--primary, #7c5cbf)'
+                                : '1px solid var(--border-medium)',
+                              padding: '12px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              cursor: 'pointer',
+                              position: 'relative',
+                              transition: 'all 0.18s ease',
+                              flex: isExpanded ? 'none' : '0 0 160px',
+                              width: isExpanded ? 'auto' : '160px',
+                              boxShadow: isCurrent
+                                ? '0 4px 14px rgba(124, 92, 191, 0.18)'
+                                : '0 2px 6px rgba(0,0,0,0.02)',
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isCurrent) e.currentTarget.style.borderColor = 'var(--text-muted)';
+                              const playBtn = e.currentTarget.querySelector('.card-play-btn');
+                              if (playBtn) playBtn.style.opacity = '1';
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isCurrent) e.currentTarget.style.borderColor = 'var(--border-medium)';
+                              const playBtn = e.currentTarget.querySelector('.card-play-btn');
+                              if (playBtn && !isTrackPlaying) playBtn.style.opacity = '0';
+                            }}
+                            title={`${track.title} • ${track.artist || 'Unknown'}`}
+                          >
+                            {/* Square Album Artwork */}
+                            <div
                               style={{
-                                position: 'absolute',
-                                bottom: '8px',
-                                right: '8px',
-                                width: '36px',
-                                height: '36px',
-                                borderRadius: '50%',
-                                backgroundColor: 'var(--primary, #7c5cbf)',
-                                color: '#ffffff',
-                                border: 'none',
+                                width: '100%',
+                                aspectRatio: '1 / 1',
+                                borderRadius: '8px',
+                                backgroundColor: 'var(--bg-main)',
+                                border: '1px solid var(--border-medium)',
+                                overflow: 'hidden',
+                                position: 'relative',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                cursor: 'pointer',
-                                boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
-                                opacity: isTrackPlaying ? 1 : 0,
-                                transition: 'all 0.15s ease',
-                                zIndex: 2,
                               }}
                             >
-                              {isTrackPlaying ? (
-                                <Pause size={16} />
+                              {art ? (
+                                <img
+                                  src={art}
+                                  alt=""
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
                               ) : (
-                                <Play size={16} style={{ marginLeft: '1px' }} />
+                                <Music size={32} color="var(--primary)" style={{ opacity: 0.6 }} />
                               )}
-                            </button>
-                          </div>
 
-                          {/* Title */}
-                          <div
-                            style={{
-                              fontSize: '13.5px',
-                              fontWeight: 600,
-                              color: isCurrent ? 'var(--primary)' : 'var(--text-primary)',
-                              marginTop: '10px',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}
-                          >
-                            {track.title}
-                          </div>
+                              {/* Hover Play Button on Artwork */}
+                              <button
+                                className="card-play-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onPlaySong && onPlaySong(track, sec.tracks);
+                                }}
+                                style={{
+                                  position: 'absolute',
+                                  bottom: '8px',
+                                  right: '8px',
+                                  width: '36px',
+                                  height: '36px',
+                                  borderRadius: '50%',
+                                  backgroundColor: 'var(--primary, #7c5cbf)',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+                                  opacity: isTrackPlaying ? 1 : 0,
+                                  transition: 'all 0.15s ease',
+                                  zIndex: 2,
+                                }}
+                              >
+                                {isTrackPlaying ? (
+                                  <Pause size={16} />
+                                ) : (
+                                  <Play size={16} style={{ marginLeft: '1px' }} />
+                                )}
+                              </button>
+                            </div>
 
-                          {/* Artist */}
-                          <div
-                            style={{
-                              fontSize: '12px',
-                              color: 'var(--text-secondary)',
-                              marginTop: '3px',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}
-                          >
-                            {track.artist || 'Unknown Artist'}
+                            {/* Title */}
+                            <div
+                              style={{
+                                fontSize: '13.5px',
+                                fontWeight: 600,
+                                color: isCurrent ? 'var(--primary)' : 'var(--text-primary)',
+                                marginTop: '10px',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {track.title}
+                            </div>
+
+                            {/* Artist */}
+                            <div
+                              style={{
+                                fontSize: '12px',
+                                color: 'var(--text-secondary)',
+                                marginTop: '3px',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                              }}
+                            >
+                              {track.artist || 'Unknown Artist'}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
-        ) : (
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          ) : (
+            <div
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '260px',
+                padding: '40px 20px',
+                backgroundColor: 'var(--bg-card)',
+                borderRadius: '16px',
+                border: '1px solid var(--border-medium)',
+                textAlign: 'center',
+                gap: '12px',
+              }}
+            >
+              <Music2 size={44} color="var(--primary)" style={{ opacity: 0.8 }} />
+              <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                No tracks found in library
+              </div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '360px' }}>
+                Scan your music folder from the Library tab or download tracks using extension URLs.
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Center-Positioned Spring-Back Slider Pill (Only Controls Albums Section) */}
+        <div
+          onMouseEnter={() => setIsHoveringTrack(true)}
+          onMouseLeave={() => setIsHoveringTrack(false)}
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: '20px',
+            right: 0,
+            width: '16px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 50,
+            pointerEvents: 'auto',
+          }}
+        >
+          {/* Subtle Vertical Guide Track Line */}
           <div
             style={{
-              flex: 1,
+              position: 'absolute',
+              top: '10px',
+              bottom: '10px',
+              width: '3px',
+              borderRadius: '2px',
+              backgroundColor: isDragging || isHoveringTrack ? 'rgba(124, 92, 191, 0.25)' : 'rgba(0, 0, 0, 0.05)',
+              transition: 'background-color 0.2s ease',
+            }}
+          />
+
+          {/* Custom SVG Center Pill Slider */}
+          <div
+            onMouseDown={handleThumbMouseDown}
+            style={{
+              position: 'relative',
+              transform: `translateY(${thumbOffset}px)`,
+              width: isDragging || isHoveringTrack ? '13px' : '9px',
+              height: '68px',
+              borderRadius: '7px',
+              backgroundColor: isDragging
+                ? 'var(--primary, #7c5cbf)'
+                : isHoveringTrack
+                ? 'rgba(124, 92, 191, 0.85)'
+                : 'rgba(124, 92, 191, 0.55)',
+              boxShadow: isDragging
+                ? '0 6px 16px rgba(124, 92, 191, 0.45)'
+                : '0 2px 8px rgba(0,0,0,0.12)',
+              cursor: isDragging ? 'grabbing' : 'grab',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              minHeight: '260px',
-              padding: '40px 20px',
-              backgroundColor: 'var(--bg-card)',
-              borderRadius: '16px',
-              border: '1px solid var(--border-medium)',
-              textAlign: 'center',
-              gap: '12px',
+              transition: isSnapping
+                ? 'transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.15s ease, background-color 0.2s ease'
+                : 'width 0.15s ease, background-color 0.2s ease',
+              zIndex: 51,
             }}
+            title="Drag up or down to scroll album shelves, springs back to center on release"
           >
-            <Music2 size={44} color="var(--primary)" style={{ opacity: 0.8 }} />
-            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              No tracks found in library
-            </div>
-            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '360px' }}>
-              Scan your music folder from the Library tab or download tracks using extension URLs.
-            </div>
+            {/* Custom SVG Gripper Icon */}
+            <svg
+              width="8"
+              height="20"
+              viewBox="0 0 8 20"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              style={{
+                opacity: isDragging || isHoveringTrack ? 0.95 : 0.7,
+                transition: 'opacity 0.2s ease',
+              }}
+            >
+              <circle cx="4" cy="3.5" r="1.3" fill="#ffffff" />
+              <circle cx="4" cy="10" r="1.3" fill="#ffffff" />
+              <circle cx="4" cy="16.5" r="1.3" fill="#ffffff" />
+            </svg>
           </div>
-        )}
-      </div>
-
-      {/* 3. Center-Positioned Spring-Back Slider Pill (Stays in Middle, Page Scrolls, Spring Jumps Back on Release) */}
-      <div
-        ref={trackRef}
-        onMouseEnter={() => setIsHoveringTrack(true)}
-        onMouseLeave={() => setIsHoveringTrack(false)}
-        style={{
-          position: 'absolute',
-          top: '20px',
-          bottom: '20px',
-          right: '8px',
-          width: '16px',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 50,
-          pointerEvents: 'auto',
-        }}
-      >
-        {/* Subtle Vertical Guide Track Line */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            bottom: 0,
-            width: '3px',
-            borderRadius: '2px',
-            backgroundColor: isDragging || isHoveringTrack ? 'rgba(124, 92, 191, 0.25)' : 'rgba(0, 0, 0, 0.05)',
-            transition: 'background-color 0.2s ease',
-          }}
-        />
-
-        {/* Custom SVG Center Pill Slider */}
-        <div
-          onMouseDown={handleThumbMouseDown}
-          style={{
-            position: 'relative',
-            transform: `translateY(${thumbOffset}px)`,
-            width: isDragging || isHoveringTrack ? '13px' : '9px',
-            height: '68px',
-            borderRadius: '7px',
-            backgroundColor: isDragging
-              ? 'var(--primary, #7c5cbf)'
-              : isHoveringTrack
-              ? 'rgba(124, 92, 191, 0.85)'
-              : 'rgba(124, 92, 191, 0.55)',
-            boxShadow: isDragging
-              ? '0 6px 16px rgba(124, 92, 191, 0.45)'
-              : '0 2px 8px rgba(0,0,0,0.12)',
-            cursor: isDragging ? 'grabbing' : 'grab',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: isSnapping
-              ? 'transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.15s ease, background-color 0.2s ease'
-              : 'width 0.15s ease, background-color 0.2s ease',
-            zIndex: 51,
-          }}
-          title="Drag up or down to scroll albums, springs back to center on release"
-        >
-          {/* Custom SVG Gripper Icon */}
-          <svg
-            width="8"
-            height="20"
-            viewBox="0 0 8 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            style={{
-              opacity: isDragging || isHoveringTrack ? 0.95 : 0.7,
-              transition: 'opacity 0.2s ease',
-            }}
-          >
-            <circle cx="4" cy="3.5" r="1.3" fill="#ffffff" />
-            <circle cx="4" cy="10" r="1.3" fill="#ffffff" />
-            <circle cx="4" cy="16.5" r="1.3" fill="#ffffff" />
-          </svg>
         </div>
       </div>
     </div>
