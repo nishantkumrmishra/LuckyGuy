@@ -419,80 +419,89 @@ export default function App() {
 
     const musicDir = preferences?.downloadFolder || 'C:\\Users\\nishant\\Music';
 
-    // Handle Multi-track entities (Playlist / Album batch) with duplicate skip
+    // Handle Multi-track entities (Playlist / Album batch)
     if (resolvedTrack.tracks && Array.isArray(resolvedTrack.tracks) && resolvedTrack.tracks.length > 0) {
+      const tasksToQueue = [];
       for (const t of resolvedTrack.tracks) {
         const itemTitle = t.title || 'Track';
         const itemArtist = t.artist || resolvedTrack.artist || 'Unknown Artist';
         const itemCover = t.coverUrl || resolvedTrack.artworkUrl || '';
 
-        // Check if already downloaded on device
-        let isAlreadyOnDevice = false;
-        if (window.electronAPI?.checkAlreadyDownloaded) {
-          try {
-            isAlreadyOnDevice = await window.electronAPI.checkAlreadyDownloaded(itemTitle, itemArtist);
-          } catch (e) {}
-        }
+        const tCleanTitle = itemTitle.replace(/[\/\\?%*:|"<>]/g, '_');
+        const tCleanArtist = (itemArtist && itemArtist !== 'Unknown Artist')
+          ? itemArtist.replace(/[\/\\?%*:|"<>]/g, '_') + ' - '
+          : '';
+        const tDestinationPath = musicDir + '\\' + tCleanArtist + tCleanTitle + '.mp3';
 
-        if (isAlreadyOnDevice) {
-          continue;
-        }
-
-        // Resolve stream and queue
         const tTaskId = 'dl-' + Date.now() + '-' + Math.random().toString(36).substring(7);
-        let tStreamUrl = null;
-        let tBitrate = '320kbps';
-        if (window.electronAPI?.searchJioSaavn) {
+        tasksToQueue.push({
+          id: tTaskId,
+          title: itemTitle,
+          artist: itemArtist,
+          album: resolvedTrack.title || 'Playlist',
+          artworkUrl: itemCover,
+          duration: Math.round((t.durationMs || 215000) / 1000),
+          format: 'MP3 320k',
+          size: 'Queued',
+          speed: 'Starting...',
+          progress: 1,
+          status: 'downloading',
+          destinationPath: tDestinationPath,
+        });
+      }
+
+      // Instantly populate the Downloads Manager UI table with artwork & info!
+      setActiveDownloads((prev) => [...tasksToQueue, ...prev]);
+
+      // Concurrently resolve & download tracks
+      (async () => {
+        for (const task of tasksToQueue) {
           try {
-            const jioMatch = await window.electronAPI.searchJioSaavn(`${itemTitle} ${itemArtist}`);
-            if (jioMatch && jioMatch.streamUrl) {
-              tStreamUrl = jioMatch.streamUrl;
-              tBitrate = jioMatch.bitrate || '320kbps';
+            // Check if file is already on device
+            if (window.electronAPI?.checkFileExists) {
+              const exists = await window.electronAPI.checkFileExists(task.destinationPath);
+              if (exists) {
+                setActiveDownloads((prev) => prev.filter((item) => item.id !== task.id));
+                continue;
+              }
             }
-          } catch (e) {}
-        }
 
-        if (tStreamUrl) {
-          const tCleanTitle = itemTitle.replace(/[\/\\?%*:|"<>]/g, '_');
-          const tCleanArtist = (itemArtist && itemArtist !== 'Unknown Artist')
-            ? itemArtist.replace(/[\/\\?%*:|"<>]/g, '_') + ' - '
-            : '';
-          const tDestinationPath = musicDir + '\\' + tCleanArtist + tCleanTitle + '.mp3';
+            let tStreamUrl = null;
+            let tBitrate = '320kbps';
+            if (window.electronAPI?.searchJioSaavn) {
+              const jioMatch = await window.electronAPI.searchJioSaavn(`${task.title} ${task.artist}`);
+              if (jioMatch && jioMatch.streamUrl) {
+                tStreamUrl = jioMatch.streamUrl;
+                tBitrate = jioMatch.bitrate || '320kbps';
+              }
+            }
 
-          const tTask = {
-            id: tTaskId,
-            title: itemTitle,
-            artist: itemArtist,
-            album: resolvedTrack.title || 'Playlist',
-            artworkUrl: itemCover,
-            duration: Math.round((t.durationMs || 215000) / 1000),
-            format: 'MP3 320k',
-            size: 'Queued',
-            speed: 'Starting...',
-            progress: 5,
-            status: 'downloading',
-            streamUrl: tStreamUrl,
-            destinationPath: tDestinationPath,
-          };
-
-          setActiveDownloads((prev) => [tTask, ...prev]);
-
-          if (window.electronAPI?.startDownload) {
-            window.electronAPI.startDownload({
-              id: tTaskId,
-              url: tStreamUrl,
-              title: itemTitle,
-              artist: itemArtist,
-              album: resolvedTrack.title || 'Playlist',
-              artworkUrl: itemCover,
-              duration: tTask.duration,
-              destinationPath: tDestinationPath,
-              formatType: 'AUDIO',
-              qualityLabel: tBitrate,
-            }).catch(console.error);
+            if (tStreamUrl && window.electronAPI?.startDownload) {
+              await window.electronAPI.startDownload({
+                id: task.id,
+                url: tStreamUrl,
+                title: task.title,
+                artist: task.artist,
+                album: task.album,
+                artworkUrl: task.artworkUrl,
+                duration: task.duration,
+                destinationPath: task.destinationPath,
+                formatType: 'AUDIO',
+                qualityLabel: tBitrate,
+              });
+            } else if (!tStreamUrl) {
+              setActiveDownloads((prev) =>
+                prev.map((item) =>
+                  item.id === task.id ? { ...item, status: 'failed', speed: 'Stream not found' } : item
+                )
+              );
+            }
+          } catch (e) {
+            console.error('Track queue error:', e);
           }
         }
-      }
+      })();
+
       return;
     }
 

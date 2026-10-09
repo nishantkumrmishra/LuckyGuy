@@ -236,15 +236,19 @@ class TaskDownloader extends EventEmitter {
     this.status = 'MERGING';
     this.emit('update', this.snapshot());
 
-    const outStream = fs.createWriteStream(destinationPath);
-    for (const part of this.partFiles) {
-      if (fs.existsSync(part)) {
-        const buffer = fs.readFileSync(part);
-        outStream.write(buffer);
-        fs.unlinkSync(part);
+    await new Promise((resolve, reject) => {
+      const outStream = fs.createWriteStream(destinationPath);
+      outStream.on('error', reject);
+      outStream.on('finish', resolve);
+      for (const part of this.partFiles) {
+        if (fs.existsSync(part)) {
+          const buffer = fs.readFileSync(part);
+          outStream.write(buffer);
+          try { fs.unlinkSync(part); } catch (e) {}
+        }
       }
-    }
-    outStream.end();
+      outStream.end();
+    });
   }
 
   cleanPartFiles() {
