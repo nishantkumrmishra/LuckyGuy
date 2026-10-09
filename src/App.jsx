@@ -10,6 +10,7 @@ import SettingsTab from './components/SettingsTab';
 import LikedSongsTab from './components/LikedSongsTab';
 import PlaylistsTab from './components/PlaylistsTab';
 import SleepTimerModal from './components/SleepTimerModal';
+import SetupWizard from './components/SetupWizard';
 import QueueDrawer from './components/QueueDrawer';
 
 export default function App() {
@@ -198,6 +199,15 @@ export default function App() {
   const [isSleepTimerOpen, setIsSleepTimerOpen] = useState(false);
   const [sleepTimerRemaining, setSleepTimerRemaining] = useState(null);
 
+  const [isSetupWizardOpen, setIsSetupWizardOpen] = useState(() => {
+    try {
+      return !localStorage.getItem('luckyguy-setup-completed');
+    } catch {
+      return false;
+    }
+  });
+  const [updateNotification, setUpdateNotification] = useState(null);
+
   const [likedTracks, setLikedTracks] = useState(() => {
     try {
       const saved = localStorage.getItem('localguy-liked-tracks');
@@ -367,6 +377,12 @@ export default function App() {
         return [completed, ...prev];
       });
     });
+
+    if (window.electronAPI.onUpdateAvailable) {
+      window.electronAPI.onUpdateAvailable((updateInfo) => {
+        setUpdateNotification(updateInfo);
+      });
+    }
 
     window.electronAPI.onDownloadFailed((payload) => {
       if (downloadCompletionMap.has(payload.id)) {
@@ -1291,6 +1307,7 @@ export default function App() {
                 preferences={preferences}
                 theme={theme}
                 onToggleTheme={handleToggleTheme}
+                onOpenSetupWizard={() => setIsSetupWizardOpen(true)}
                 onSavePreferences={(prefs) => {
                   setPreferences(prefs);
                   window.electronAPI?.savePreferences?.(prefs);
@@ -1344,6 +1361,86 @@ export default function App() {
           onToggleTheme={handleToggleTheme}
         />
       </div>
+
+      {/* Top Update Notification Banner */}
+      {updateNotification && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '40px',
+            right: '24px',
+            zIndex: 9999,
+            backgroundColor: 'var(--bg-card, #ffffff)',
+            borderRadius: '12px',
+            padding: '14px 18px',
+            border: '1.5px solid var(--primary, #7c5cbf)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            maxWidth: '420px',
+            animation: 'fadeIn 0.2s ease',
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+              Update Available: v{updateNotification.latestVersion}
+            </div>
+            <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              A newer release of LuckyGuy is available on GitHub.
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              if (updateNotification.releaseUrl && window.electronAPI?.openExternal) {
+                window.electronAPI.openExternal(updateNotification.releaseUrl);
+              } else if (updateNotification.releaseUrl) {
+                window.open(updateNotification.releaseUrl, '_blank');
+              }
+            }}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '6px',
+              backgroundColor: 'var(--primary, #7c5cbf)',
+              border: 'none',
+              color: '#ffffff',
+              fontSize: '11.5px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Update
+          </button>
+          <button
+            onClick={() => setUpdateNotification(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              fontSize: '14px',
+              cursor: 'pointer',
+              padding: '2px',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Setup Wizard Modal */}
+      <SetupWizard
+        isOpen={isSetupWizardOpen}
+        onClose={() => setIsSetupWizardOpen(false)}
+        preferences={preferences}
+        onSavePreferences={(prefs) => {
+          setPreferences((prev) => ({ ...prev, ...prefs }));
+          if (window.electronAPI?.savePreferences) {
+            window.electronAPI.savePreferences(prefs);
+          }
+        }}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
+      />
 
       {/* Sleep Timer Modal */}
       {isSleepTimerOpen && (

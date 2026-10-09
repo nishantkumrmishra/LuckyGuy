@@ -45,26 +45,6 @@ export default function DownloadsTab({
   const [isFocused, setIsFocused] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState('MP3 320k');
   const [selectedQuality, setSelectedQuality] = useState('320kbps');
-  const [showConfig, setShowConfig] = useState(false);
-  const [spotifyClientId, setSpotifyClientId] = useState(preferences?.spotifyClientId || '');
-  const [spotifyClientSecret, setSpotifyClientSecret] = useState(preferences?.spotifyClientSecret || '');
-  const [spotifyCookie, setSpotifyCookie] = useState(preferences?.spotifyCookie || '');
-
-  useEffect(() => {
-    setSpotifyClientId(preferences?.spotifyClientId || '');
-    setSpotifyClientSecret(preferences?.spotifyClientSecret || '');
-    setSpotifyCookie(preferences?.spotifyCookie || '');
-  }, [preferences?.spotifyClientId, preferences?.spotifyClientSecret, preferences?.spotifyCookie]);
-
-  const handleSaveSpotifyCreds = () => {
-    if (onSavePreferences) {
-      onSavePreferences({
-        spotifyClientId: spotifyClientId.trim(),
-        spotifyClientSecret: spotifyClientSecret.trim(),
-        spotifyCookie: spotifyCookie.trim(),
-      });
-    }
-  };
   const [filterTab, setFilterTab] = useState('all'); // 'all' | 'downloading' | 'completed'
 
   // Multi-selection state
@@ -346,26 +326,29 @@ export default function DownloadsTab({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              onClick={() => setShowConfig(!showConfig)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                backgroundColor: showConfig ? 'rgba(124, 92, 191, 0.1)' : 'var(--bg-main)',
-                color: showConfig ? 'var(--primary, #7c5cbf)' : 'var(--text-secondary)',
-                border: '1px solid var(--border-medium)',
-                fontSize: '12px',
-                fontWeight: 500,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <SlidersHorizontal size={13} />
-              <span>{showConfig ? 'Hide Config' : 'Audio Options'}</span>
-            </button>
+            {onOpenFolder && (
+              <button
+                onClick={() => onOpenFolder(downloadFolder)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  backgroundColor: 'var(--bg-main)',
+                  color: 'var(--text-secondary)',
+                  border: '1px solid var(--border-medium)',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                title="Open Music Folder in File Explorer"
+              >
+                <FolderOpen size={13} color="var(--primary, #7c5cbf)" />
+                <span>Open Folder</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -509,183 +492,9 @@ export default function DownloadsTab({
           </button>
         </div>
 
-        {/* Configuration Bar */}
-        {showConfig && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingTop: '10px',
-              borderTop: '1px solid var(--border-medium)',
-              flexWrap: 'wrap',
-              gap: '12px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                  Format:
-                </span>
-                {['MP3 320k', 'FLAC', 'M4A 256k'].map((fmt) => (
-                  <button
-                    key={fmt}
-                    onClick={() => setSelectedFormat(fmt)}
-                    style={{
-                      padding: '4px 9px',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      fontWeight: selectedFormat === fmt ? 600 : 400,
-                      backgroundColor: selectedFormat === fmt ? 'rgba(124, 92, 191, 0.15)' : 'var(--bg-main)',
-                      color: selectedFormat === fmt ? 'var(--primary, #7c5cbf)' : 'var(--text-secondary)',
-                      border: selectedFormat === fmt ? '1px solid var(--primary, #7c5cbf)' : '1px solid var(--border-medium)',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    {fmt}
-                  </button>
-                ))}
-              </div>
+        </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                  Bitrate:
-                </span>
-                {['320kbps', '256kbps', '192kbps'].map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => setSelectedQuality(q)}
-                    style={{
-                      padding: '4px 9px',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      fontWeight: selectedQuality === q ? 600 : 400,
-                      backgroundColor: selectedQuality === q ? 'rgba(124, 92, 191, 0.15)' : 'var(--bg-main)',
-                      color: selectedQuality === q ? 'var(--primary, #7c5cbf)' : 'var(--text-secondary)',
-                      border: selectedQuality === q ? '1px solid var(--primary, #7c5cbf)' : '1px solid var(--border-medium)',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {onOpenFolder && (
-              <button
-                onClick={() => onOpenFolder(downloadFolder)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  color: 'var(--text-secondary)',
-                  fontSize: '11.5px',
-                  cursor: 'pointer',
-                }}
-                title="Open destination folder"
-              >
-                <FolderOpen size={13} />
-                <span style={{ maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {downloadFolder}
-                </span>
-              </button>
-            )}
-
-            {/* Spotify Web API Integration for 200+ Track Playlists */}
-            <div
-              style={{
-                width: '100%',
-                paddingTop: '10px',
-                borderTop: '1px dashed var(--border-light)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                flexWrap: 'wrap',
-                fontSize: '11.5px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#1db954', fontWeight: 600 }}>
-                <Key size={13} />
-                <span>Spotify Credentials (to load over 100 tracks):</span>
-              </div>
-              <input
-                type="text"
-                placeholder="Client ID"
-                value={spotifyClientId}
-                onChange={(e) => setSpotifyClientId(e.target.value)}
-                style={{
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-medium)',
-                  backgroundColor: 'var(--bg-main)',
-                  color: 'var(--text-primary)',
-                  fontSize: '11px',
-                  width: '120px',
-                }}
-              />
-              <input
-                type="password"
-                placeholder="Client Secret"
-                value={spotifyClientSecret}
-                onChange={(e) => setSpotifyClientSecret(e.target.value)}
-                style={{
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-medium)',
-                  backgroundColor: 'var(--bg-main)',
-                  color: 'var(--text-primary)',
-                  fontSize: '11px',
-                  width: '120px',
-                }}
-              />
-              <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>or</span>
-              <input
-                type="password"
-                placeholder="sp_dc Cookie"
-                value={spotifyCookie}
-                onChange={(e) => setSpotifyCookie(e.target.value)}
-                title="Browser sp_dc cookie from open.spotify.com"
-                style={{
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border-medium)',
-                  backgroundColor: 'var(--bg-main)',
-                  color: 'var(--text-primary)',
-                  fontSize: '11px',
-                  width: '130px',
-                }}
-              />
-              <button
-                onClick={handleSaveSpotifyCreds}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  backgroundColor: 'var(--primary, #7c5cbf)',
-                  border: 'none',
-                  color: '#ffffff',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                Save
-              </button>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                Unlocks full 200+ tracks playlist pagination
-              </span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 2. Download Manager Controls & Filter Tabs */}
+   {/* 2. Download Manager Controls & Filter Tabs */}
       <div
         style={{
           display: 'flex',

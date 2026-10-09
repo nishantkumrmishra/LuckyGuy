@@ -76,5 +76,13 @@ contextBridge.exposeInMainWorld('electronAPI', {\n  minimize: () => ipcRenderer.
   getPreferences: () => ipcRenderer.invoke('get-preferences'),
   savePreferences: (prefs) => ipcRenderer.invoke('save-preferences', prefs),
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
-  getSystemInfo: () => ipcRenderer.invoke('get-system-info')
+  openDirectoryDialog: () => ipcRenderer.invoke('pick-folder'),
+  getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  onUpdateAvailable: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('update-available', handler);
+    return () => ipcRenderer.removeListener('update-available', handler);
+  }
 });

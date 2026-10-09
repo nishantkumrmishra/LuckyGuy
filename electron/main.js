@@ -128,6 +128,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
+  setTimeout(() => checkAppUpdates(true), 4000);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -693,3 +694,53 @@ ipcMain.handle('get-system-info', async () => ({
   totalMemory: os.totalmem(),
   freeMemory: os.freemem()
 }));
+
+
+// --- Auto-Updater & Version Checker ---
+function semverCompare(v1, v2) {
+  const p1 = (v1 || '0').replace(/^v/, '').split('.').map(Number);
+  const p2 = (v2 || '0').replace(/^v/, '').split('.').map(Number);
+  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+    const num1 = p1[i] || 0;
+    const num2 = p2[i] || 0;
+    if (num1 > num2) return 1;
+    if (num1 < num2) return -1;
+  }
+  return 0;
+}
+
+async function checkAppUpdates(silent = false) {
+  try {
+    const currentVer = app.getVersion() || '1.0.0';
+    const resp = await fetch('https://api.github.com/repos/nishantkumrmishra/LuckyGuy/releases/latest', {
+      headers: { 'User-Agent': 'LuckyGuy-App' }
+    });
+    if (resp.ok) {
+      const release = await resp.json();
+      const latestTag = release.tag_name || '';
+      const latestVer = latestTag.replace(/^v/, '');
+      if (latestVer && semverCompare(latestVer, currentVer) > 0) {
+        const updateInfo = {
+          available: true,
+          currentVersion: currentVer,
+          latestVersion: latestVer,
+          releaseName: release.name || latestTag,
+          releaseNotes: release.body || 'A new update is available for LuckyGuy.',
+          releaseUrl: release.html_url,
+          publishedAt: release.published_at,
+          assets: release.assets || []
+        };
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('update-available', updateInfo);
+        }
+        return updateInfo;
+      }
+    }
+    return { available: false, currentVersion: app.getVersion() || '1.0.0', message: 'You are running the latest version.' };
+  } catch (err) {
+    if (!silent) console.warn('[AutoUpdater] Check failed:', err.message);
+    return { available: false, error: err.message };
+  }
+}
+
+ipcMain.handle('check-for-updates', async () => checkAppUpdates(false));

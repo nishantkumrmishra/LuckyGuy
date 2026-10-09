@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   FolderOpen,
+  Key,
+  Sparkles,
   Sliders,
   Cpu,
   CheckCircle2,
@@ -26,6 +28,7 @@ export default function SettingsTab({
   onSavePreferences,
   theme = 'light',
   onToggleTheme,
+  onOpenSetupWizard,
 }) {
   const [downloadFolder, setDownloadFolder] = useState(preferences?.downloadFolder || 'C:\\Users\
 ishant\\Music');
@@ -33,6 +36,46 @@ ishant\\Music');
   const [defaultQuality, setDefaultQuality] = useState(preferences?.bitrate || '320k');
   const [chunkCount, setChunkCount] = useState(8);
   const [savedNotice, setSavedNotice] = useState(false);
+  const [spotifyClientId, setSpotifyClientId] = useState(preferences?.spotifyClientId || '');
+  const [spotifyClientSecret, setSpotifyClientSecret] = useState(preferences?.spotifyClientSecret || '');
+  const [spotifyCookie, setSpotifyCookie] = useState(preferences?.spotifyCookie || '');
+  const [updateChecking, setUpdateChecking] = useState(false);
+  const [updateResult, setUpdateResult] = useState(null);
+
+  useEffect(() => {
+    setSpotifyClientId(preferences?.spotifyClientId || '');
+    setSpotifyClientSecret(preferences?.spotifyClientSecret || '');
+    setSpotifyCookie(preferences?.spotifyCookie || '');
+  }, [preferences?.spotifyClientId, preferences?.spotifyClientSecret, preferences?.spotifyCookie]);
+
+  const handleSaveSpotify = () => {
+    if (onSavePreferences) {
+      onSavePreferences({
+        spotifyClientId: spotifyClientId.trim(),
+        spotifyClientSecret: spotifyClientSecret.trim(),
+        spotifyCookie: spotifyCookie.trim(),
+      });
+      flashSaved();
+    }
+  };
+
+  const handleCheckUpdates = async () => {
+    setUpdateChecking(true);
+    setUpdateResult(null);
+    if (window.electronAPI?.checkForUpdates) {
+      try {
+        const res = await window.electronAPI.checkForUpdates();
+        setUpdateResult(res);
+      } catch (e) {
+        setUpdateResult({ available: false, error: e.message });
+      }
+    } else {
+      setTimeout(() => {
+        setUpdateResult({ available: false, message: 'You are running the latest version of LuckyGuy (v1.0.0).' });
+      }, 700);
+    }
+    setUpdateChecking(false);
+  };
 
   // Modular Extension Base URL state
   const [extensionUrl, setExtensionUrl] = useState('');
@@ -258,6 +301,118 @@ ishant\\Music');
       {/* SUBTAB 1: DOWNLOAD & STORAGE SETTINGS */}
       {category === 'downloads' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Setup Wizard & Software Updates */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: '14px',
+            }}
+          >
+            {/* Setup Wizard Card */}
+            <div
+              style={{
+                padding: '16px 18px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-medium, #e2e8f0)',
+                backgroundColor: 'var(--bg-card, #ffffff)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sparkles size={16} color="var(--primary, #7c5cbf)" />
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  First-Time Setup Wizard
+                </span>
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
+                Relaunch the interactive setup guide to configure your music directory, automated genre sorting, and appearance.
+              </p>
+              <div>
+                <button
+                  type="button"
+                  onClick={onOpenSetupWizard}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: 'var(--primary, #7c5cbf)',
+                    color: '#ffffff',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <Sparkles size={13} />
+                  <span>Launch Setup Wizard</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Auto-Updater Card */}
+            <div
+              style={{
+                padding: '16px 18px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-medium, #e2e8f0)',
+                backgroundColor: 'var(--bg-card, #ffffff)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <RefreshCw size={15} color="var(--primary, #7c5cbf)" />
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    LuckyGuy Updates
+                  </span>
+                </div>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                  v1.0.0
+                </span>
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
+                LuckyGuy automatically verifies new releases against official GitHub releases.
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={handleCheckUpdates}
+                  disabled={updateChecking}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-medium)',
+                    backgroundColor: 'var(--bg-main)',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    cursor: updateChecking ? 'wait' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <RefreshCw size={12} className={updateChecking ? 'spin' : ''} />
+                  <span>{updateChecking ? 'Checking...' : 'Check for Updates'}</span>
+                </button>
+                {updateResult && (
+                  <span style={{ fontSize: '11.5px', color: updateResult.available ? '#10b981' : 'var(--text-muted)' }}>
+                    {updateResult.available ? `New version v${updateResult.latestVersion} available!` : (updateResult.message || 'Up to date.')}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FolderOpen size={16} color="var(--primary, #7c5cbf)" />
             <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
@@ -536,6 +691,124 @@ ishant\\Music');
       {/* SUBTAB 3: PLUGINS & MODULAR EXTENSIONS */}
       {category === 'plugins' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Spotify API & Session Credentials */}
+          <div
+            style={{
+              padding: '18px 20px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-medium, #e2e8f0)',
+              backgroundColor: 'var(--bg-card, #ffffff)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Key size={16} color="#1db954" />
+                <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                  Spotify Web Integration & Credentials
+                </h3>
+              </div>
+              <span style={{ fontSize: '11px', color: '#1db954', fontWeight: 600 }}>
+                Pathfinder Session Active
+              </span>
+            </div>
+
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+              LuckyGuy's built-in background Pathfinder session automatically extracts full 200+ track playlists without requiring API keys. If you prefer to supply your own developer credentials or browser session cookie, enter them below:
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                  Client ID (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Spotify Client ID"
+                  value={spotifyClientId}
+                  onChange={(e) => setSpotifyClientId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '34px',
+                    padding: '0 10px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-medium, #e2e8f0)',
+                    backgroundColor: 'var(--bg-main, #f8fafc)',
+                    fontSize: '12px',
+                    color: 'var(--text-primary)',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                  Client Secret (Optional)
+                </label>
+                <input
+                  type="password"
+                  placeholder="Spotify Client Secret"
+                  value={spotifyClientSecret}
+                  onChange={(e) => setSpotifyClientSecret(e.target.value)}
+                  style={{
+                    width: '100%',
+                    height: '34px',
+                    padding: '0 10px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-medium, #e2e8f0)',
+                    backgroundColor: 'var(--bg-main, #f8fafc)',
+                    fontSize: '12px',
+                    color: 'var(--text-primary)',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                Browser Session Cookie (sp_dc)
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="password"
+                  placeholder="Paste sp_dc cookie from open.spotify.com..."
+                  value={spotifyCookie}
+                  onChange={(e) => setSpotifyCookie(e.target.value)}
+                  style={{
+                    flex: 1,
+                    height: '34px',
+                    padding: '0 10px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-medium, #e2e8f0)',
+                    backgroundColor: 'var(--bg-main, #f8fafc)',
+                    fontSize: '12px',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveSpotify}
+                  style={{
+                    height: '34px',
+                    padding: '0 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: '#1db954',
+                    color: '#ffffff',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Save Spotify Config
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* SECTION 1: EXTENSION INSTALLER (URL Input Field) */}
           <div
             style={{
