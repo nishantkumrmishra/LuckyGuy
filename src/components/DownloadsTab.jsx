@@ -74,17 +74,18 @@ export default function DownloadsTab({
     for (const ext of installedExtensions) {
       if (ext.enabled) {
         const extNameLower = (ext.name || '').toLowerCase();
-        if (extNameLower.includes('youtube') && (lower.includes('youtube.com') || lower.includes('youtu.be'))) {
-          return { name: ext.name || 'YouTube', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)' };
+        const isAudioUniversal = ext.id === 'luckyguy-ext-universal-audio' || ext.type === 'audio' || extNameLower.includes('audio') || extNameLower.includes('music');
+        if ((isAudioUniversal || extNameLower.includes('youtube')) && (lower.includes('youtube.com') || lower.includes('youtu.be'))) {
+          return { name: 'YouTube Audio', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)' };
         }
-        if (extNameLower.includes('spotify') && lower.includes('spotify.com')) {
-          return { name: ext.name || 'Spotify', color: '#1db954', bg: 'rgba(29, 185, 84, 0.12)' };
+        if ((isAudioUniversal || extNameLower.includes('spotify')) && lower.includes('spotify.com')) {
+          return { name: 'Spotify Music', color: '#1db954', bg: 'rgba(29, 185, 84, 0.12)' };
         }
-        if (extNameLower.includes('jiosaavn') && lower.includes('jiosaavn.com')) {
-          return { name: ext.name || 'JioSaavn', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.12)' };
+        if ((isAudioUniversal || extNameLower.includes('jiosaavn')) && lower.includes('jiosaavn.com')) {
+          return { name: 'JioSaavn 320k', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.12)' };
         }
-        if (extNameLower.includes('soundcloud') && lower.includes('soundcloud.com')) {
-          return { name: ext.name || 'SoundCloud', color: '#f97316', bg: 'rgba(249, 115, 22, 0.12)' };
+        if ((isAudioUniversal || extNameLower.includes('soundcloud')) && lower.includes('soundcloud.com')) {
+          return { name: 'SoundCloud Stream', color: '#f97316', bg: 'rgba(249, 115, 22, 0.12)' };
         }
       }
     }
