@@ -7,7 +7,7 @@ const youtubeExtractor = require('./extractors/youtube');
 const spotifyExtractor = require('./extractors/spotify');
 const jiosaavnExtractor = require('./extractors/jiosaavn');
 const { DownloadManager } = require('./downloader');
-const { embedId3Metadata } = require('./id3Tagger');
+const { embedId3Metadata, repairCorruptedMusicDirectory } = require('./id3Tagger');
 const LibraryManager = require('./libraryManager');
 const HistoryManager = require('./historyManager');
 const { fetchEnrichedMetadata, normalizeGenre } = require('./metadataEnricher');
@@ -43,6 +43,11 @@ try {
   } else {
     fs.writeFileSync(prefsFile, JSON.stringify(preferences, null, 2));
   }
+} catch (e) {}
+
+// Auto-repair any damaged audio files in music directories on startup
+try {
+  repairCorruptedMusicDirectory(preferences.downloadFolder);
 } catch (e) {}
 
 // Managers
@@ -186,7 +191,7 @@ ipcMain.handle('extract-url', async (event, url) => {
 
   // 4. Direct HTTP URL
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    const ext = path.extname(new URL(trimmed).pathname) || '.mp3';
+    const ext = path.extname(new URL(trimmed).pathname) || '.m4a';
     return {
       platform: 'Direct Stream',
       type: 'track',
@@ -205,6 +210,53 @@ ipcMain.handle('extract-url', async (event, url) => {
 
 ipcMain.handle('search-jiosaavn', async (event, query) => {
   return await jiosaavnExtractor.searchTrack(query);
+});
+
+// Resilient Stream & Artwork Resolver (JioSaavn variations + iTunes HQ fallback)
+ipcMain.handle('resolve-track-stream', async (event, title, artist) => {
+  const cleanTitle = (title || '').replace(/[\u00a0\u1680\u180e\u2000-\u200b\u202f\u205f\u3000\ufeff]/g, ' ').trim();
+  const cleanArtist = (artist || '').replace(/[\u00a0\u1680\u180e\u2000-\u200b\u202f\u205f\u3000\ufeff]/g, ' ').trim();
+  const firstArtist = cleanArtist.split(/[,/|]/)[0].trim();
+
+  // 1. Try JioSaavn with title + first artist
+  let res = null;
+  if (firstArtist) {
+    res = await jiosaavnExtractor.searchTrack(`${cleanTitle} ${firstArtist}`);
+  }
+  if (!res) {
+    res = await jiosaavnExtractor.searchTrack(`${cleanTitle} ${cleanArtist}`);
+  }
+  if (!res) {
+    res = await jiosaavnExtractor.searchTrack(cleanTitle);
+  }
+  if (res && res.streamUrl) return res;
+
+  // 2. Try iTunes Search API fallback
+  try {
+    const q = `${cleanTitle} ${firstArtist || cleanArtist}`.trim();
+    const itunesResp = await fetch('https://itunes.apple.com/search?term=' + encodeURIComponent(q) + '&media=music&limit=1');
+    if (itunesResp.ok) {
+      const itunesData = await itunesResp.json();
+      if (itunesData.results && itunesData.results.length > 0) {
+        const item = itunesData.results[0];
+        if (item.previewUrl) {
+          return {
+            id: String(item.trackId || Date.now()),
+            title: item.trackName || title,
+            artist: item.artistName || artist,
+            album: item.collectionName || 'Master',
+            duration: Math.round((item.trackTimeMillis || 215000) / 1000),
+            artworkUrl: (item.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
+            streamUrl: item.previewUrl,
+            bitrate: '256kbps',
+            source: 'iTunes Direct HQ'
+          };
+        }
+      }
+    }
+  } catch (e) {}
+
+  return null;
 });
 
 // Download Manager IPC
@@ -229,7 +281,14 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
   const itunesArtwork = enriched?.artworkUrl || '';
   const artworkUrl = taskConfig.artworkUrl || itunesArtwork || '';
 
-  const ext = taskConfig.formatType === 'VIDEO' ? '.mp4' : '.mp3';
+  // Determine correct initial extension based on format or stream URL
+  let ext = '.m4a';
+  if (taskConfig.formatType === 'VIDEO') {
+    ext = '.mp4';
+  } else if (taskConfig.url && (taskConfig.url.includes('.mp3') || taskConfig.url.includes('youtube.com') || taskConfig.url.includes('googlevideo.com'))) {
+    ext = '.mp3';
+  }
+
   const cleanTitle = (taskConfig.title || 'download').replace(/[\/\\?%*:|"<>]/g, '_');
   const cleanArtist = (taskConfig.artist && taskConfig.artist !== 'Unknown Artist' && taskConfig.artist !== 'Various Artists')
     ? taskConfig.artist.replace(/[\/\\?%*:|"<>]/g, '_') + ' - '
@@ -269,9 +328,31 @@ downloadManager.on('update', (snap) => {
 });
 
 downloadManager.on('completed', async (snap) => {
-  const targetPath = snap.destinationPath;
+  let targetPath = snap.destinationPath;
   const targetDir = targetPath ? path.dirname(targetPath) : preferences.downloadFolder;
-  if (targetPath && targetPath.endsWith('.mp3')) {
+
+  // Inspect physical container of the downloaded stream to prevent file corruption
+  if (targetPath && fs.existsSync(targetPath)) {
+    try {
+      const head = Buffer.alloc(16);
+      const fd = fs.openSync(targetPath, 'r');
+      fs.readSync(fd, head, 0, 16, 0);
+      fs.closeSync(fd);
+
+      const isFtyp = head.slice(4, 8).toString('ascii') === 'ftyp';
+      if (isFtyp && targetPath.endsWith('.mp3')) {
+        // Correct extension to .m4a so Windows Media Player and external players play natively
+        const correctedPath = targetPath.replace(/\.mp3$/i, '.m4a');
+        fs.renameSync(targetPath, correctedPath);
+        targetPath = correctedPath;
+      }
+    } catch (renameErr) {
+      console.warn('Could not inspect container header:', renameErr.message);
+    }
+  }
+
+  // Universal metadata embedding (atoms for M4A, ID3 frames for MP3)
+  if (targetPath && (targetPath.endsWith('.mp3') || targetPath.endsWith('.m4a'))) {
     try {
       await embedId3Metadata(targetPath, {
         title: snap.title,
@@ -282,7 +363,7 @@ downloadManager.on('completed', async (snap) => {
         artworkUrl: snap.artworkUrl
       });
     } catch (tagErr) {
-      console.warn('Failed to embed ID3 tags into MP3:', tagErr.message);
+      console.warn('Failed to embed metadata tags:', tagErr.message);
     }
   }
 
@@ -410,7 +491,12 @@ ipcMain.handle('verify-files-exist', async (event, filePaths) => {
 
 ipcMain.handle('check-file-exists', async (event, filePath) => {
   if (!filePath) return false;
-  return fs.existsSync(filePath);
+  if (fs.existsSync(filePath)) return true;
+  const altM4a = filePath.replace(/\.mp3$/i, '.m4a');
+  if (fs.existsSync(altM4a)) return true;
+  const altMp3 = filePath.replace(/\.m4a$/i, '.mp3');
+  if (fs.existsSync(altMp3)) return true;
+  return false;
 });
 
 // Library Manager IPC
@@ -424,20 +510,29 @@ ipcMain.handle('library-delete-playlist', async (event, plId) => libraryManager.
 ipcMain.handle('library-update-song', async (event, songId, updates) => libraryManager.updateSong(songId, updates));
 ipcMain.handle('library-find-duplicates', async () => libraryManager.findDuplicates());
 ipcMain.handle('library-organize-fix', async (event, musicDir) => libraryManager.organizeAndFixLibrary(musicDir));
+
 function hasRealAudioData(targetPath) {
   try {
     if (!targetPath || !fs.existsSync(targetPath)) return false;
     const stat = fs.statSync(targetPath);
     if (stat.size < 50000) return false;
-    const fd = fs.openSync(targetPath, String.fromCharCode(114));
-    const header = Buffer.alloc(10);
-    fs.readSync(fd, header, 0, 10, 0);
+    const fd = fs.openSync(targetPath, 'r');
+    const header = Buffer.alloc(16);
+    fs.readSync(fd, header, 0, 16, 0);
     fs.closeSync(fd);
-    if (header.slice(0, 3).toString(String.fromCharCode(97, 115, 99, 105, 105)) === String.fromCharCode(73, 68, 51)) {
+
+    // M4A / MP4 container check
+    if (header.slice(4, 8).toString('ascii') === 'ftyp') {
+      return stat.size > 100000;
+    }
+
+    // ID3 MP3 check
+    if (header.slice(0, 3).toString('ascii') === 'ID3') {
       const tagSize = ((header[6] & 0x7f) << 21) | ((header[7] & 0x7f) << 14) | ((header[8] & 0x7f) << 7) | (header[9] & 0x7f);
       const audioBytes = stat.size - (10 + tagSize);
       return audioBytes > 102400;
     }
+
     return stat.size > 200000;
   } catch (e) {
     return false;
@@ -445,8 +540,14 @@ function hasRealAudioData(targetPath) {
 }
 
 ipcMain.handle('resolve-audio-path', async (event, filePath, title, artist) => {
-  // If local file exists and actually has valid playable audio data, return it immediately
-  if (filePath && fs.existsSync(filePath) && hasRealAudioData(filePath)) return filePath;
+  // Check exact file or alternative .m4a / .mp3 extensions
+  if (filePath) {
+    if (fs.existsSync(filePath) && hasRealAudioData(filePath)) return filePath;
+    const altM4a = filePath.replace(/\.mp3$/i, '.m4a');
+    if (fs.existsSync(altM4a) && hasRealAudioData(altM4a)) return altM4a;
+    const altMp3 = filePath.replace(/\.m4a$/i, '.mp3');
+    if (fs.existsSync(altMp3) && hasRealAudioData(altMp3)) return altMp3;
+  }
 
   function cleanFuzzy(s) {
     return (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -454,7 +555,7 @@ ipcMain.handle('resolve-audio-path', async (event, filePath, title, artist) => {
 
   // 1. Check in libraryManager.songs for a valid local copy
   const matchInSongs = libraryManager.songs.find(s =>
-    (filePath && s.filePath === filePath) ||
+    (filePath && (s.filePath === filePath || s.filePath === filePath.replace(/\.mp3$/i, '.m4a') || s.filePath === filePath.replace(/\.m4a$/i, '.mp3'))) ||
     (title && s.title && s.title.toLowerCase() === title.toLowerCase()) ||
     (s.id && filePath && filePath.includes(s.id))
   );
@@ -468,6 +569,7 @@ ipcMain.handle('resolve-audio-path', async (event, filePath, title, artist) => {
     const cTitle = cleanFuzzy(title);
     const cArtist = cleanFuzzy(artist);
     const cBase = filePath ? cleanFuzzy(path.basename(filePath, path.extname(filePath))) : '';
+    const validAudioExts = ['.m4a', '.mp3', '.flac', '.wav', '.aac', '.ogg'];
 
     const searchFile = (dir) => {
       try {
@@ -477,7 +579,7 @@ ipcMain.handle('resolve-audio-path', async (event, filePath, title, artist) => {
           if (e.isDirectory()) {
             const found = searchFile(full);
             if (found) return found;
-          } else if (e.isFile() && e.name.toLowerCase().endsWith('.mp3')) {
+          } else if (e.isFile() && validAudioExts.some(ext => e.name.toLowerCase().endsWith(ext))) {
             const cName = cleanFuzzy(e.name);
             if ((cBase && cName.includes(cBase)) || (cTitle && cName.includes(cTitle)) || (cArtist && cName.includes(cArtist))) {
               if (hasRealAudioData(full)) return full;
@@ -491,7 +593,7 @@ ipcMain.handle('resolve-audio-path', async (event, filePath, title, artist) => {
     if (found) return found;
   }
 
-  // 3. Fallback: If local file is a corrupted stub (<200KB without audio), dynamically resolve 320k stream online!
+  // 3. Fallback: If local file is not found, dynamically resolve stream online
   const query = [title || '', (artist && artist !== 'Unknown Artist') ? artist : ''].join(' ').trim();
   if (query) {
     try {

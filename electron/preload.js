@@ -1,7 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('electronAPI', {
-  minimize: () => ipcRenderer.send('window-minimize'),
+contextBridge.exposeInMainWorld('electronAPI', {\n  minimize: () => ipcRenderer.send('window-minimize'),
   minimizeWindow: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
   maximizeWindow: () => ipcRenderer.send('window-maximize'),
@@ -17,6 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   extractUrl: (url) => ipcRenderer.invoke('extract-url', url),
   searchJioSaavn: (query) => ipcRenderer.invoke('search-jiosaavn', query),
+  resolveTrackStream: (title, artist) => ipcRenderer.invoke('resolve-track-stream', title, artist),
 
   startDownload: (task) => ipcRenderer.invoke('download-start', task),
   pauseDownload: (id) => ipcRenderer.invoke('download-pause', id),

@@ -295,7 +295,10 @@ export default function DownloadsTab({
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        padding: '24px 32px 40px 32px',
+        padding: '24px 32px 100px 32px',
+        boxSizing: 'border-box',
+        maxHeight: '100%',
+        scrollBehavior: 'smooth',
         backgroundColor: 'var(--bg-main, #f5f5f5)',
         overflowY: 'auto',
         height: '100%',
@@ -921,10 +924,8 @@ export default function DownloadsTab({
         <div
           style={{
             backgroundColor: 'var(--bg-card)',
-            borderRadius: '12px',
-            border: '1px solid var(--border-medium)',
-            overflow: 'hidden',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
           }}
         >
           <table
@@ -935,10 +936,10 @@ export default function DownloadsTab({
               fontSize: '12.5px',
             }}
           >
-            <thead>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 10, backgroundColor: 'var(--bg-main, #f5f5f5)' }}>
               <tr
                 style={{
-                  borderBottom: '1px solid var(--border-medium)',
+                  borderBottom: '1.5px solid var(--border-medium)',
                   backgroundColor: 'var(--bg-main)',
                   color: 'var(--text-muted)',
                   fontSize: '11px',
@@ -1009,7 +1010,7 @@ export default function DownloadsTab({
                         ? 'rgba(124, 92, 191, 0.09)'
                         : isTaskActive
                         ? 'rgba(124, 92, 191, 0.02)'
-                        : 'transparent',
+                        : 'var(--bg-card, #ffffff)',
                       cursor: 'pointer',
                       transition: 'background-color 0.12s ease',
                     }}

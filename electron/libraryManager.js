@@ -226,7 +226,7 @@ class LibraryManager {
                 artworkUrl: art || '',
                 filePath: fullPath,
                 ext,
-                mimeType: ext === '.mp4' || ext === '.mkv' ? 'video/mp4' : 'audio/mpeg',
+                mimeType: ext === '.mp4' || ext === '.mkv' ? 'video/mp4' : (ext === '.m4a' || ext === '.aac' ? 'audio/mp4' : 'audio/mpeg'),
                 modifiedAt: stat.mtimeMs,
                 source: 'Local Storage'
               });

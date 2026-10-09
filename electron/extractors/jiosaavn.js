@@ -226,6 +226,11 @@ function decryptMediaUrl(encryptedUrl) {
 function cleanSearchQuery(text) {
   if (!text) return '';
   return text
+    .replace(/[\u00a0\u1680\u180e\u2000-\u200b\u202f\u205f\u3000\ufeff]/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/[\u0600-\u06FF]/g, ' ') // Strip Arabic characters that confuse Saavn autocomplete index
     .replace(/\(.*?\)/g, '')
     .replace(/\[.*?\]/g, '')
     .replace(/feat\..*$/i, '')
@@ -234,63 +239,102 @@ function cleanSearchQuery(text) {
     .replace(/audio/gi, '')
     .replace(/lyric(s)?/gi, '')
     .replace(/remix/gi, '')
-    .replace(/[\-|_|\|]/g, ' ')
+    .replace(/prod\..*$/gi, '')
+    .replace(/[\-|_|\\/]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
+function getSearchVariations(query) {
+  if (!query) return [];
+  const raw = String(query)
+    .replace(/[\u00a0\u1680\u180e\u2000-\u200b\u202f\u205f\u3000\ufeff]/g, ' ')
+    .trim();
+
+  const variations = [];
+  variations.push(raw);
+
+  const cleaned = cleanSearchQuery(raw);
+  if (cleaned && cleaned !== raw) {
+    variations.push(cleaned);
+  }
+
+  // If query contains comma or slash (multiple artists or alternative names)
+  const parts = raw.split(/[,/|]/);
+  if (parts.length > 1) {
+    const firstPart = cleanSearchQuery(parts[0]);
+    if (firstPart && !variations.includes(firstPart)) variations.push(firstPart);
+  }
+
+  // Title without artist tag if separated by hyphen
+  if (raw.includes('-')) {
+    const hParts = raw.split('-');
+    const titlePart = cleanSearchQuery(hParts[0]);
+    if (titlePart && !variations.includes(titlePart)) variations.push(titlePart);
+  }
+
+  return [...new Set(variations.filter(v => v.length > 0))];
+}
+
+async function searchTrackSingle(queryStr) {
+  const searchUrl = 'https://www.jiosaavn.com/api.php?__call=autocomplete.get&_format=json&_marker=0&cc=in&includeMetaTags=1&query=' + encodeURIComponent(queryStr);
+  const resp = await fetch(searchUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+  });
+
+  if (!resp.ok) return null;
+  const data = await resp.json();
+
+  if (!data.songs || !data.songs.data || data.songs.data.length === 0) {
+    return null;
+  }
+
+  const firstSong = data.songs.data[0];
+  const songId = firstSong.id;
+
+  // Fetch details
+  const detailUrl = 'https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=' + songId;
+  const detailResp = await fetch(detailUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+  });
+
+  if (!detailResp.ok) return null;
+  const detailData = await detailResp.json();
+  const songObj = detailData[songId];
+  if (!songObj || !songObj.encrypted_media_url) return null;
+
+  const streamUrl = decryptMediaUrl(songObj.encrypted_media_url);
+  if (!streamUrl) return null;
+
+  const artwork = (songObj.image || firstSong.image || '')
+    .replace('150x150', '500x500')
+    .replace('50x50', '500x500');
+
+  return {
+    id: songId,
+    title: songObj.song ? decodeHtml(songObj.song) : firstSong.title,
+    artist: songObj.singers ? decodeHtml(songObj.singers) : (firstSong.more_info?.singers || 'Unknown Artist'),
+    album: songObj.album ? decodeHtml(songObj.album) : '',
+    duration: parseInt(songObj.duration || '0', 10),
+    artworkUrl: artwork,
+    streamUrl: streamUrl,
+    bitrate: '320kbps',
+    source: 'JioSaavn 320k Studio'
+  };
+}
+
 async function searchTrack(query) {
   try {
-    const clean = cleanSearchQuery(query);
-    const searchUrl = 'https://www.jiosaavn.com/api.php?__call=autocomplete.get&_format=json&_marker=0&cc=in&includeMetaTags=1&query=' + encodeURIComponent(clean || query);
-    
-    const resp = await fetch(searchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
-    });
-
-    if (!resp.ok) return null;
-    const data = await resp.json();
-
-    if (!data.songs || !data.songs.data || data.songs.data.length === 0) {
-      return null;
+    const variations = getSearchVariations(query);
+    for (const v of variations) {
+      const res = await searchTrackSingle(v);
+      if (res && res.streamUrl) return res;
     }
-
-    const firstSong = data.songs.data[0];
-    const songId = firstSong.id;
-
-    // Fetch details
-    const detailUrl = 'https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=' + songId;
-    const detailResp = await fetch(detailUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
-    });
-
-    if (!detailResp.ok) return null;
-    const detailData = await detailResp.json();
-    const songObj = detailData[songId];
-    if (!songObj || !songObj.encrypted_media_url) return null;
-
-    const streamUrl = decryptMediaUrl(songObj.encrypted_media_url);
-    if (!streamUrl) return null;
-
-    const artwork = (songObj.image || firstSong.image || '')
-      .replace('150x150', '500x500')
-      .replace('50x50', '500x500');
-
-    return {
-      id: songId,
-      title: songObj.song ? decodeHtml(songObj.song) : firstSong.title,
-      artist: songObj.singers ? decodeHtml(songObj.singers) : (firstSong.more_info?.singers || 'Unknown Artist'),
-      album: songObj.album ? decodeHtml(songObj.album) : '',
-      duration: parseInt(songObj.duration || '0', 10),
-      artworkUrl: artwork,
-      streamUrl: streamUrl,
-      bitrate: '320kbps',
-      source: 'JioSaavn 320k Studio'
-    };
+    return null;
   } catch (err) {
     console.error('JioSaavn search failed:', err.message);
     return null;

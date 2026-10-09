@@ -444,7 +444,7 @@ export default function App() {
         const tCleanArtist = (itemArtist && itemArtist !== 'Unknown Artist')
           ? itemArtist.replace(/[\/\\?%*:|"<>]/g, '_') + ' - '
           : '';
-        const tDestinationPath = musicDir + '\\' + tCleanArtist + tCleanTitle + '.mp3';
+        const tDestinationPath = musicDir + '\\' + tCleanArtist + tCleanTitle + '.m4a';
 
         const tTaskId = 'dl-' + Date.now() + '-' + Math.random().toString(36).substring(7);
         tasksToQueue.push({
@@ -513,9 +513,19 @@ export default function App() {
               let tArtwork = task.artworkUrl;
               let tAlbum = task.album;
 
-              if (window.electronAPI?.searchJioSaavn) {
+              if (window.electronAPI?.resolveTrackStream) {
                 try {
-                  const jioMatch = await window.electronAPI.searchJioSaavn(`${task.title} ${task.artist}`);
+                  const resolved = await window.electronAPI.resolveTrackStream(task.title, task.artist);
+                  if (resolved && resolved.streamUrl) {
+                    tStreamUrl = resolved.streamUrl;
+                    tBitrate = resolved.bitrate || '320kbps';
+                    if (resolved.artworkUrl) tArtwork = resolved.artworkUrl;
+                    if (resolved.album) tAlbum = resolved.album;
+                  }
+                } catch (e) {}
+              } else if (window.electronAPI?.searchJioSaavn) {
+                try {
+                  const jioMatch = await window.electronAPI.searchJioSaavn(task.title + ' ' + task.artist);
                   if (jioMatch && jioMatch.streamUrl) {
                     tStreamUrl = jioMatch.streamUrl;
                     tBitrate = jioMatch.bitrate || '320kbps';
@@ -869,8 +879,13 @@ export default function App() {
     if (!filePath) return '';
     if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath;
     const clean = filePath.replace(/\\/g, '/');
-    const pathWithSlash = clean.startsWith('/') ? clean : '/' + clean;
-    return 'file://' + encodeURI(pathWithSlash);
+    const parts = clean.split('/');
+    const encodedParts = parts.map((part, idx) => {
+      if (idx === 0 && part.endsWith(':')) return part;
+      return encodeURIComponent(part);
+    });
+    const normalized = encodedParts.join('/');
+    return 'file:///' + (normalized.startsWith('/') ? normalized.slice(1) : normalized);
   };
 
   // Playback Controls with Real Audio Source Loading
