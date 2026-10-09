@@ -147,24 +147,7 @@ header nav > div {
     gap: 10px;
 }
 
-header nav > div a {
-    padding: 7px 18px;
-    border: 1px solid #e4e4e7;
-    border-radius: 6px;
-    font-weight: 400;
-    font-size: 0.9em;
-    color: #27272a;
-    background: #ffffff;
-    display: inline-flex;
-    align-items: center;
-    transition: all 0.2s ease;
-}
-
-header nav > div a:hover {
-    border-color: #18181b;
-    color: #09090b;
-    background: #f4f4f5;
-}
+/* Navigation action buttons styled specifically via .nav-btn-primary and .nav-link-github */
 
 /* ===== HERO ===== */
 .hero {
@@ -1219,4 +1202,293 @@ header nav {
     .search-results-modal {
         width: 100%;
     }
+}
+
+/* ===== NEW NAV EXPANSIONS FOR DROPDOWNS & SEARCH (Clean Text Links, No Box Borders) ===== */
+.nav-left {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.nav-brand {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    font-size: 1.15em !important;
+    font-weight: 600 !important;
+    color: #09090b !important;
+    letter-spacing: -0.02em !important;
+    white-space: nowrap !important;
+    text-decoration: none !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.nav-brand i {
+    font-size: 1.15em;
+    color: #18181b;
+}
+
+.nav-center {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex: 1;
+    justify-content: center;
+}
+
+.nav-menu {
+    display: flex;
+    align-items: center;
+    list-style: none;
+    gap: 20px;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-item {
+    position: relative;
+}
+
+/* Natural clean text links - NO BOX, NO BORDER, NO ROUNDED CORNERS */
+.nav-link {
+    font-size: 0.92em !important;
+    color: #52525b !important;
+    font-weight: 400 !important;
+    padding: 6px 2px !important;
+    border: none !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    cursor: pointer !important;
+    transition: color 0.15s ease !important;
+    white-space: nowrap !important;
+    text-decoration: none !important;
+    box-shadow: none !important;
+}
+
+.nav-link:hover, .nav-link.active {
+    color: #09090b !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+.nav-link.active {
+    font-weight: 600 !important;
+}
+
+/* Dropdown Menu Flyout */
+.nav-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 240px;
+    background: #ffffff;
+    border: 1px solid #e4e4e7;
+    border-radius: 4px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    padding: 6px;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 1050;
+    margin-top: 6px;
+}
+
+.nav-item:hover .nav-dropdown,
+.nav-item:focus-within .nav-dropdown {
+    display: flex;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 0.88em;
+    color: #27272a;
+    transition: background 0.15s ease, color 0.15s ease;
+    text-align: left;
+    text-decoration: none;
+    border: none !important;
+    background: transparent !important;
+}
+
+.dropdown-item:hover {
+    background: #f4f4f5 !important;
+    color: #09090b !important;
+}
+
+.dropdown-item i {
+    font-size: 1.1em;
+    color: #71717a;
+}
+
+.dropdown-item:hover i {
+    color: #18181b;
+}
+
+/* Global Search Input in Header */
+.nav-search-container {
+    position: relative;
+    max-width: 240px;
+    width: 100%;
+}
+
+.nav-search-input {
+    width: 100%;
+    height: 32px;
+    padding: 0 46px 0 32px;
+    background: #f4f4f5;
+    border: 1px solid #e4e4e7;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-family: inherit;
+    color: #18181b;
+    outline: none;
+    transition: all 0.15s ease;
+}
+
+.nav-search-input:focus {
+    background: #ffffff;
+    border-color: #18181b;
+    box-shadow: 0 0 0 2px rgba(24, 24, 27, 0.08);
+}
+
+.nav-search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #71717a;
+    font-size: 0.9em;
+    pointer-events: none;
+}
+
+.nav-search-kbd {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #ffffff;
+    border: 1px solid #e4e4e7;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 0.7em;
+    font-weight: 500;
+    color: #71717a;
+    pointer-events: none;
+}
+
+/* Search Results Modal Flyout */
+.search-results-modal {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    width: 360px;
+    max-height: 400px;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1px solid #e4e4e7;
+    border-radius: 4px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12);
+    display: none;
+    flex-direction: column;
+    padding: 6px;
+    z-index: 1100;
+}
+
+.search-result-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    text-align: left;
+    transition: all 0.15s ease;
+    border-bottom: 1px solid #f4f4f5;
+    text-decoration: none;
+}
+
+.search-result-row:last-child {
+    border-bottom: none;
+}
+
+.search-result-row:hover {
+    background: #f4f4f5;
+}
+
+.search-result-title {
+    font-size: 0.88em;
+    font-weight: 600;
+    color: #09090b;
+}
+
+.search-result-snippet {
+    font-size: 0.78em;
+    color: #71717a;
+    line-height: 1.4;
+}
+
+.search-result-badge {
+    align-self: flex-start;
+    font-size: 0.68em;
+    background: #e4e4e7;
+    color: #27272a;
+    padding: 1px 6px;
+    border-radius: 3px;
+}
+
+.nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+}
+
+.nav-link-github {
+    font-size: 0.9em;
+    color: #52525b !important;
+    font-weight: 400;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 6px 2px !important;
+    border-radius: 0 !important;
+    transition: color 0.15s ease;
+}
+
+.nav-link-github:hover {
+    color: #09090b !important;
+}
+
+.nav-btn-primary {
+    padding: 7px 16px;
+    background: #09090b;
+    color: #ffffff !important;
+    border: 1px solid #09090b;
+    border-radius: 4px;
+    font-size: 0.88em;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+.nav-btn-primary:hover {
+    background: #27272a;
+    border-color: #27272a;
 }
