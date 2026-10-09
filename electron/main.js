@@ -100,8 +100,14 @@ function createWindow() {
   }
 
   // Handle reload failure safely
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-    console.warn(`Page failed to load (${errorCode}: ${errorDescription}), falling back to built dist/index.html`);
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    // Crucial: Only reload if the top-level LuckyGuy application itself fails to load!
+    // Never reload because an iframe, webview, or portal sub-request returned an error!
+    if (!isMainFrame) return;
+    if (validatedURL && (validatedURL.includes('pornhub') || validatedURL.startsWith('http://') || validatedURL.startsWith('https://'))) {
+      return;
+    }
+    console.warn(`Primary app failed to load (${errorCode}: ${errorDescription}), falling back to built dist/index.html`);
     if (fs.existsSync(indexPath)) {
       mainWindow.loadFile(indexPath);
     }
@@ -136,6 +142,12 @@ app.whenReady().then(() => {
       delete responseHeaders['X-Frame-Options'];
       delete responseHeaders['content-security-policy'];
       delete responseHeaders['Content-Security-Policy'];
+      delete responseHeaders['cross-origin-embedder-policy'];
+      delete responseHeaders['Cross-Origin-Embedder-Policy'];
+      delete responseHeaders['cross-origin-resource-policy'];
+      delete responseHeaders['Cross-Origin-Resource-Policy'];
+      delete responseHeaders['cross-origin-opener-policy'];
+      delete responseHeaders['Cross-Origin-Opener-Policy'];
       callback({ cancel: false, responseHeaders });
     });
 
@@ -154,16 +166,14 @@ app.whenReady().then(() => {
     });
 
     // Pre-populate age verification cookies on session store
-    const phCookies = [
-      { url: 'https://www.pornhub.com', name: 'accessAgeDisclaimerPH', value: '1' },
-      { url: 'https://www.pornhub.com', name: 'age_verified', value: '1' },
-      { url: 'https://www.pornhub.com', name: 'hasVisited', value: '1' },
-      { url: 'https://www.pornhub.com', name: 'accessPH', value: '1' },
-      { url: 'https://www.pornhub.com', name: 'cookieConsent', value: '1' },
-      { url: 'https://www.pornhub.com', name: 'platform', value: 'pc' },
-    ];
-    for (const c of phCookies) {
-      session.defaultSession.cookies.set(c).catch(() => {});
+    const phDomains = ['https://www.pornhub.com', 'https://www.pornhub.org', 'https://pornhub.com', 'https://pornhub.org'];
+    for (const domain of phDomains) {
+      session.defaultSession.cookies.set({ url: domain, name: 'accessAgeDisclaimerPH', value: '1' }).catch(() => {});
+      session.defaultSession.cookies.set({ url: domain, name: 'age_verified', value: '1' }).catch(() => {});
+      session.defaultSession.cookies.set({ url: domain, name: 'hasVisited', value: '1' }).catch(() => {});
+      session.defaultSession.cookies.set({ url: domain, name: 'accessPH', value: '1' }).catch(() => {});
+      session.defaultSession.cookies.set({ url: domain, name: 'cookieConsent', value: '1' }).catch(() => {});
+      session.defaultSession.cookies.set({ url: domain, name: 'platform', value: 'pc' }).catch(() => {});
     }
   } catch (err) {}
   createWindow();

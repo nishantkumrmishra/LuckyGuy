@@ -271,9 +271,11 @@ export default function PluginTabContainer({
   };
 
   const handleBypassAgeVerification = async () => {
-    if (window.electronAPI?.bypassAgeVerification) {
-      await window.electronAPI.bypassAgeVerification();
-    }
+    try {
+      if (window.electronAPI?.bypassAgeVerification) {
+        await window.electronAPI.bypassAgeVerification();
+      }
+    } catch (e) {}
     setAgeVerificationBypassed(true);
     setDownloadSuccessMsg('18+ Age verification tokens and session cookies unlocked!');
     setTimeout(() => setDownloadSuccessMsg(''), 3000);
