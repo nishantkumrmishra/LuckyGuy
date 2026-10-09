@@ -529,167 +529,243 @@ export default function HomeTab({
                       ) : null}
                     </div>
 
-                    {/* Down: Horizontally scrollable 1-row shelf or full grid when expanded */}
-                    <div
-                      className="shelf-row-container"
-                      onWheel={(e) => {
-                        if (!isExpanded && e.deltaY !== 0) {
-                          e.currentTarget.scrollLeft += e.deltaY;
-                        }
-                      }}
-                      style={
-                        isExpanded
-                          ? {
-                              display: 'grid',
-                              gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-                              gap: '16px',
-                              width: '100%',
-                            }
-                          : {
-                              display: 'flex',
-                              flexDirection: 'row',
-                              gap: '16px',
-                              width: '100%',
-                              overflowX: 'auto',
-                              overflowY: 'hidden',
-                              paddingBottom: '4px',
-                              scrollbarWidth: 'none',
-                              msOverflowStyle: 'none',
-                            }
-                      }
-                    >
-                      {visibleTracks.map((track) => {
-                        const isCurrent =
-                          currentTrack &&
-                          (currentTrack.id === track.id || currentTrack.filePath === track.filePath);
-                        const isTrackPlaying = isCurrent && isPlaying;
-                        const art = track.artworkUrl || track.coverArt;
-
-                        return (
-                          <div
-                            key={track.id || track.filePath}
-                            onClick={() => onPlaySong && onPlaySong(track, sec.tracks)}
-                            style={{
-                              backgroundColor: 'var(--bg-card)',
-                              borderRadius: '12px',
-                              border: isCurrent
-                                ? '1px solid var(--primary, #7c5cbf)'
-                                : '1px solid var(--border-medium)',
-                              padding: '12px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              cursor: 'pointer',
-                              position: 'relative',
-                              transition: 'all 0.18s ease',
-                              flex: isExpanded ? 'none' : '0 0 160px',
-                              width: isExpanded ? 'auto' : '160px',
-                              boxShadow: isCurrent
-                                ? '0 4px 14px rgba(124, 92, 191, 0.18)'
-                                : '0 2px 6px rgba(0,0,0,0.02)',
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!isCurrent) e.currentTarget.style.borderColor = 'var(--text-muted)';
-                              const playBtn = e.currentTarget.querySelector('.card-play-btn');
-                              if (playBtn) playBtn.style.opacity = '1';
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isCurrent) e.currentTarget.style.borderColor = 'var(--border-medium)';
-                              const playBtn = e.currentTarget.querySelector('.card-play-btn');
-                              if (playBtn && !isTrackPlaying) playBtn.style.opacity = '0';
-                            }}
-                            title={`${track.title} • ${track.artist || 'Unknown'}`}
-                          >
-                            {/* Square Album Artwork */}
-                            <div
-                              style={{
+                    {/* Down: Horizontally scrollable 1-row shelf with smooth left/right arrow controls or full grid when expanded */}
+                    <div style={{ position: 'relative', width: '100%' }}>
+                      <div
+                        id={`shelf-row-${sec.name}`}
+                        className="shelf-row-container"
+                        style={
+                          isExpanded
+                            ? {
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                                gap: '16px',
                                 width: '100%',
-                                aspectRatio: '1 / 1',
-                                borderRadius: '8px',
-                                backgroundColor: 'var(--bg-main)',
-                                border: '1px solid var(--border-medium)',
-                                overflow: 'hidden',
-                                position: 'relative',
+                              }
+                            : {
                                 display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              {art ? (
-                                <img
-                                  src={art}
-                                  alt=""
-                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                />
-                              ) : (
-                                <Music size={32} color="var(--primary)" style={{ opacity: 0.6 }} />
-                              )}
+                                flexDirection: 'row',
+                                gap: '16px',
+                                width: '100%',
+                                overflowX: 'auto',
+                                overflowY: 'hidden',
+                                paddingBottom: '4px',
+                                scrollbarWidth: 'none',
+                                msOverflowStyle: 'none',
+                                scrollBehavior: 'smooth',
+                              }
+                        }
+                      >
+                        {visibleTracks.map((track) => {
+                          const isCurrent =
+                            currentTrack &&
+                            (currentTrack.id === track.id || currentTrack.filePath === track.filePath);
+                          const isTrackPlaying = isCurrent && isPlaying;
+                          const art = track.artworkUrl || track.coverArt;
 
-                              {/* Hover Play Button on Artwork */}
-                              <button
-                                className="card-play-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onPlaySong && onPlaySong(track, sec.tracks);
-                                }}
+                          return (
+                            <div
+                              key={track.id || track.filePath}
+                              onClick={() => onPlaySong && onPlaySong(track, sec.tracks)}
+                              style={{
+                                backgroundColor: 'var(--bg-card)',
+                                borderRadius: '12px',
+                                border: isCurrent
+                                  ? '1px solid var(--primary, #7c5cbf)'
+                                  : '1px solid var(--border-medium)',
+                                padding: '12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                transition: 'all 0.18s ease',
+                                flex: isExpanded ? 'none' : '0 0 160px',
+                                width: isExpanded ? 'auto' : '160px',
+                                boxShadow: isCurrent
+                                  ? '0 4px 14px rgba(124, 92, 191, 0.18)'
+                                  : '0 2px 6px rgba(0,0,0,0.02)',
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isCurrent) e.currentTarget.style.borderColor = 'var(--text-muted)';
+                                const playBtn = e.currentTarget.querySelector('.card-play-btn');
+                                if (playBtn) playBtn.style.opacity = '1';
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isCurrent) e.currentTarget.style.borderColor = 'var(--border-medium)';
+                                const playBtn = e.currentTarget.querySelector('.card-play-btn');
+                                if (playBtn && !isTrackPlaying) playBtn.style.opacity = '0';
+                              }}
+                              title={`${track.title} • ${track.artist || 'Unknown'}`}
+                            >
+                              {/* Square Album Artwork */}
+                              <div
                                 style={{
-                                  position: 'absolute',
-                                  bottom: '8px',
-                                  right: '8px',
-                                  width: '36px',
-                                  height: '36px',
-                                  borderRadius: '50%',
-                                  backgroundColor: 'var(--primary, #7c5cbf)',
-                                  color: '#ffffff',
-                                  border: 'none',
+                                  width: '100%',
+                                  aspectRatio: '1 / 1',
+                                  borderRadius: '8px',
+                                  backgroundColor: 'var(--bg-main)',
+                                  border: '1px solid var(--border-medium)',
+                                  overflow: 'hidden',
+                                  position: 'relative',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  cursor: 'pointer',
-                                  boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
-                                  opacity: isTrackPlaying ? 1 : 0,
-                                  transition: 'all 0.15s ease',
-                                  zIndex: 2,
                                 }}
                               >
-                                {isTrackPlaying ? (
-                                  <Pause size={16} />
+                                {art ? (
+                                  <img
+                                    src={art}
+                                    alt=""
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  />
                                 ) : (
-                                  <Play size={16} style={{ marginLeft: '1px' }} />
+                                  <Music size={32} color="var(--primary)" style={{ opacity: 0.6 }} />
                                 )}
-                              </button>
-                            </div>
 
-                            {/* Title */}
-                            <div
-                              style={{
-                                fontSize: '13.5px',
-                                fontWeight: 600,
-                                color: isCurrent ? 'var(--primary)' : 'var(--text-primary)',
-                                marginTop: '10px',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                              }}
-                            >
-                              {track.title}
-                            </div>
+                                {/* Hover Play Button on Artwork */}
+                                <button
+                                  className="card-play-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onPlaySong && onPlaySong(track, sec.tracks);
+                                  }}
+                                  style={{
+                                    position: 'absolute',
+                                    bottom: '8px',
+                                    right: '8px',
+                                    width: '36px',
+                                    height: '36px',
+                                    borderRadius: '50%',
+                                    backgroundColor: 'var(--primary, #7c5cbf)',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+                                    opacity: isTrackPlaying ? 1 : 0,
+                                    transition: 'all 0.15s ease',
+                                    zIndex: 2,
+                                  }}
+                                >
+                                  {isTrackPlaying ? (
+                                    <Pause size={16} />
+                                  ) : (
+                                    <Play size={16} style={{ marginLeft: '1px' }} />
+                                  )}
+                                </button>
+                              </div>
 
-                            {/* Artist */}
-                            <div
-                              style={{
-                                fontSize: '12px',
-                                color: 'var(--text-secondary)',
-                                marginTop: '3px',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                              }}
-                            >
-                              {track.artist || 'Unknown Artist'}
+                              {/* Title */}
+                              <div
+                                style={{
+                                  fontSize: '13.5px',
+                                  fontWeight: 600,
+                                  color: isCurrent ? 'var(--primary)' : 'var(--text-primary)',
+                                  marginTop: '10px',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                              >
+                                {track.title}
+                              </div>
+
+                              {/* Artist */}
+                              <div
+                                style={{
+                                  fontSize: '12px',
+                                  color: 'var(--text-secondary)',
+                                  marginTop: '3px',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                }}
+                              >
+                                {track.artist || 'Unknown Artist'}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
+
+                      {/* Smooth Left / Right Nav Arrows for Horizontal Navigation */}
+                      {!isExpanded && visibleTracks.length > 5 && (
+                        <>
+                          <button
+                            onClick={() => {
+                              const el = document.getElementById(`shelf-row-${sec.name}`);
+                              if (el) el.scrollBy({ left: -360, behavior: 'smooth' });
+                            }}
+                            style={{
+                              position: 'absolute',
+                              left: '-14px',
+                              top: '40%',
+                              width: '30px',
+                              height: '30px',
+                              borderRadius: '50%',
+                              backgroundColor: 'var(--bg-card)',
+                              border: '1px solid var(--border-medium)',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: 'var(--text-primary)',
+                              zIndex: 10,
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = 'var(--primary)';
+                              e.currentTarget.style.color = '#fff';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'var(--bg-card)';
+                              e.currentTarget.style.color = 'var(--text-primary)';
+                            }}
+                            title="Scroll left"
+                          >
+                            <ChevronRight size={16} style={{ transform: 'rotate(180deg)' }} />
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              const el = document.getElementById(`shelf-row-${sec.name}`);
+                              if (el) el.scrollBy({ left: 360, behavior: 'smooth' });
+                            }}
+                            style={{
+                              position: 'absolute',
+                              right: '-14px',
+                              top: '40%',
+                              width: '30px',
+                              height: '30px',
+                              borderRadius: '50%',
+                              backgroundColor: 'var(--bg-card)',
+                              border: '1px solid var(--border-medium)',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              color: 'var(--text-primary)',
+                              zIndex: 10,
+                              transition: 'all 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = 'var(--primary)';
+                              e.currentTarget.style.color = '#fff';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'var(--bg-card)';
+                              e.currentTarget.style.color = 'var(--text-primary)';
+                            }}
+                            title="Scroll right"
+                          >
+                            <ChevronRight size={16} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </section>
                 );
