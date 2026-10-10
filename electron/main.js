@@ -177,6 +177,7 @@ app.whenReady().then(() => {
           existingCookie = (existingCookie ? existingCookie + '; ' : '') + 'accessAgeDisclaimerPH=1; age_verified=1; hasVisited=1; accessPH=1; cookieConsent=1; platform=pc';
         }
         requestHeaders['Cookie'] = existingCookie;
+        requestHeaders['Referer'] = 'https://www.pornhub.org/';
         requestHeaders['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
       }
       callback({ cancel: false, requestHeaders });
@@ -388,15 +389,38 @@ ipcMain.handle('crawl-portal', async (event, targetUrl) => {
                 if (!vkey || seen.has(vkey)) return;
                 seen.add(vkey);
 
-                const titleLink = el.querySelector('span.title a, .title a, .videoTitle, a.linkVideoThumb');
+                const titleEl = el.querySelector('span.title a, .thumbnailTitle, .title a, .videoTitle');
                 const imgEl = el.querySelector('img');
-                let title = titleLink?.getAttribute('title') || titleLink?.textContent?.trim() || imgEl?.getAttribute('alt') || ('Video ' + vkey);
-                if (/^\d+:\d+(:\d+)?$/.test(title.trim())) {
-                  title = imgEl?.getAttribute('alt') || ('Video ' + vkey);
+                let title = titleEl?.getAttribute('title') || titleEl?.textContent?.trim() || imgEl?.getAttribute('title') || imgEl?.getAttribute('alt') || '';
+                if (!title || /^\d+:\d+(:\d+)?$/.test(title.trim())) {
+                  const alt = imgEl?.getAttribute('alt') || imgEl?.getAttribute('title');
+                  if (alt && !/^\d+:\d+(:\d+)?$/.test(alt.trim())) {
+                    title = alt;
+                  }
                 }
-                title = title.replace(/^\d+:\d+(:\d+)?\s*/, '').trim();
-                const imgEl = el.querySelector('img');
-                const thumbnail = imgEl?.getAttribute('data-src') || imgEl?.getAttribute('data-thumb_url') || imgEl?.getAttribute('data-mediumthumb') || imgEl?.getAttribute('src') || '';
+                title = (title || '')
+                  .replace(/&amp;/g, '&')
+                  .replace(/&#039;/g, "'")
+                  .replace(/&quot;/g, '"')
+                  .replace(/^Video\s*\d+:\d+\s*/i, '')
+                  .replace(/^\d+:\d+(:\d+)?\s*[-–:]?\s*/, '')
+                  .trim();
+                if (!title || /^\d+:\d+(:\d+)?$/.test(title)) {
+                  title = 'Featured Video ' + (vkey ? vkey.substring(0, 8) : '');
+                }
+
+                let thumbnail = imgEl?.getAttribute('data-mediumthumb') || imgEl?.getAttribute('data-image') || imgEl?.getAttribute('data-thumb_url') || imgEl?.getAttribute('data-src') || imgEl?.getAttribute('src') || '';
+                if (thumbnail.startsWith('data:image/gif') || !thumbnail.startsWith('http')) {
+                  if (imgEl && imgEl.attributes) {
+                    for (let a = 0; a < imgEl.attributes.length; a++) {
+                      const attr = imgEl.attributes[a];
+                      if (attr.value && attr.value.startsWith('http') && (attr.name.includes('thumb') || attr.name.includes('image') || attr.name.includes('src'))) {
+                        thumbnail = attr.value;
+                        break;
+                      }
+                    }
+                  }
+                }
                 const duration = el.querySelector('.duration, var.duration')?.textContent?.trim() || '12:00';
                 const views = el.querySelector('.views var, .views')?.textContent?.trim() || '1.2M views';
                 const rating = el.querySelector('.value, .rating')?.textContent?.trim() || '96%';

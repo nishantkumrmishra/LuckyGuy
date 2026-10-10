@@ -347,23 +347,37 @@ export default function PluginTabContainer({
             if (!vkey || seen.has(vkey)) return;
             seen.add(vkey);
 
-            const titleLink = el.querySelector('span.title a, .title a, .videoTitle, a.linkVideoThumb');
+            const titleEl = el.querySelector('span.title a, .thumbnailTitle, .title a, .videoTitle');
             const imgEl = el.querySelector('img');
-            let title = titleLink ? (titleLink.getAttribute('title') || titleLink.textContent) : (imgEl?.getAttribute('alt') || '');
-            title = (title || '').trim();
-            if (/^\d+:\d+(:\d+)?$/.test(title.trim())) {
-              title = imgEl?.getAttribute('alt') || ('Video ' + vkey);
+            let title = titleEl?.getAttribute('title') || titleEl?.textContent?.trim() || imgEl?.getAttribute('title') || imgEl?.getAttribute('alt') || '';
+            if (!title || /^\d+:\d+(:\d+)?$/.test(title.trim())) {
+              const alt = imgEl?.getAttribute('alt') || imgEl?.getAttribute('title');
+              if (alt && !/^\d+:\d+(:\d+)?$/.test(alt.trim())) {
+                title = alt;
+              }
             }
-            title = title.replace(/^\d+:\d+(:\d+)?\s*/, '').trim();
-            if (!title) return;
+            title = (title || '')
+              .replace(/&amp;/g, '&')
+              .replace(/&#039;/g, "'")
+              .replace(/&quot;/g, '"')
+              .replace(/^Video\s*\d+:\d+\s*/i, '')
+              .replace(/^\d+:\d+(:\d+)?\s*[-–:]?\s*/, '')
+              .trim();
+            if (!title || /^\d+:\d+(:\d+)?$/.test(title)) {
+              title = 'Featured Video ' + (vkey ? vkey.substring(0, 8) : '');
+            }
 
-            const imgEl = el.querySelector('img');
-            let thumbnail = '';
-            if (imgEl) {
-              thumbnail = imgEl.getAttribute('data-src') || 
-                          imgEl.getAttribute('data-thumb_url') || 
-                          imgEl.getAttribute('data-mediumthumb') || 
-                          imgEl.getAttribute('src') || '';
+            let thumbnail = imgEl?.getAttribute('data-mediumthumb') || imgEl?.getAttribute('data-image') || imgEl?.getAttribute('data-thumb_url') || imgEl?.getAttribute('data-src') || imgEl?.getAttribute('src') || '';
+            if (thumbnail.startsWith('data:image/gif') || !thumbnail.startsWith('http')) {
+              if (imgEl && imgEl.attributes) {
+                for (let a = 0; a < imgEl.attributes.length; a++) {
+                  const attr = imgEl.attributes[a];
+                  if (attr.value && attr.value.startsWith('http') && (attr.name.includes('thumb') || attr.name.includes('image') || attr.name.includes('src'))) {
+                    thumbnail = attr.value;
+                    break;
+                  }
+                }
+              }
             }
 
             const durEl = el.querySelector('.duration, var.duration, .time');
@@ -693,7 +707,33 @@ export default function PluginTabContainer({
 
   const handlePlayVideo = (video) => {
     setActivePlayerVideo(video);
+    if (video.url) {
+      setInputUrl(video.url);
+    }
     if (onVideoPlay) onVideoPlay();
+
+    // Dynamically resolve full metadata and direct streams from official page
+    if (video.url && window.electronAPI?.extractUrl) {
+      window.electronAPI.extractUrl(video.url)
+        .then((res) => {
+          if (res && !res.error) {
+            setActivePlayerVideo((prev) => {
+              if (prev && (prev.id === video.id || prev.url === video.url)) {
+                return {
+                  ...prev,
+                  title: (res.title && !/^\d+:\d+(:\d+)?$/.test(res.title)) ? res.title : prev.title,
+                  author: res.artist || prev.author,
+                  streamUrl: res.streamUrl || prev.streamUrl,
+                  streams: res.streams || prev.streams,
+                  thumbnail: res.artworkUrl || prev.thumbnail,
+                };
+              }
+              return prev;
+            });
+          }
+        })
+        .catch(() => {});
+    }
 
     // Save to Watch History & adapt recommendations
     try {
@@ -1166,7 +1206,9 @@ export default function PluginTabContainer({
               {/* Video Title & Primary Metadata */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <h1 style={{ fontSize: '18px', fontWeight: 700, margin: 0, lineHeight: '1.3' }}>
-                  {activePlayerVideo.title}
+                  {activePlayerVideo.title && !/^\d+:\d+(:\d+)?$/.test(activePlayerVideo.title)
+                    ? activePlayerVideo.title
+                    : (activePlayerVideo.author ? `${activePlayerVideo.author} Video` : 'Featured Video')}
                 </h1>
 
                 {/* Clean Creator / Channel Row */}
@@ -1593,7 +1635,7 @@ export default function PluginTabContainer({
                       <img
                         src={item.thumbnail}
                         alt={item.title}
-                        onError={(e) => { e.target.src = item.thumbnailFallback || matureThumbnails[0]; }}
+                        onError={(e) => { if (item.thumbnailFallback && e.target.src !== item.thumbnailFallback) { e.target.src = item.thumbnailFallback; } }}
                         style={{
                           width: '100%',
                           height: '100%',
@@ -1693,7 +1735,7 @@ export default function PluginTabContainer({
                         }}
                         title={item.title}
                       >
-                        {item.title}
+                        {item.title && !/^\d+:\d+(:\d+)?$/.test(item.title) ? item.title : (item.author ? `${item.author} Video` : 'Featured Video')}
                       </div>
                     </div>
                   </div>

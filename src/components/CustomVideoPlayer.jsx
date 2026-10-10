@@ -11,6 +11,7 @@ import {
   Check,
   ChevronDown,
   Loader2,
+  RotateCcw,
   AlertCircle
 } from 'lucide-react';
 
@@ -26,7 +27,7 @@ export default function CustomVideoPlayer({
   const progressTrackRef = useRef(null);
   const hideControlsTimeoutRef = useRef(null);
 
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.85);
@@ -40,10 +41,15 @@ export default function CustomVideoPlayer({
   const [hoverPosition, setHoverPosition] = useState(0);
   const [isHoveringProgress, setIsHoveringProgress] = useState(false);
   const [playSplash, setPlaySplash] = useState(null); // 'play' | 'pause' | null
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const [resolvedStreams, setResolvedStreams] = useState(video?.streams || {});
-  const [currentStreamSrc, setCurrentStreamSrc] = useState(video?.streamUrl || '');
-  const [useFallbackEmbed, setUseFallbackEmbed] = useState(false);
+  const [currentStreamSrc, setCurrentStreamSrc] = useState(
+    (video?.streams && video?.streams[selectedQuality]) || video?.streamUrl || ''
+  );
+  const [displayTitle, setDisplayTitle] = useState(
+    video?.title && !/^\d+:\d+$/.test(video.title) ? video.title : ''
+  );
 
   // Format seconds into MM:SS
   const formatTime = (seconds) => {
@@ -53,52 +59,67 @@ export default function CustomVideoPlayer({
     return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  // Resolve direct streams if only website URL is provided
-  useEffect(() => {
-    let isMounted = true;
-    setUseFallbackEmbed(false);
+  // Resolve direct streams if needed
+  const resolveStreams = useCallback(async () => {
+    setHasError(false);
+    setIsLoading(true);
 
     if (video?.streams && Object.keys(video.streams).length > 0) {
       setResolvedStreams(video.streams);
-      setCurrentStreamSrc(video.streams[selectedQuality] || video.streamUrl || Object.values(video.streams)[0]);
+      const chosen = video.streams[selectedQuality] || video.streamUrl || Object.values(video.streams)[0];
+      setCurrentStreamSrc(chosen);
+      setIsLoading(false);
       return;
     }
 
     if (video?.url && window.electronAPI?.extractUrl) {
-      setIsLoading(true);
-      window.electronAPI.extractUrl(video.url)
-        .then((res) => {
-          if (!isMounted) return;
-          if (res && !res.error) {
-            if (res.streams && Object.keys(res.streams).length > 0) {
-              setResolvedStreams(res.streams);
-              const bestSrc = res.streams[selectedQuality] || res.streamUrl || Object.values(res.streams)[0];
-              setCurrentStreamSrc(bestSrc);
-            } else if (res.streamUrl) {
-              setCurrentStreamSrc(res.streamUrl);
-            }
+      try {
+        const res = await window.electronAPI.extractUrl(video.url);
+        if (res && !res.error) {
+          if (res.title) setDisplayTitle(res.title);
+          if (res.streams && Object.keys(res.streams).length > 0) {
+            setResolvedStreams(res.streams);
+            const best = res.streams[selectedQuality] || res.streamUrl || Object.values(res.streams)[0];
+            setCurrentStreamSrc(best);
+          } else if (res.streamUrl) {
+            setCurrentStreamSrc(res.streamUrl);
           }
-        })
-        .catch(() => {})
-        .finally(() => {
-          if (isMounted) setIsLoading(false);
-        });
+        } else {
+          // If extractor returned direct stream or fallback
+          if (video?.streamUrl) setCurrentStreamSrc(video.streamUrl);
+        }
+      } catch (err) {
+        console.warn('Error extracting direct stream:', err);
+        if (video?.streamUrl) setCurrentStreamSrc(video.streamUrl);
+      } finally {
+        setIsLoading(false);
+      }
     } else if (video?.streamUrl) {
       setCurrentStreamSrc(video.streamUrl);
+      setIsLoading(false);
+    } else {
+      setIsLoading(false);
     }
-
-    return () => {
-      isMounted = false;
-    };
   }, [video, selectedQuality]);
 
-  // Video source resolution based on chosen quality
-  const getVideoSource = useCallback(() => {
-    if (resolvedStreams && resolvedStreams[selectedQuality]) {
-      return resolvedStreams[selectedQuality];
+  useEffect(() => {
+    resolveStreams();
+  }, [resolveStreams]);
+
+  // When currentStreamSrc changes, load and play
+  useEffect(() => {
+    if (currentStreamSrc && videoRef.current) {
+      setHasError(false);
+      const v = videoRef.current;
+      v.src = currentStreamSrc;
+      v.play()
+        .then(() => setIsPlaying(true))
+        .catch(() => {
+          // Autoplay policy may pause until user gesture
+          setIsPlaying(false);
+        });
     }
-    return currentStreamSrc || video?.streamUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
-  }, [resolvedStreams, selectedQuality, currentStreamSrc, video]);
+  }, [currentStreamSrc]);
 
   // Auto-hide controls when mouse is inactive
   const resetHideTimer = useCallback(() => {
@@ -269,21 +290,14 @@ export default function CustomVideoPlayer({
     }
   };
 
-  // Handle Playback error by falling back to embed if viewkey exists
-  const handleVideoError = () => {
-    const vkey = video?.url?.match(/viewkey=([a-zA-Z0-9_-]+)/)?.[1];
-    if (vkey) {
-      setUseFallbackEmbed(true);
-    }
-  };
-
   const progressPercent = duration ? (currentTime / duration) * 100 : 0;
-  const vkey = video?.url?.match(/viewkey=([a-zA-Z0-9_-]+)/)?.[1];
 
   // Available qualities list
   const availableQualities = Object.keys(resolvedStreams).length > 0
     ? Object.keys(resolvedStreams).sort((a, b) => parseInt(b) - parseInt(a))
     : ['1080p', '720p', '480p'];
+
+  const titleToShow = displayTitle || video?.title || 'High-Definition Stream';
 
   return (
     <div
@@ -302,452 +316,488 @@ export default function CustomVideoPlayer({
         userSelect: 'none',
       }}
     >
-      {/* If native video had an error and viewkey is available, fallback to embed webview */}
-      {useFallbackEmbed && vkey ? (
-        <webview
-          src={"https://www.pornhub.org/embed/" + vkey}
-          style={{ width: "100%", height: "100%", border: "none" }}
-          allowpopups="false"
-        />
-      ) : (
-        <>
-          {/* Native Video Element */}
-          <video
-            ref={videoRef}
-            src={getVideoSource()}
-            poster={video?.thumbnail}
-            autoPlay
-            playsInline
-            onError={handleVideoError}
-            onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={(e) => {
-              if (e.target.duration && !isNaN(e.target.duration)) {
-                setDuration(e.target.duration);
-              }
-              setIsLoading(false);
-            }}
-            onWaiting={() => setIsLoading(true)}
-            onPlaying={() => setIsLoading(false)}
-            onClick={togglePlay}
+      {/* Native Video Element */}
+      <video
+        ref={videoRef}
+        poster={video?.thumbnail}
+        playsInline
+        onError={() => setHasError(true)}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={(e) => {
+          if (e.target.duration && !isNaN(e.target.duration)) {
+            setDuration(e.target.duration);
+          }
+          setIsLoading(false);
+          setHasError(false);
+        }}
+        onWaiting={() => setIsLoading(true)}
+        onPlaying={() => {
+          setIsLoading(false);
+          setIsPlaying(true);
+          setHasError(false);
+        }}
+        onClick={togglePlay}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          display: 'block',
+          backgroundColor: '#000000',
+          cursor: 'pointer',
+        }}
+      />
+
+      {/* Loading Spinner / Poster Overlay */}
+      {isLoading && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+            backdropFilter: 'blur(3px)',
+            pointerEvents: 'none',
+            zIndex: 15,
+            gap: '12px',
+          }}
+        >
+          <Loader2 size={38} color="#a855f7" className="animate-spin" />
+          <span style={{ color: '#ffffff', fontSize: '12px', fontWeight: 600, letterSpacing: '0.3px' }}>
+            Resolving High-Definition Stream...
+          </span>
+        </div>
+      )}
+
+      {/* Playback Error Retry Overlay */}
+      {hasError && !isLoading && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            zIndex: 16,
+            gap: '14px',
+            color: '#fff',
+            padding: '20px',
+            textAlign: 'center',
+          }}
+        >
+          <AlertCircle size={36} color="#ef4444" />
+          <div style={{ fontSize: '13px', fontWeight: 600 }}>Stream interrupted or buffering error</div>
+          <button
+            type="button"
+            onClick={resolveStreams}
             style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              display: 'block',
-              backgroundColor: '#000000',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: 'var(--primary, #7c5cbf)',
+              color: '#ffffff',
+              fontSize: '12px',
+              fontWeight: 600,
               cursor: 'pointer',
             }}
-          />
+          >
+            <RotateCcw size={14} />
+            <span>Reload Stream</span>
+          </button>
+        </div>
+      )}
 
-          {/* Loading Spinner */}
-          {isLoading && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                pointerEvents: 'none',
-                zIndex: 15,
-                backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                padding: '14px',
-                borderRadius: '50%',
-                backdropFilter: 'blur(4px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Loader2 size={36} color="#a855f7" className="animate-spin" />
-            </div>
-          )}
+      {/* Play/Pause Splash Ripple Animation in Center */}
+      {playSplash && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '72px',
+            height: '72px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ffffff',
+            pointerEvents: 'none',
+            zIndex: 12,
+          }}
+        >
+          {playSplash === 'play' ? <Play size={32} fill="#ffffff" /> : <Pause size={32} fill="#ffffff" />}
+        </div>
+      )}
 
-          {/* Play/Pause Splash Ripple Animation in Center */}
-          {playSplash && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: '72px',
-                height: '72px',
-                borderRadius: '50%',
-                backgroundColor: 'rgba(0, 0, 0, 0.65)',
-                backdropFilter: 'blur(4px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff',
-                pointerEvents: 'none',
-                zIndex: 12,
-              }}
-            >
-              {playSplash === 'play' ? <Play size={32} fill="#ffffff" /> : <Pause size={32} fill="#ffffff" />}
-            </div>
-          )}
+      {/* Top Gradient Header Overlay with Title */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          padding: '16px 20px',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          opacity: showControls ? 1 : 0,
+          transition: 'opacity 0.25s ease',
+          pointerEvents: showControls ? 'auto' : 'none',
+          zIndex: 10,
+        }}
+      >
+        <span
+          style={{
+            color: '#ffffff',
+            fontSize: '14px',
+            fontWeight: 600,
+            textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+            maxWidth: '75%',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+          title={titleToShow}
+        >
+          {titleToShow}
+        </span>
 
-          {/* Top Gradient Header Overlay with Title */}
+        {/* Video Quality Indicator Badge */}
+        <span
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(8px)',
+            color: '#ffffff',
+            fontSize: '11px',
+            fontWeight: 700,
+            padding: '2px 8px',
+            borderRadius: '4px',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+          }}
+        >
+          {selectedQuality}
+        </span>
+      </div>
+
+      {/* Bottom Controls Bar Overlay */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: 'linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.45) 60%, transparent 100%)',
+          padding: '20px 18px 12px 18px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          opacity: showControls ? 1 : 0,
+          transition: 'opacity 0.25s ease',
+          pointerEvents: showControls ? 'auto' : 'none',
+          zIndex: 10,
+        }}
+      >
+        {/* Scrubber Timeline Bar */}
+        <div
+          ref={progressTrackRef}
+          onClick={handleSeek}
+          onMouseMove={handleProgressMouseMove}
+          onMouseEnter={() => setIsHoveringProgress(true)}
+          onMouseLeave={() => setIsHoveringProgress(false)}
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: isHoveringProgress ? '7px' : '5px',
+            backgroundColor: 'rgba(255, 255, 255, 0.25)',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            transition: 'height 0.15s ease',
+          }}
+        >
+          {/* Played Progress Bar */}
           <div
             style={{
               position: 'absolute',
               top: 0,
               left: 0,
-              right: 0,
-              padding: '16px 20px',
-              background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              opacity: showControls ? 1 : 0,
-              transition: 'opacity 0.25s ease',
-              pointerEvents: showControls ? 'auto' : 'none',
-              zIndex: 10,
+              bottom: 0,
+              width: `${progressPercent}%`,
+              backgroundColor: '#a855f7',
+              backgroundImage: 'linear-gradient(to right, #7c5cbf, #a855f7)',
+              borderRadius: '4px',
             }}
-          >
-            <span
-              style={{
-                color: '#ffffff',
-                fontSize: '14px',
-                fontWeight: 600,
-                textShadow: '0 1px 4px rgba(0,0,0,0.8)',
-                maxWidth: '75%',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-              title={video?.title}
-            >
-              {video?.title}
-            </span>
+          />
 
-            {/* Video Quality Indicator Badge */}
-            <span
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                backdropFilter: 'blur(8px)',
-                color: '#ffffff',
-                fontSize: '11px',
-                fontWeight: 700,
-                padding: '2px 8px',
-                borderRadius: '4px',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-              }}
-            >
-              {selectedQuality}
-            </span>
-          </div>
-
-          {/* Bottom Controls Bar Overlay */}
+          {/* Scrubber Thumb */}
           <div
             style={{
               position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              background: 'linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.45) 60%, transparent 100%)',
-              padding: '20px 18px 12px 18px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              opacity: showControls ? 1 : 0,
-              transition: 'opacity 0.25s ease',
-              pointerEvents: showControls ? 'auto' : 'none',
-              zIndex: 10,
+              top: '50%',
+              left: `${progressPercent}%`,
+              transform: 'translate(-50%, -50%)',
+              width: isHoveringProgress ? '14px' : '10px',
+              height: isHoveringProgress ? '14px' : '10px',
+              borderRadius: '50%',
+              backgroundColor: '#ffffff',
+              boxShadow: '0 0 6px rgba(0,0,0,0.5)',
+              transition: 'width 0.15s ease, height 0.15s ease',
             }}
-          >
-            {/* Scrubber Timeline Bar */}
+          />
+
+          {/* Hover Preview Tooltip */}
+          {isHoveringProgress && hoverTime !== null && (
             <div
-              ref={progressTrackRef}
-              onClick={handleSeek}
-              onMouseMove={handleProgressMouseMove}
-              onMouseEnter={() => setIsHoveringProgress(true)}
-              onMouseLeave={() => setIsHoveringProgress(false)}
               style={{
-                position: 'relative',
-                width: '100%',
-                height: isHoveringProgress ? '7px' : '5px',
-                backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                position: 'absolute',
+                bottom: '14px',
+                left: `${hoverPosition}%`,
+                transform: 'translateX(-50%)',
+                backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                color: '#ffffff',
+                fontSize: '11px',
+                fontWeight: 600,
+                padding: '2px 6px',
                 borderRadius: '4px',
-                cursor: 'pointer',
-                transition: 'height 0.15s ease',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
               }}
             >
-              {/* Played Progress Bar */}
-              <div
+              {formatTime(hoverTime)}
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Controls Row */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+          }}
+        >
+          {/* Left Controls: Play/Pause, Volume, Time */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Play / Pause Button */}
+            <button
+              type="button"
+              onClick={togglePlay}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#ffffff',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'transform 0.15s ease',
+              }}
+              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+            >
+              {isPlaying ? (
+                <Pause size={20} fill="#ffffff" />
+              ) : (
+                <Play size={20} fill="#ffffff" style={{ marginLeft: '2px' }} />
+              )}
+            </button>
+
+            {/* Volume Icon & Slider */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                type="button"
+                onClick={toggleMute}
                 style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  bottom: 0,
-                  width: `${progressPercent}%`,
-                  backgroundColor: '#a855f7',
-                  backgroundImage: 'linear-gradient(to right, #7c5cbf, #a855f7)',
-                  borderRadius: '4px',
+                  background: 'none',
+                  border: 'none',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title={isMuted ? 'Unmute (M)' : 'Mute (M)'}
+              >
+                {isMuted || volume === 0 ? (
+                  <VolumeX size={18} />
+                ) : volume < 0.5 ? (
+                  <Volume1 size={18} />
+                ) : (
+                  <Volume2 size={18} />
+                )}
+              </button>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={isMuted ? 0 : volume}
+                onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                style={{
+                  width: '64px',
+                  height: '4px',
+                  accentColor: '#a855f7',
+                  cursor: 'pointer',
                 }}
               />
+            </div>
 
-              {/* Scrubber Thumb */}
-              <div
+            {/* Current Time / Duration Counter */}
+            <span
+              style={{
+                color: 'rgba(255, 255, 255, 0.85)',
+                fontSize: '11.5px',
+                fontFamily: 'monospace',
+                marginLeft: '4px',
+              }}
+            >
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+          </div>
+
+          {/* Right Controls: Quality Selector, In-Player Download Button, Fullscreen */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
+            {/* In-Player Quality Selector Dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => setShowQualityMenu((prev) => !prev)}
                 style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: `${progressPercent}%`,
-                  transform: 'translate(-50%, -50%)',
-                  width: isHoveringProgress ? '14px' : '10px',
-                  height: isHoveringProgress ? '14px' : '10px',
-                  borderRadius: '50%',
-                  backgroundColor: '#ffffff',
-                  boxShadow: '0 0 6px rgba(0,0,0,0.5)',
-                  transition: 'width 0.15s ease, height 0.15s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 8px',
+                  borderRadius: '5px',
+                  backgroundColor: showQualityMenu ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.15)',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  color: '#ffffff',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(4px)',
                 }}
-              />
+                title="Select Video Quality"
+              >
+                <span>{selectedQuality}</span>
+                <ChevronDown size={12} />
+              </button>
 
-              {/* Hover Preview Tooltip */}
-              {isHoveringProgress && hoverTime !== null && (
+              {/* Quality Menu Popup */}
+              {showQualityMenu && (
                 <div
                   style={{
                     position: 'absolute',
-                    bottom: '14px',
-                    left: `${hoverPosition}%`,
-                    transform: 'translateX(-50%)',
-                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-                    color: '#ffffff',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    whiteSpace: 'nowrap',
-                    pointerEvents: 'none',
+                    bottom: '32px',
+                    right: 0,
+                    backgroundColor: 'rgba(24, 24, 27, 0.95)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '8px',
+                    padding: '4px',
+                    minWidth: '120px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                    zIndex: 100,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
                   }}
                 >
-                  {formatTime(hoverTime)}
+                  <div style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.5)', padding: '4px 8px', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Quality
+                  </div>
+                  {availableQualities.map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      onClick={() => handleQualitySelect(q)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 8px',
+                        borderRadius: '4px',
+                        border: 'none',
+                        backgroundColor: selectedQuality === q ? 'rgba(168, 85, 247, 0.3)' : 'transparent',
+                        color: selectedQuality === q ? '#a855f7' : '#ffffff',
+                        fontSize: '11.5px',
+                        fontWeight: selectedQuality === q ? 700 : 500,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span>{q} {q === '1080p' ? 'Full HD' : q === '720p' ? 'HD' : q === '480p' ? 'SD' : ''}</span>
+                      {selectedQuality === q && <Check size={12} color="#a855f7" />}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
 
-            {/* Bottom Controls Row */}
-            <div
+            {/* In-Player Clean Download Button */}
+            <button
+              type="button"
+              onClick={handleDownload}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '12px',
+                gap: '5px',
+                padding: '4px 10px',
+                borderRadius: '5px',
+                backgroundColor: downloadQueued ? '#10b981' : 'var(--primary, #7c5cbf)',
+                border: 'none',
+                color: '#ffffff',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                transition: 'all 0.15s ease',
               }}
+              title={`Download in ${selectedQuality}`}
             >
-              {/* Left Controls: Play/Pause, Volume, Time */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {/* Play / Pause Button */}
-                <button
-                  type="button"
-                  onClick={togglePlay}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'transform 0.15s ease',
-                  }}
-                  title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
-                >
-                  {isPlaying ? (
-                    <Pause size={20} fill="#ffffff" />
-                  ) : (
-                    <Play size={20} fill="#ffffff" style={{ marginLeft: '2px' }} />
-                  )}
-                </button>
+              {downloadQueued ? (
+                <>
+                  <Check size={12} />
+                  <span>Queued!</span>
+                </>
+              ) : (
+                <>
+                  <Download size={12} />
+                  <span>Download {selectedQuality}</span>
+                </>
+              )}
+            </button>
 
-                {/* Volume Icon & Slider */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <button
-                    type="button"
-                    onClick={toggleMute}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#ffffff',
-                      cursor: 'pointer',
-                      padding: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                    }}
-                    title={isMuted ? 'Unmute (M)' : 'Mute (M)'}
-                  >
-                    {isMuted || volume === 0 ? (
-                      <VolumeX size={18} />
-                    ) : volume < 0.5 ? (
-                      <Volume1 size={18} />
-                    ) : (
-                      <Volume2 size={18} />
-                    )}
-                  </button>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={isMuted ? 0 : volume}
-                    onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                    style={{
-                      width: '64px',
-                      height: '4px',
-                      accentColor: '#a855f7',
-                      cursor: 'pointer',
-                    }}
-                  />
-                </div>
-
-                {/* Current Time / Duration Counter */}
-                <span
-                  style={{
-                    color: 'rgba(255, 255, 255, 0.85)',
-                    fontSize: '11.5px',
-                    fontFamily: 'monospace',
-                    marginLeft: '4px',
-                  }}
-                >
-                  {formatTime(currentTime)} / {formatTime(duration)}
-                </span>
-              </div>
-
-              {/* Right Controls: Quality Selector, In-Player Download Button, Fullscreen */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
-                {/* In-Player Quality Selector Dropdown */}
-                <div style={{ position: 'relative' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowQualityMenu((prev) => !prev)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '4px 8px',
-                      borderRadius: '5px',
-                      backgroundColor: showQualityMenu ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.15)',
-                      border: '1px solid rgba(255, 255, 255, 0.25)',
-                      color: '#ffffff',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      backdropFilter: 'blur(4px)',
-                    }}
-                    title="Select Video Quality"
-                  >
-                    <span>{selectedQuality}</span>
-                    <ChevronDown size={12} />
-                  </button>
-
-                  {/* Quality Menu Popup */}
-                  {showQualityMenu && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        bottom: '32px',
-                        right: 0,
-                        backgroundColor: 'rgba(24, 24, 27, 0.95)',
-                        backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        borderRadius: '8px',
-                        padding: '4px',
-                        minWidth: '120px',
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-                        zIndex: 100,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '2px',
-                      }}
-                    >
-                      <div style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.5)', padding: '4px 8px', fontWeight: 700, textTransform: 'uppercase' }}>
-                        Quality
-                      </div>
-                      {availableQualities.map((q) => (
-                        <button
-                          key={q}
-                          type="button"
-                          onClick={() => handleQualitySelect(q)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '6px 8px',
-                            borderRadius: '4px',
-                            border: 'none',
-                            backgroundColor: selectedQuality === q ? 'rgba(168, 85, 247, 0.3)' : 'transparent',
-                            color: selectedQuality === q ? '#a855f7' : '#ffffff',
-                            fontSize: '11.5px',
-                            fontWeight: selectedQuality === q ? 700 : 500,
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                          }}
-                        >
-                          <span>{q} {q === '1080p' ? 'Full HD' : q === '720p' ? 'HD' : q === '480p' ? 'SD' : ''}</span>
-                          {selectedQuality === q && <Check size={12} color="#a855f7" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* In-Player Clean Download Button */}
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    padding: '4px 10px',
-                    borderRadius: '5px',
-                    backgroundColor: downloadQueued ? '#10b981' : 'var(--primary, #7c5cbf)',
-                    border: 'none',
-                    color: '#ffffff',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                    transition: 'all 0.15s ease',
-                  }}
-                  title={`Download in ${selectedQuality}`}
-                >
-                  {downloadQueued ? (
-                    <>
-                      <Check size={12} />
-                      <span>Queued!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download size={12} />
-                      <span>Download {selectedQuality}</span>
-                    </>
-                  )}
-                </button>
-
-                {/* Fullscreen Toggle Button */}
-                <button
-                  type="button"
-                  onClick={toggleFullscreen}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
-                  title={isFullscreen ? 'Exit Fullscreen (F)' : 'Fullscreen (F)'}
-                >
-                  {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
-                </button>
-              </div>
-            </div>
+            {/* Fullscreen Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#ffffff',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+              title={isFullscreen ? 'Exit Fullscreen (F)' : 'Fullscreen (F)'}
+            >
+              {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+            </button>
           </div>
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 }
