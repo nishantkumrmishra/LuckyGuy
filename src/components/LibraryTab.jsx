@@ -1,4 +1,4 @@
-import AdultStreamingTab from './AdultStreamingTab';
+import VideoStreamingTab from './VideoStreamingTab';
 import ContextMenu from './ContextMenu';
 import EditMetadataModal from './EditMetadataModal';
 import React, { useState, useMemo } from 'react';
@@ -17,7 +17,7 @@ import {
   Music,
   Film,
 } from 'lucide-react';
-import { CustomIcon } from './DuoIcons';
+import { CustomIcon, DuoVideo } from './DuoIcons';
 
 export default function LibraryTab({
   songs = [],
@@ -35,11 +35,17 @@ export default function LibraryTab({
   onNavigateToHome,
   likedTracks = [],
   onToggleLike,
+  videos = [],
   adultVideos = [],
+  activeVideo = null,
   activeAdultVideo = null,
+  onPlayVideo,
   onPlayAdultVideo,
+  onClosePlayer,
   onCloseAdultPlayer,
+  onDeleteVideo,
   onDeleteAdultVideo,
+  onRefreshVideos,
   onRefreshAdultVideos,
   libraryMode = 'music',
   onSetLibraryMode,
@@ -50,6 +56,12 @@ export default function LibraryTab({
     if (onSetLibraryMode) onSetLibraryMode(mode);
     else setInternalMode(mode);
   };
+  const videoList = (videos && videos.length > 0) ? videos : adultVideos;
+  const currentActiveVideo = activeVideo || activeAdultVideo;
+  const handlePlayVid = onPlayVideo || onPlayAdultVideo;
+  const handleClosePlayer = onClosePlayer || onCloseAdultPlayer;
+  const handleDeleteVid = onDeleteVideo || onDeleteAdultVideo;
+  const handleRefreshVid = onRefreshVideos || onRefreshAdultVideos;
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFolder, setSelectedFolder] = useState(null); // null = overview folders grid, string = opened folder name
   const [contextMenu, setContextMenu] = useState(null);
@@ -144,10 +156,10 @@ export default function LibraryTab({
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  if (currentLibraryMode === 'adult') {
+  if (currentLibraryMode === 'videos' || currentLibraryMode === 'adult') {
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-        {!activeAdultVideo && (
+        {!currentActiveVideo && (
           <div style={{ display: 'flex', alignItems: 'center', padding: '16px 32px 0 32px', backgroundColor: 'var(--bg-main)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '8px', padding: '3px' }}>
               <button
@@ -170,7 +182,7 @@ export default function LibraryTab({
                 <span>Music ({songs.length})</span>
               </button>
               <button
-                onClick={() => handleSetLibraryMode('adult')}
+                onClick={() => handleSetLibraryMode('videos')}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -186,20 +198,20 @@ export default function LibraryTab({
                   boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                 }}
               >
-                <Film size={13} />
-                <span>Adult Videos ({adultVideos.length})</span>
+                <DuoVideo size={13} active={true} />
+                <span>Videos ({videoList.length})</span>
               </button>
             </div>
           </div>
         )}
 
-        <AdultStreamingTab
-          videos={adultVideos}
-          activeVideo={activeAdultVideo}
-          onPlayVideo={onPlayAdultVideo}
-          onClosePlayer={onCloseAdultPlayer}
-          onDeleteVideo={onDeleteAdultVideo}
-          onRefreshVideos={onRefreshAdultVideos}
+        <VideoStreamingTab
+          videos={videoList}
+          activeVideo={currentActiveVideo}
+          onPlayVideo={handlePlayVid}
+          onClosePlayer={handleClosePlayer}
+          onDeleteVideo={handleDeleteVid}
+          onRefreshVideos={handleRefreshVid}
           onOpenFolder={onOpenFolder}
           downloadFolder={downloadFolder}
         />
@@ -304,7 +316,7 @@ export default function LibraryTab({
               <span>Music ({songs.length})</span>
             </button>
             <button
-              onClick={() => handleSetLibraryMode('adult')}
+              onClick={() => handleSetLibraryMode('videos')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -319,8 +331,8 @@ export default function LibraryTab({
                 cursor: 'pointer',
               }}
             >
-              <Film size={13} />
-              <span>Adult Videos ({adultVideos.length})</span>
+              <DuoVideo size={13} active={false} />
+              <span>Videos ({videoList.length})</span>
             </button>
           </div>
         )}

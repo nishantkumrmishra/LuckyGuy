@@ -92,6 +92,69 @@ export const DuoLibrary = ({ size = 20, active = false, className = '' }) => (
   </svg>
 );
 
+// Duo-Tone Video Navigation Icon (for Videos Tab & Video Library)
+export const DuoVideo = ({ size = 20, active = false, className = '' }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
+    <rect
+      x="2.5"
+      y="4.5"
+      width="13.5"
+      height="15"
+      rx="3"
+      stroke={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
+      strokeWidth="1.8"
+      fill={active ? 'rgba(124, 92, 191, 0.15)' : 'none'}
+    />
+    <path
+      d="M16 9.5l5-3v11l-5-3v-5z"
+      stroke={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill={active ? 'var(--duo-purple, #7c5cbf)' : 'rgba(124, 92, 191, 0.25)'}
+    />
+    <circle cx="9.25" cy="12" r="2.2" fill="var(--duo-purple, #7c5cbf)" />
+  </svg>
+);
+
+// Duo-Tone Pornhub Icon matching the App's UI Layout & Design System
+export const DuoPornhub = ({ size = 18, active = false, className = '' }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
+    <rect
+      x="2.5"
+      y="4.5"
+      width="19"
+      height="15"
+      rx="3.5"
+      stroke={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
+      strokeWidth="1.8"
+      fill={active ? 'rgba(124, 92, 191, 0.12)' : 'none'}
+    />
+    <path
+      d="M6 8.5v7M6 8.5h3.2a1.8 1.8 0 010 3.6H6"
+      stroke={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <rect
+      x="12"
+      y="7"
+      width="7.5"
+      height="10"
+      rx="2"
+      fill="var(--duo-purple, #7c5cbf)"
+    />
+    <path
+      d="M14 9.5v5M14 12h3.5M17.5 9.5v5"
+      stroke="#ffffff"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
 // Duo-Tone Download Icon
 export const DuoDownload = ({ size = 20, active = false, className = '' }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">

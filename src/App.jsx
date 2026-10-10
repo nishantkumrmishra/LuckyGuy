@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar';
 import PlayerBar from './components/PlayerBar';
 import HomeTab from './components/HomeTab';
 import LibraryTab from './components/LibraryTab';
-import AdultStreamingTab from './components/AdultStreamingTab';
+import VideoStreamingTab from './components/VideoStreamingTab';
 import DownloadsTab from './components/DownloadsTab';
 import PluginTabContainer from './components/PluginTabContainer';
 import TelegramTab from './components/TelegramTab';
@@ -214,9 +214,9 @@ export default function App() {
 
   // 2. Downloads: Active tasks + Completed downloads
   const [activeDownloads, setActiveDownloads] = useState([]);
-  const [adultVideos, setAdultVideos] = useState([]);
-  const [activeAdultVideo, setActiveAdultVideo] = useState(null);
-  const [libraryMode, setLibraryMode] = useState('music'); // 'music' | 'adult'
+  const [videos, setVideos] = useState([]);
+  const [activeVideo, setActiveVideo] = useState(null);
+  const [libraryMode, setLibraryMode] = useState('music'); // 'music' | 'videos'
   const [completedDownloads, setCompletedDownloads] = useState(() => {
     try {
       const saved = localStorage.getItem("localguy-downloads");
@@ -451,20 +451,23 @@ export default function App() {
   useEffect(() => {
     if (!window.electronAPI) return;
 
-    // 0. Sync adult videos from backend
-    const refreshAdultVideos = async () => {
-      if (window.electronAPI?.getAdultVideos) {
-        try {
-          const list = await window.electronAPI.getAdultVideos();
-          if (Array.isArray(list)) {
-            setAdultVideos(list);
-          }
-        } catch (e) {
-          console.warn('Failed to load adult videos:', e);
+    // 0. Sync videos from backend
+    const refreshVideos = async () => {
+      try {
+        let list = null;
+        if (window.electronAPI?.getVideos) {
+          list = await window.electronAPI.getVideos();
+        } else if (window.electronAPI?.getAdultVideos) {
+          list = await window.electronAPI.getAdultVideos();
         }
+        if (Array.isArray(list)) {
+          setVideos(list);
+        }
+      } catch (e) {
+        console.warn('Failed to load videos:', e);
       }
     };
-    refreshAdultVideos();
+    refreshVideos();
 
     // 1. Sync & verify backend library songs
     if (window.electronAPI.getSongs) {
@@ -1081,32 +1084,39 @@ export default function App() {
   };
 
   // Playback logic
-  const refreshAdultVideos = async () => {
-    if (window.electronAPI?.getAdultVideos) {
-      try {
-        const list = await window.electronAPI.getAdultVideos();
-        if (Array.isArray(list)) {
-          setAdultVideos(list);
-        }
-      } catch (e) {
-        console.warn('Failed to load adult videos:', e);
+  const refreshVideos = async () => {
+    try {
+      let list = null;
+      if (window.electronAPI?.getVideos) {
+        list = await window.electronAPI.getVideos();
+      } else if (window.electronAPI?.getAdultVideos) {
+        list = await window.electronAPI.getAdultVideos();
       }
+      if (Array.isArray(list)) {
+        setVideos(list);
+      }
+    } catch (e) {
+      console.warn('Failed to load videos:', e);
     }
   };
 
-  const handlePlayAdultVideo = (video) => {
+  const handlePlayVideo = (video) => {
     setIsPlaying(false);
-    setActiveAdultVideo(video);
-    setActiveTab('adult');
+    setActiveVideo(video);
+    setActiveTab('videos');
   };
 
-  const handleDeleteAdultVideo = async (video) => {
-    if (activeAdultVideo?.id === video.id) {
-      setActiveAdultVideo(null);
+  const handleDeleteVideo = async (video) => {
+    if (activeVideo?.id === video.id) {
+      setActiveVideo(null);
     }
-    setAdultVideos((prev) => prev.filter((v) => v.id !== video.id && v.filePath !== video.filePath));
-    if (video.filePath && window.electronAPI?.deleteAdultVideo) {
-      await window.electronAPI.deleteAdultVideo(video.filePath);
+    setVideos((prev) => prev.filter((v) => v.id !== video.id && v.filePath !== video.filePath));
+    if (video.filePath) {
+      if (window.electronAPI?.deleteVideo) {
+        await window.electronAPI.deleteVideo(video.filePath);
+      } else if (window.electronAPI?.deleteAdultVideo) {
+        await window.electronAPI.deleteAdultVideo(video.filePath);
+      }
     }
   };
 
@@ -1121,13 +1131,7 @@ export default function App() {
     if (isVideo) {
       // Pause music player so video audio does not conflict
       setIsPlaying(false);
-
-      const targetPath = track.filePath || track.destinationPath;
-      if (targetPath && window.electronAPI?.openFile) {
-        window.electronAPI.openFile(targetPath);
-      } else if (targetPath && window.electronAPI?.openInFolder) {
-        window.electronAPI.openInFolder(targetPath);
-      }
+      handlePlayVideo(track);
       return;
     }
 
@@ -1251,6 +1255,7 @@ export default function App() {
           isCollapsed={isSidebarCollapsed}
           setIsCollapsed={setIsSidebarCollapsed}
           activeDownloadCount={activeDownloads.length}
+          videoCount={videos.length}
           playlists={playlists}
           pluginTabs={pluginTabs}
           settingsCategory={settingsCategory}
@@ -1305,14 +1310,14 @@ export default function App() {
               />
             )}
 
-                        {activeTab === 'adult' && (
-              <AdultStreamingTab
-                videos={adultVideos}
-                activeVideo={activeAdultVideo}
-                onPlayVideo={handlePlayAdultVideo}
-                onClosePlayer={() => setActiveAdultVideo(null)}
-                onDeleteVideo={handleDeleteAdultVideo}
-                onRefreshVideos={refreshAdultVideos}
+            {activeTab === 'videos' && (
+              <VideoStreamingTab
+                videos={videos}
+                activeVideo={activeVideo}
+                onPlayVideo={handlePlayVideo}
+                onClosePlayer={() => setActiveVideo(null)}
+                onDeleteVideo={handleDeleteVideo}
+                onRefreshVideos={refreshVideos}
                 onOpenFolder={handleOpenFolder}
                 downloadFolder="C:\\Users\\nishant\\Videos"
               />
@@ -1321,6 +1326,14 @@ export default function App() {
             {activeTab === 'library' && (
               <LibraryTab
                 songs={songs}
+                videos={videos}
+                activeVideo={activeVideo}
+                onPlayVideo={handlePlayVideo}
+                onClosePlayer={() => setActiveVideo(null)}
+                onDeleteVideo={handleDeleteVideo}
+                onRefreshVideos={refreshVideos}
+                libraryMode={libraryMode}
+                onSetLibraryMode={setLibraryMode}
                 playlists={playlists}
                 onPlaySong={handlePlayTrack}
                 onScanLibrary={handleScanLibrary}
@@ -1474,7 +1487,7 @@ export default function App() {
           </div>
 
           {/* Persistent Player Bar at Bottom (Never on video/plugin/telegram tabs, only when track is active) */}
-          {!activeTab.startsWith('plugin-') && activeTab !== 'telegram' && activeTab !== 'adult' && currentTrack && (
+          {!activeTab.startsWith('plugin-') && activeTab !== 'telegram' && activeTab !== 'videos' && activeTab !== 'adult' && currentTrack && (
             <PlayerBar
             currentTrack={currentTrack}
             isPlaying={isPlaying}

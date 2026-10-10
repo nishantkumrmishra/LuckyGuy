@@ -3,6 +3,8 @@ import AppIcon from './AppIcon';
 import {
   DuoHome,
   DuoLibrary,
+  DuoVideo,
+  DuoPornhub,
   DuoDownload,
   DuoTrash,
   DuoSettings,
@@ -35,11 +37,14 @@ export default function Sidebar({
   activeDownloadCount = 0,
   trashCount = 0,
   likedCount = 0,
+  videoCount = 0,
   adultVideoCount = 0,
   theme = 'light',
   onToggleTheme,
   pluginTabs = [],
 }) {
+  const totalVideoCount = videoCount || adultVideoCount || 0;
+
   const [width, setWidth] = useState(() => {
     const saved = localStorage.getItem('localguy-sidebar-width');
     if (saved) {
@@ -149,15 +154,19 @@ export default function Sidebar({
   const isMini = width <= 52;
   const isSettingsMode = activeTab === 'settings';
 
-  const getPluginIcon = (iconName, isActive) => {
+  const getPluginIcon = (iconName, isActive, pluginId = '') => {
     const color = isActive ? 'var(--primary, #7c5cbf)' : 'var(--duo-stroke, currentColor)';
     const name = (iconName || '').toLowerCase();
+    const pid = (pluginId || '').toLowerCase();
+    if (pid.includes('pornhub') || name.includes('pornhub')) {
+      return <DuoPornhub size={18} active={isActive} />;
+    }
     if (name.includes('telegram') || name.includes('send') || name.includes('paper-plane') || name.includes('plane')) {
       return <Send size={17} color={color} />;
     }
     if (name.includes('download')) return <DownloadCloud size={17} color={color} />;
     if (name.includes('image') || name.includes('photo')) return <ImageIcon size={17} color={color} />;
-    if (name.includes('film') || name.includes('video')) return <Film size={17} color={color} />;
+    if (name.includes('film') || name.includes('video')) return <DuoVideo size={18} active={isActive} />;
     return <Sparkles size={17} color={color} />;
   };
 
@@ -296,7 +305,7 @@ export default function Sidebar({
 
         {/* Top Navigation Group: Conditional on isSettingsMode */}
         {isSettingsMode ? (
-          /* SETTINGS / PREFERENCES NAVIGATION VIEW (NorthTracks Pattern) */
+          /* SETTINGS / PREFERENCES NAVIGATION VIEW */
           <nav
             className="sidebar-nav sidebar-preferences-nav"
             style={{
@@ -360,7 +369,8 @@ export default function Sidebar({
                 {pluginTabs.filter((p) => p.settings).map((plugin) => {
                   const targetCat = 'plugin-' + plugin.id;
                   const isSelected = settingsCategory === targetCat;
-                  const label = plugin.settings.title || (plugin.name + ' Setup');
+                  const isPornhub = (plugin.id || '').toLowerCase().includes('pornhub') || (plugin.name || '').toLowerCase().includes('pornhub');
+                  const label = isPornhub ? "Pornhub" : (plugin.settings.title || (plugin.name + ' Setup'));
                   return (
                     <div
                       key={plugin.id}
@@ -372,7 +382,7 @@ export default function Sidebar({
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '20px' }}>
                           <SlidersHorizontal size={16} color={isSelected ? 'var(--primary, #7c5cbf)' : 'var(--duo-stroke, currentColor)'} />
                         </div>
-                        <span style={labelStyle}>{(plugin.name || "").split(/\s+/).slice(0, 2).join(" ")}</span>
+                        <span style={labelStyle}>{isPornhub ? "Pornhub" : (plugin.name || "").split(/\s+/).slice(0, 2).join(" ")}</span>
                       </div>
                     </div>
                   );
@@ -419,20 +429,20 @@ export default function Sidebar({
               </div>
             </div>
 
-            {/* Adult Videos / Streaming */}
+            {/* 3. Videos Navigation */}
             <div
-              style={navItemStyle(activeTab === 'adult')}
-              onClick={() => setActiveTab('adult')}
-              title={isMini ? 'Adult Videos' : ''}
+              style={navItemStyle(activeTab === 'videos')}
+              onClick={() => setActiveTab('videos')}
+              title={isMini ? 'Videos' : ''}
             >
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '20px' }}>
-                  <Film size={18} color={activeTab === 'adult' ? 'var(--primary, #7c5cbf)' : 'var(--duo-stroke, currentColor)'} />
+                  <DuoVideo size={18} active={activeTab === 'videos'} />
                 </div>
-                <span style={labelStyle}>Adult</span>
+                <span style={labelStyle}>Videos</span>
               </div>
 
-              {adultVideoCount > 0 && !isMini && (
+              {totalVideoCount > 0 && !isMini && (
                 <span
                   style={{
                     fontSize: '10.5px',
@@ -443,17 +453,15 @@ export default function Sidebar({
                     color: 'var(--primary, #7c5cbf)',
                   }}
                 >
-                  {adultVideoCount}
+                  {totalVideoCount}
                 </span>
               )}
             </div>
 
-
-
             {/* Section Divider */}
             <div style={{ height: '1px', backgroundColor: 'var(--border-light, rgba(255,255,255,0.06))', margin: isMini ? '6px 2px' : '6px 4px' }} />
 
-            {/* 3. Playlists */}
+            {/* 4. Playlists */}
             <div
               style={navItemStyle(activeTab === 'playlists')}
               onClick={() => setActiveTab('playlists')}
@@ -467,7 +475,7 @@ export default function Sidebar({
               </div>
             </div>
 
-            {/* 4. Liked Songs */}
+            {/* 5. Liked Songs */}
             <div
               style={navItemStyle(activeTab === 'liked')}
               onClick={() => setActiveTab('liked')}
@@ -495,7 +503,7 @@ export default function Sidebar({
               )}
             </div>
 
-            {/* 5. Downloads */}
+            {/* 6. Downloads */}
             <div
               style={navItemStyle(activeTab === 'downloads')}
               onClick={() => setActiveTab('downloads')}
@@ -532,7 +540,8 @@ export default function Sidebar({
                   const tabId = 'plugin-' + plugin.id;
                   const isTabActive = activeTab === tabId;
                   const rawTitle = plugin.tab?.title || plugin.name || "";
-                  const tabTitle = rawTitle.split(/\s+/).slice(0, 2).join(" ");
+                  const isPornhub = (plugin.id || '').toLowerCase().includes('pornhub') || rawTitle.toLowerCase().includes('pornhub');
+                  const tabTitle = isPornhub ? "Pornhub" : rawTitle.split(/\s+/).slice(0, 2).join(" ");
                   return (
                     <div
                       key={plugin.id}
@@ -542,11 +551,11 @@ export default function Sidebar({
                     >
                       <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, flex: 1, overflow: 'hidden' }}>
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '20px', flexShrink: 0 }}>
-                          {getPluginIcon(plugin.tab?.icon, isTabActive)}
+                          {getPluginIcon(plugin.tab?.icon, isTabActive, plugin.id)}
                         </div>
                         <span style={{ ...labelStyle, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{tabTitle}</span>
                       </div>
-                      {plugin.rating && plugin.rating !== "all" && !isMini && (
+                      {plugin.rating && plugin.rating !== "all" && !isPornhub && !isMini && (
                         <span
                           style={{
                             fontSize: '9px',

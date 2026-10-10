@@ -918,14 +918,22 @@ ipcMain.handle('library-delete-playlist', async (event, plId) => libraryManager.
 ipcMain.handle('library-update-song', async (event, songId, updates) => libraryManager.updateSong(songId, updates));
 ipcMain.handle('library-find-duplicates', async () => libraryManager.findDuplicates());
 ipcMain.handle('library-organize-fix', async (event, musicDir) => libraryManager.organizeAndFixLibrary(musicDir));
+ipcMain.handle('library-get-videos', async (event, customDirs) => {
+  const dirs = [
+    preferences?.downloadFolder,
+    ...(Array.isArray(customDirs) ? customDirs : [customDirs])
+  ].filter(Boolean);
+  return libraryManager.getVideos(dirs);
+});
+ipcMain.handle('library-delete-video', async (event, filePath) => libraryManager.deleteVideo(filePath));
 ipcMain.handle('library-get-adult-videos', async (event, customDirs) => {
   const dirs = [
     preferences?.downloadFolder,
     ...(Array.isArray(customDirs) ? customDirs : [customDirs])
   ].filter(Boolean);
-  return libraryManager.getAdultVideos(dirs);
+  return libraryManager.getVideos(dirs);
 });
-ipcMain.handle('library-delete-adult-video', async (event, filePath) => libraryManager.deleteAdultVideo(filePath));
+ipcMain.handle('library-delete-adult-video', async (event, filePath) => libraryManager.deleteVideo(filePath));
 
 function hasRealAudioData(targetPath) {
   try {

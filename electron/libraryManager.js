@@ -853,8 +853,8 @@ class LibraryManager {
             videoMap.set(normPath, {
               id: item.id || Buffer.from(item.filePath).toString('base64').replace(/=/g, ''),
               title: item.title || path.basename(item.filePath, ext),
-              artist: item.artist || item.uploader || 'Adult Video',
-              album: item.platform || 'Adult Library',
+              artist: item.artist || item.uploader || 'Video',
+              album: item.platform || 'Videos',
               quality: item.quality || '1080p',
               artworkUrl: item.artworkUrl || '',
               filePath: item.filePath,
@@ -888,8 +888,8 @@ class LibraryManager {
                   videoMap.set(normPath, {
                     id: Buffer.from(fullPath).toString('base64').replace(/=/g, ''),
                     title,
-                    artist: 'Adult Video',
-                    album: 'Adult Library',
+                    artist: 'Video',
+                    album: 'Videos',
                     quality: 'HD',
                     artworkUrl: '',
                     filePath: fullPath,
@@ -913,6 +913,14 @@ class LibraryManager {
     const result = Array.from(videoMap.values());
     result.sort((a, b) => (b.modifiedAt || 0) - (a.modifiedAt || 0));
     return result;
+  }
+
+  getVideos(customDirs = []) {
+    return this.getAdultVideos(customDirs);
+  }
+
+  deleteVideo(filePath) {
+    return this.deleteAdultVideo(filePath);
   }
 
   deleteAdultVideo(filePath) {

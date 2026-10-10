@@ -1,141 +1,102 @@
-// Global Search Index & Navigation Handler for LuckyGuy Documentation
-const docsSearchIndex = [
-  // 1. Architecture & Privacy
+// Documentation Search Index & Autocomplete Navigation
+const searchDatabase = [
   {
-    title: "Neutral Core Architecture",
-    category: "Architecture",
-    url: "about.html#neutral-core",
-    keywords: "neutral core offline local baseline privacy security telemetry zero scrapers",
-    desc: "Offline-first base client containing zero proprietary scrapers, adult sources, or telemetry."
+    title: "Overview & Architecture",
+    category: "Getting Started",
+    url: "index.html",
+    keywords: "overview architecture local-first electron react modular components high-res lossless design",
+    desc: "Discover LuckyGuy's offline-first architecture, decoupled audio core, and modular extension runtime."
   },
   {
-    title: "Disabled-by-Default Security Model",
-    category: "Security",
-    url: "about.html#disabled-default",
-    keywords: "disabled by default enabled false security permissions isolation consent",
-    desc: "Every newly installed extension defaults to inactive until explicitly enabled by user."
+    title: "Installation & Setup",
+    category: "Getting Started",
+    url: "getting-started.html",
+    keywords: "install setup requirements git clone npm dependencies launch package windows linux mac",
+    desc: "Step-by-step setup guide for running LuckyGuy in development mode or building production desktop packages."
   },
   {
-    title: "Local-First Storage & Cache",
-    category: "Storage",
-    url: "about.html#storage",
-    keywords: "storage localstorage sqlite database music folder genre sorting offline cache",
-    desc: "All track indexing, playlists, tags, and preferences stay 100% on your local Windows PC."
+    title: "Core Features",
+    category: "Getting Started",
+    url: "features.html",
+    keywords: "features queue playlists sleep timer hotkeys search metadata tagging volume normalize",
+    desc: "Deep-dive into features including Smart Queue, Sleep Timer, Global Shortcuts, and Tag Editing."
   },
-
-  // 2. Plugin & Extension SDK
   {
-    title: "Plugin Manifest Specification (manifest.json)",
-    category: "Plugin SDK",
+    title: "Audio Engine & Formats",
+    category: "Audio Engine",
+    url: "audio-engine.html",
+    keywords: "audio engine flac mp3 aac ogg wav gapless playback equalization 10-band dsp volume boost bit-perfect",
+    desc: "Learn about the Web Audio API backend, gapless transitions, bit-perfect streaming, and format decoding."
+  },
+  {
+    title: "Equalizer & Sound Effects",
+    category: "Audio Engine",
+    url: "audio-engine.html#equalizer",
+    keywords: "eq equalizer presets bass boost vocal treble gain decibels frequency biquad filter",
+    desc: "Details on the 10-band parametric equalizer, custom presets, and real-time audio shaping."
+  },
+  {
+    title: "Downloader Pipeline",
+    category: "Downloader",
+    url: "download-manager.html",
+    keywords: "downloader download manager queue chunked streaming resume progress speed limit retry concurrency",
+    desc: "Technical documentation of the multi-stream downloader, range headers, and auto-resume logic."
+  },
+  {
+    title: "Batch & Background Downloads",
+    category: "Downloader",
+    url: "download-manager.html#batch",
+    keywords: "batch multiple parallel background downloads pause cancel restart active failed completed",
+    desc: "Manage high-concurrency downloads, bandwidth throttling, and network recovery mechanisms."
+  },
+  {
+    title: "Plugins & Extensions SDK",
+    category: "Plugins",
+    url: "plugins.html",
+    keywords: "plugins extensions modular sdk sandbox manifest lifecycle stream resolver crawler adblock",
+    desc: "Complete guide to developing, testing, and distributing modular plugins using JSON manifests and JavaScript."
+  },
+  {
+    title: "Manifest Specification (schema.json)",
+    category: "Plugins",
     url: "plugins.html#manifest-spec",
-    keywords: "manifest json id name version rating type tab adBlockRules capabilities schema",
-    desc: "Complete JSON structure defining plugin identity, rating, capabilities, and tabs."
+    keywords: "manifest schema.json format capabilities permissions entry id version author icon",
+    desc: "Specification for manifest.json including declared tabs, settings categories, and stream capabilities."
   },
   {
-    title: "Runtime Implementation (index.js)",
-    category: "Plugin SDK",
-    url: "plugins.html#runtime-spec",
-    keywords: "index js isSupported resolve crawlPage single stream resolver crawler",
-    desc: "Asynchronous JavaScript methods for URL matching, stream extraction, and batch crawling."
+    title: "Settings & Preferences Reference",
+    category: "Configuration",
+    url: "settings-reference.html",
+    keywords: "settings preferences download directory theme dark light audio output format hotkeys reset",
+    desc: "Comprehensive reference of all user preferences, cache directories, and audio device mappings."
   },
   {
-    title: "Dynamic Sidebar Tabs",
-    category: "Plugin SDK",
-    url: "plugins.html#dynamic-tabs",
-    keywords: "dynamic tab sidebar title icon badge portal isolated container",
-    desc: "Declare custom tabs in manifest.json to spawn dedicated sidebar media views."
+    title: "Electron IPC API Reference",
+    category: "Developer API",
+    url: "api-reference.html",
+    keywords: "electron ipc contextbridge preload api invoke send handle main renderer security",
+    desc: "Reference for preload contextBridge methods exposing secure system capabilities to React."
   },
   {
-    title: "Integrated Back-End AdBlocker",
-    category: "Plugin SDK",
-    url: "plugins.html#adblock-rules",
-    keywords: "adblock rules popunder ads tracker blocking redirect filter popcash",
-    desc: "Hooking network requests against regex/glob blacklist patterns to strip annoying ads."
+    title: "Troubleshooting & FAQ",
+    category: "Support",
+    url: "troubleshooting.html",
+    keywords: "troubleshooting errors fixes faq audio not playing download failed permission denied corrupt cache reset",
+    desc: "Common errors, solutions, and diagnostic steps for playback issues, broken downloads, and corrupted metadata."
   },
   {
-    title: "Batch Webpage Crawler (crawlPage)",
-    category: "Plugin SDK",
-    url: "plugins.html#batch-crawler",
-    keywords: "crawlPage batch crawler 50 100 200 media files multi select download",
-    desc: "Scan category pages in seconds and queue dozens of streams for concurrent downloading."
-  },
-
-  // 3. Appearance & Theme Studio
-  {
-    title: "In-App Appearance & Theme Studio",
-    category: "Themes",
-    url: "themes.html#theme-studio",
-    keywords: "appearance studio light dark mode fonts palette colors corner radius",
-    desc: "Live customization of themes, typography, swatches, and interface roundings in Settings."
+    title: "Universal Audio Engine Sample",
+    category: "Sample Plugins",
+    url: "plugins.html#sample-universal-audio",
+    keywords: "sample universal audio youtube spotify jiosaavn soundcloud stream fallback 320k",
+    desc: "All-in-one music engine combining YouTube, Spotify metadata, JioSaavn 320kbps CDN, and SoundCloud."
   },
   {
-    title: "Theme JSON Specification (theme.json)",
-    category: "Themes",
-    url: "themes.html#theme-json",
-    keywords: "theme json accentColor fontFamily borderRadius mode preset paste export",
-    desc: "Standard JSON object for sharing, exporting, and pasting custom UI color presets."
-  },
-  {
-    title: "Interactive Live Web Theme Sandbox",
-    category: "Themes",
-    url: "themes.html#live-sandbox",
-    keywords: "sandbox preview live test color font radius generate theme json",
-    desc: "Web playground to design palettes with instant preview and copy-paste theme JSON."
-  },
-
-  // 4. AI Website Scanner
-  {
-    title: "Master AI Website Scanner Prompt",
-    category: "AI Tools",
-    url: "ai-scanner.html#master-prompt",
-    keywords: "ai prompt scanner chatgpt claude gemini deepseek website scraper generator",
-    desc: "Copy-paste developer prompt to feed any website into an AI to build a 100% working extension."
-  },
-  {
-    title: "Step-by-Step AI Extension Creation",
-    category: "AI Tools",
-    url: "ai-scanner.html#ai-steps",
-    keywords: "how to create extension ai steps prompt paste settings test save script",
-    desc: "Zero-friction workflow to generate, paste, test, and run plugins without coding."
-  },
-
-  // 5. Downloads & Releases
-  {
-    title: "LuckyGuy Setup Installer (.exe)",
-    category: "Downloads",
-    url: "downloads.html#setup-installer",
-    keywords: "download setup exe windows 10 11 installer desktop shortcut auto update",
-    desc: "Recommended standard Windows installer with Start Menu integration and updater."
-  },
-  {
-    title: "LuckyGuy Portable Edition (.exe)",
-    category: "Downloads",
-    url: "downloads.html#portable-edition",
-    keywords: "download portable exe single file standalone usb flash drive no install",
-    desc: "Standalone executable requiring zero installation. Run anywhere from USB or folder."
-  },
-  {
-    title: "System Requirements & Compatibility",
-    category: "Downloads",
-    url: "downloads.html#system-requirements",
-    keywords: "requirements windows 10 11 64-bit ram disk broadband compatibility",
-    desc: "Minimum specs and hardware recommendations for high-speed audio downloading."
-  },
-  {
-    title: "Building LuckyGuy from Source",
-    category: "Developers",
-    url: "downloads.html#build-source",
-    keywords: "git clone npm install npm run dev source code build github electron vite",
-    desc: "Full instructions to clone the repository and run developer builds locally."
-  },
-
-  // 6. Community Extensions
-  {
-    title: "Archive Cinema & Open Movies Sample",
+    title: "Archive Cinema & Movies Sample",
     category: "Sample Plugins",
     url: "plugins.html#sample-archive",
-    keywords: "sample archive movies cinema public domain documentary 100 crawler",
-    desc: "Public domain cinema streaming portal with ad-blocker and 100-video batch crawler."
+    keywords: "sample archive movies cinema public domain open culture video stream download",
+    desc: "Stream public domain films, classic documentaries, and open culture videos with ad-blocker."
   },
   {
     title: "Worldwide Live Radio Hub Sample",
@@ -145,11 +106,11 @@ const docsSearchIndex = [
     desc: "30,000+ live stations and podcasts streaming worldwide via Icecast."
   },
   {
-    title: "Pornhub Portal & AdBlock Sample",
+    title: "Pornhub",
     category: "Sample Plugins",
     url: "plugins.html#sample-pornhub",
-    keywords: "sample adult 18+ portal adblock popunder resolver crawler",
-    desc: "18+ sandboxed portal with popup adblocker, stream resolver, and category crawler."
+    keywords: "sample adult 18+ pornhub video player adblock popunder resolver crawler",
+    desc: "Video resolver and crawler extension with dedicated sidebar tab, multi-quality video player, and ad blocking."
   }
 ];
 
@@ -161,112 +122,49 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!searchInput || !resultsContainer) return;
 
   function performSearch(query) {
-    const q = query.toLowerCase().trim();
+    const q = query.trim().toLowerCase();
     if (!q) {
       resultsContainer.style.display = 'none';
       resultsContainer.innerHTML = '';
       return;
     }
 
-    const matches = docsSearchIndex.filter(item => {
-      return (
-        item.title.toLowerCase().includes(q) ||
-        item.keywords.toLowerCase().includes(q) ||
-        item.category.toLowerCase().includes(q) ||
-        item.desc.toLowerCase().includes(q)
-      );
+    const words = q.split(/\s+/).filter(Boolean);
+
+    const matches = searchDatabase.filter(item => {
+      const fullText = (item.title + ' ' + item.category + ' ' + item.keywords + ' ' + item.desc).toLowerCase();
+      return words.every(w => fullText.includes(w));
     });
 
     if (matches.length === 0) {
-      resultsContainer.innerHTML = `
-        <div style="padding: 16px; text-align: center; color: #71717a; font-size: 0.88em;">
-          No matching documentation found for "<strong>${escapeHtml(query)}</strong>"
-        </div>
-      `;
-      resultsContainer.style.display = 'flex';
+      resultsContainer.innerHTML = '<div class="no-results">No matching documentation found</div>';
+      resultsContainer.style.display = 'block';
       return;
     }
 
     resultsContainer.innerHTML = matches.slice(0, 7).map(item => `
-      <a href="${item.url}" class="search-result-row">
-        <div class="search-row-title">
-          <span>${highlightMatch(item.title, q)}</span>
-          <span class="search-row-badge">${item.category}</span>
-        </div>
-        <div class="search-row-desc">${item.desc}</div>
+      <a href="${item.url}" class="search-result-item">
+        <div class="search-result-category">${item.category}</div>
+        <div class="search-result-title">${item.title}</div>
+        <div class="search-result-desc">${item.desc}</div>
       </a>
     `).join('');
-
-    resultsContainer.style.display = 'flex';
-  }
-
-  function highlightMatch(text, query) {
-    const idx = text.toLowerCase().indexOf(query);
-    if (idx === -1) return escapeHtml(text);
-    const before = text.substring(0, idx);
-    const match = text.substring(idx, idx + query.length);
-    const after = text.substring(idx + query.length);
-    return `${escapeHtml(before)}<strong style="color: #18181b; background: #e4e4e7; border-radius: 2px; padding: 0 2px;">${escapeHtml(match)}</strong>${escapeHtml(after)}`;
-  }
-
-  function escapeHtml(str) {
-    return str.replace(/[&<>"']/g, m => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    }[m]));
+    resultsContainer.style.display = 'block';
   }
 
   searchInput.addEventListener('input', (e) => {
     performSearch(e.target.value);
   });
 
-  searchInput.addEventListener('focus', () => {
-    if (searchInput.value.trim()) {
-      performSearch(searchInput.value);
-    }
-  });
-
-  // Keyboard shortcut Ctrl+K or / to focus search
-  document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-      e.preventDefault();
-      searchInput.focus();
-    } else if (e.key === '/' && document.activeElement !== searchInput) {
-      e.preventDefault();
-      searchInput.focus();
-    } else if (e.key === 'Escape') {
-      resultsContainer.style.display = 'none';
-      searchInput.blur();
-    }
-  });
-
-  // Close when clicking outside
   document.addEventListener('click', (e) => {
     if (!searchInput.contains(e.target) && !resultsContainer.contains(e.target)) {
       resultsContainer.style.display = 'none';
     }
   });
+
+  searchInput.addEventListener('focus', () => {
+    if (searchInput.value.trim()) {
+      resultsContainer.style.display = 'block';
+    }
+  });
 });
-
-
-// 1-Click Copy helper for direct manifest URL inputs
-window.copyInputUrl = function(btn) {
-  const container = btn.closest('.extension-install-url-box') || btn.parentElement;
-  const input = container.querySelector('input');
-  if (input && input.value) {
-    navigator.clipboard.writeText(input.value).then(() => {
-      const orig = btn.innerHTML;
-      btn.innerHTML = '<i class="ci-Check_Big"></i> Copied!';
-      btn.style.backgroundColor = '#10b981';
-      btn.style.borderColor = '#10b981';
-      setTimeout(() => {
-        btn.innerHTML = orig;
-        btn.style.backgroundColor = '';
-        btn.style.borderColor = '';
-      }, 2000);
-    });
-  }
-};
