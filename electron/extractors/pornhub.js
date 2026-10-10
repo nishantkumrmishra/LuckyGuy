@@ -17,12 +17,17 @@ async function extractPornhubVideo(url) {
 
   const targetUrl = `https://www.pornhub.org/view_video.php?viewkey=${vkey}`;
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 9000);
+
     const resp = await fetch(targetUrl, {
+      signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Cookie': 'accessAgeDisclaimerPH=1; platform=pc; bs=1;'
       }
     });
+    clearTimeout(timeoutId);
 
     if (!resp.ok) return null;
     const html = await resp.text();
@@ -44,12 +49,17 @@ async function extractPornhubVideo(url) {
     const mp4Def = (fv.mediaDefinitions || []).find(x => x.format === 'mp4' && x.videoUrl);
     if (mp4Def && mp4Def.videoUrl) {
       try {
+        const mController = new AbortController();
+        const mTimeoutId = setTimeout(() => mController.abort(), 6000);
         const mResp = await fetch(mp4Def.videoUrl, {
+          signal: mController.signal,
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'Cookie': 'accessAgeDisclaimerPH=1; platform=pc; bs=1;'
           }
         });
+        clearTimeout(mTimeoutId);
+
         if (mResp.ok) {
           const mediaList = await mResp.json();
           if (Array.isArray(mediaList)) {

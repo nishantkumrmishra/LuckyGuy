@@ -6,6 +6,7 @@ process.on("unhandledRejection", (reason) => {
   console.warn("Unhandled Rejection:", reason);
 });
 const { app, BrowserWindow, ipcMain, dialog, shell, globalShortcut, session } = require('electron');
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -165,6 +166,8 @@ app.whenReady().then(() => {
       delete responseHeaders['Cross-Origin-Resource-Policy'];
       delete responseHeaders['cross-origin-opener-policy'];
       delete responseHeaders['Cross-Origin-Opener-Policy'];
+      responseHeaders['Access-Control-Allow-Origin'] = ['*'];
+      responseHeaders['access-control-allow-origin'] = ['*'];
       callback({ cancel: false, responseHeaders });
     });
 
@@ -436,7 +439,7 @@ ipcMain.handle('crawl-portal', async (event, targetUrl) => {
                     rating,
                     author: uploader,
                     url: 'https://www.pornhub.org/view_video.php?viewkey=' + vkey,
-                    streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+                    streamUrl: null
                   });
                 }
               });

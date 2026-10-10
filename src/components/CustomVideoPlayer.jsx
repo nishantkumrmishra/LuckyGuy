@@ -26,6 +26,7 @@ export default function CustomVideoPlayer({
   const videoRef = useRef(null);
   const progressTrackRef = useRef(null);
   const hideControlsTimeoutRef = useRef(null);
+  const lastExtractedUrlRef = useRef(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -41,15 +42,39 @@ export default function CustomVideoPlayer({
   const [hoverPosition, setHoverPosition] = useState(0);
   const [isHoveringProgress, setIsHoveringProgress] = useState(false);
   const [playSplash, setPlaySplash] = useState(null); // 'play' | 'pause' | null
-  const [isLoading, setIsLoading] = useState(true);
+  
+  // Separation of initial URL resolution and in-playback buffering
+  const [isResolving, setIsResolving] = useState(
+    !video?.streamUrl && (!video?.streams || Object.keys(video.streams).length === 0)
+  );
+  const [isBuffering, setIsBuffering] = useState(false);
   const [hasError, setHasError] = useState(false);
+  
   const [resolvedStreams, setResolvedStreams] = useState(video?.streams || {});
   const [currentStreamSrc, setCurrentStreamSrc] = useState(
     (video?.streams && video?.streams[selectedQuality]) || video?.streamUrl || ''
   );
   const [displayTitle, setDisplayTitle] = useState(
-    video?.title && !/^\d+:\d+$/.test(video.title) ? video.title : ''
+    video?.title && !/^\d+:\d+(:\d+)?$/.test(video.title) ? video.title : ''
   );
+
+  // Sync state if video prop updates externally from parent
+  useEffect(() => {
+    if (video?.title && !/^\d+:\d+(:\d+)?$/.test(video.title)) {
+      setDisplayTitle(video.title);
+    }
+    if (video?.streams && Object.keys(video.streams).length > 0) {
+      setResolvedStreams(video.streams);
+      const chosen = video.streams[selectedQuality] || Object.values(video.streams)[0];
+      if (chosen) {
+        setCurrentStreamSrc(chosen);
+        setIsResolving(false);
+      }
+    } else if (video?.streamUrl && !currentStreamSrc) {
+      setCurrentStreamSrc(video.streamUrl);
+      setIsResolving(false);
+    }
+  }, [video?.title, video?.streams, video?.streamUrl, selectedQuality, currentStreamSrc]);
 
   // Format seconds into MM:SS
   const formatTime = (seconds) => {
@@ -62,61 +87,86 @@ export default function CustomVideoPlayer({
   // Resolve direct streams if needed
   const resolveStreams = useCallback(async () => {
     setHasError(false);
-    setIsLoading(true);
 
     if (video?.streams && Object.keys(video.streams).length > 0) {
       setResolvedStreams(video.streams);
-      const chosen = video.streams[selectedQuality] || video.streamUrl || Object.values(video.streams)[0];
-      setCurrentStreamSrc(chosen);
-      setIsLoading(false);
-      return;
+      const chosen = video.streams[selectedQuality] || Object.values(video.streams)[0];
+      if (chosen) {
+        setCurrentStreamSrc(chosen);
+        setIsResolving(false);
+        return;
+      }
     }
 
     if (video?.url && window.electronAPI?.extractUrl) {
+      // Avoid duplicate extraction if already requested for this URL
+      if (lastExtractedUrlRef.current === video.url && currentStreamSrc) {
+        setIsResolving(false);
+        return;
+      }
+      lastExtractedUrlRef.current = video.url;
+
+      setIsResolving(true);
       try {
-        const res = await window.electronAPI.extractUrl(video.url);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Extraction timed out')), 8000)
+        );
+        const extractPromise = window.electronAPI.extractUrl(video.url);
+        
+        const res = await Promise.race([extractPromise, timeoutPromise]);
         if (res && !res.error) {
-          if (res.title) setDisplayTitle(res.title);
+          if (res.title && !/^\d+:\d+(:\d+)?$/.test(res.title)) {
+            setDisplayTitle(res.title);
+          }
           if (res.streams && Object.keys(res.streams).length > 0) {
             setResolvedStreams(res.streams);
-            const best = res.streams[selectedQuality] || res.streamUrl || Object.values(res.streams)[0];
+            const best = res.streams[selectedQuality] || Object.values(res.streams)[0] || res.streamUrl;
             setCurrentStreamSrc(best);
           } else if (res.streamUrl) {
             setCurrentStreamSrc(res.streamUrl);
           }
-        } else {
-          // If extractor returned direct stream or fallback
-          if (video?.streamUrl) setCurrentStreamSrc(video.streamUrl);
+        } else if (video?.streamUrl) {
+          setCurrentStreamSrc(video.streamUrl);
         }
       } catch (err) {
-        console.warn('Error extracting direct stream:', err);
-        if (video?.streamUrl) setCurrentStreamSrc(video.streamUrl);
+        console.warn('Stream extraction completed with fallback:', err.message);
+        if (video?.streamUrl) {
+          setCurrentStreamSrc(video.streamUrl);
+        }
       } finally {
-        setIsLoading(false);
+        setIsResolving(false);
       }
     } else if (video?.streamUrl) {
       setCurrentStreamSrc(video.streamUrl);
-      setIsLoading(false);
+      setIsResolving(false);
     } else {
-      setIsLoading(false);
+      setIsResolving(false);
     }
-  }, [video, selectedQuality]);
+  }, [video?.url, video?.streams, video?.streamUrl, selectedQuality, currentStreamSrc]);
 
   useEffect(() => {
     resolveStreams();
   }, [resolveStreams]);
 
-  // When currentStreamSrc changes, load and play
+  // When currentStreamSrc changes, trigger load and attempt playback
   useEffect(() => {
     if (currentStreamSrc && videoRef.current) {
       setHasError(false);
       const v = videoRef.current;
-      v.src = currentStreamSrc;
+      if (v.src !== currentStreamSrc) {
+        v.src = currentStreamSrc;
+      }
+      v.load();
       v.play()
-        .then(() => setIsPlaying(true))
+        .then(() => {
+          setIsPlaying(true);
+          setIsBuffering(false);
+          setIsResolving(false);
+        })
         .catch(() => {
-          // Autoplay policy may pause until user gesture
+          // If browser requires user click, remain paused with big play button visible
           setIsPlaying(false);
+          setIsResolving(false);
         });
     }
   }, [currentStreamSrc]);
@@ -152,10 +202,14 @@ export default function CustomVideoPlayer({
       v.play()
         .then(() => {
           setIsPlaying(true);
+          setIsBuffering(false);
+          setIsResolving(false);
           setPlaySplash('play');
           setTimeout(() => setPlaySplash(null), 600);
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.warn('Play error:', err);
+        });
     } else {
       v.pause();
       setIsPlaying(false);
@@ -172,6 +226,7 @@ export default function CustomVideoPlayer({
       if (videoRef.current.duration && !isNaN(videoRef.current.duration)) {
         setDuration(videoRef.current.duration);
       }
+      if (isBuffering) setIsBuffering(false);
     }
   };
 
@@ -234,7 +289,7 @@ export default function CustomVideoPlayer({
     }
   };
 
-  // Listen for fullscreen change events (e.g. Esc pressed)
+  // Listen for fullscreen change events
   useEffect(() => {
     const handleFsChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement));
@@ -297,13 +352,14 @@ export default function CustomVideoPlayer({
     ? Object.keys(resolvedStreams).sort((a, b) => parseInt(b) - parseInt(a))
     : ['1080p', '720p', '480p'];
 
-  const titleToShow = displayTitle || video?.title || 'High-Definition Stream';
+  const titleToShow = displayTitle || (video?.title && !/^\d+:\d+(:\d+)?$/.test(video.title) ? video.title : 'High-Definition Video');
 
   return (
     <div
       ref={containerRef}
       onMouseMove={resetHideTimer}
       onMouseLeave={() => isPlaying && setShowControls(false)}
+      onClick={togglePlay}
       style={{
         position: 'relative',
         width: '100%',
@@ -319,24 +375,35 @@ export default function CustomVideoPlayer({
       {/* Native Video Element */}
       <video
         ref={videoRef}
+        src={currentStreamSrc || undefined}
         poster={video?.thumbnail}
         playsInline
-        onError={() => setHasError(true)}
+        preload="auto"
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={(e) => {
           if (e.target.duration && !isNaN(e.target.duration)) {
             setDuration(e.target.duration);
           }
-          setIsLoading(false);
+          setIsResolving(false);
+          setIsBuffering(false);
           setHasError(false);
         }}
-        onWaiting={() => setIsLoading(true)}
+        onCanPlay={() => {
+          setIsResolving(false);
+          setIsBuffering(false);
+        }}
+        onWaiting={() => setIsBuffering(true)}
         onPlaying={() => {
-          setIsLoading(false);
+          setIsResolving(false);
+          setIsBuffering(false);
           setIsPlaying(true);
           setHasError(false);
         }}
-        onClick={togglePlay}
+        onError={() => {
+          setIsResolving(false);
+          setIsBuffering(false);
+          setHasError(true);
+        }}
         style={{
           width: '100%',
           height: '100%',
@@ -347,8 +414,42 @@ export default function CustomVideoPlayer({
         }}
       />
 
-      {/* Loading Spinner / Poster Overlay */}
-      {isLoading && (
+      {/* Large Inviting Center Play Button (Shown when paused and ready) */}
+      {!isPlaying && !isResolving && !isBuffering && !hasError && (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();
+            togglePlay();
+          }}
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '76px',
+            height: '76px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(124, 92, 191, 0.9)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ffffff',
+            cursor: 'pointer',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 4px rgba(255, 255, 255, 0.2)',
+            transition: 'transform 0.15s ease, background-color 0.15s ease',
+            zIndex: 14,
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.08)')}
+          onMouseLeave={(e) => (e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)')}
+          title="Play Video"
+        >
+          <Play size={34} fill="#ffffff" style={{ marginLeft: '4px' }} />
+        </div>
+      )}
+
+      {/* URL Resolving Spinner Overlay */}
+      {isResolving && (
         <div
           style={{
             position: 'absolute',
@@ -357,8 +458,8 @@ export default function CustomVideoPlayer({
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'rgba(0, 0, 0, 0.55)',
-            backdropFilter: 'blur(3px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
             pointerEvents: 'none',
             zIndex: 15,
             gap: '12px',
@@ -371,9 +472,29 @@ export default function CustomVideoPlayer({
         </div>
       )}
 
-      {/* Playback Error Retry Overlay */}
-      {hasError && !isLoading && (
+      {/* Subtle Buffering Spinner (When playing and waiting for chunks) */}
+      {isBuffering && !isResolving && (
         <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            pointerEvents: 'none',
+            zIndex: 15,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            padding: '12px',
+            borderRadius: '50%',
+          }}
+        >
+          <Loader2 size={32} color="#a855f7" className="animate-spin" />
+        </div>
+      )}
+
+      {/* Playback Error Retry Overlay */}
+      {hasError && !isResolving && (
+        <div
+          onClick={(e) => e.stopPropagation()}
           style={{
             position: 'absolute',
             inset: 0,
@@ -381,7 +502,7 @@ export default function CustomVideoPlayer({
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
             zIndex: 16,
             gap: '14px',
             color: '#fff',
@@ -390,7 +511,7 @@ export default function CustomVideoPlayer({
           }}
         >
           <AlertCircle size={36} color="#ef4444" />
-          <div style={{ fontSize: '13px', fontWeight: 600 }}>Stream interrupted or buffering error</div>
+          <div style={{ fontSize: '13px', fontWeight: 600 }}>Stream buffering or connection interrupted</div>
           <button
             type="button"
             onClick={resolveStreams}
@@ -398,7 +519,7 @@ export default function CustomVideoPlayer({
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '8px 16px',
+              padding: '8px 18px',
               borderRadius: '6px',
               border: 'none',
               backgroundColor: 'var(--primary, #7c5cbf)',
@@ -441,13 +562,14 @@ export default function CustomVideoPlayer({
 
       {/* Top Gradient Header Overlay with Title */}
       <div
+        onClick={(e) => e.stopPropagation()}
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
           padding: '16px 20px',
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -492,12 +614,13 @@ export default function CustomVideoPlayer({
 
       {/* Bottom Controls Bar Overlay */}
       <div
+        onClick={(e) => e.stopPropagation()}
         style={{
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
-          background: 'linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.45) 60%, transparent 100%)',
+          background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.45) 60%, transparent 100%)',
           padding: '20px 18px 12px 18px',
           display: 'flex',
           flexDirection: 'column',

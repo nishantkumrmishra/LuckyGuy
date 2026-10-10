@@ -305,7 +305,7 @@ export default function PluginTabContainer({
           thumbnail: thumbUrl,
           thumbnailFallback: matureThumbnails[(itemIdx + 1) % matureThumbnails.length],
           url: `https://www.pornhub.org/view_video.php?viewkey=ph${10000000 + itemIdx * 4927}`,
-          streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+          streamUrl: null,
         };
       });
     }
@@ -323,7 +323,7 @@ export default function PluginTabContainer({
         size: `${(180 + itemIdx * 25)} MB`,
         thumbnail: matureThumbnails[itemIdx % matureThumbnails.length],
         url: `${activeUrl || 'https://stream.org'}/watch/${itemIdx + 1}`,
-        streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+        streamUrl: null,
       };
     });
   };
@@ -400,7 +400,7 @@ export default function PluginTabContainer({
                 rating,
                 author,
                 url: 'https://www.pornhub.org/view_video.php?viewkey=' + vkey,
-                streamUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+                streamUrl: null
               });
             }
           });
