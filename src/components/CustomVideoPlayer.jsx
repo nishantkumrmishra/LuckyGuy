@@ -307,11 +307,16 @@ export default function CustomVideoPlayer({
   }, [audioStreamSrc, volume, isMuted]);
 
   const syncAudioPlay = () => {
-    if (audioRef.current && audioStreamSrc) {
-      if (videoRef.current) {
-        audioRef.current.currentTime = videoRef.current.currentTime;
+    const a = audioRef.current;
+    const v = videoRef.current;
+    if (a && audioStreamSrc && v) {
+      if (Math.abs(a.currentTime - v.currentTime) > 0.2) {
+        a.currentTime = v.currentTime;
       }
-      audioRef.current.play().catch(() => {});
+      a.playbackRate = v.playbackRate;
+      a.volume = isMuted ? 0 : (volume || 0.8);
+      a.muted = isMuted;
+      a.play().catch(() => {});
     }
   };
 
@@ -351,6 +356,7 @@ export default function CustomVideoPlayer({
     if (v.paused) {
       v.play()
         .then(() => {
+          syncAudioPlay();
           setIsPlaying(true);
           setIsBuffering(false);
           setIsResolving(false);
@@ -570,6 +576,10 @@ export default function CustomVideoPlayer({
             setIsBuffering(false);
           }}
           onWaiting={() => { if (audioRef.current && audioStreamSrc) audioRef.current.pause(); setIsBuffering(true); }}
+          onPause={() => { syncAudioPause(); setIsPlaying(false); }}
+          onSeeking={() => { if (audioRef.current && audioStreamSrc && videoRef.current) audioRef.current.currentTime = videoRef.current.currentTime; }}
+          onSeeked={() => { syncAudioPlay(); }}
+          onRateChange={() => { if (audioRef.current && videoRef.current) audioRef.current.playbackRate = videoRef.current.playbackRate; }}
           onPlaying={() => {
             syncAudioPlay();
             setIsResolving(false);
@@ -597,7 +607,7 @@ export default function CustomVideoPlayer({
           ref={audioRef}
           preload="auto"
           playsInline
-          style={{ display: 'none' }}
+          style={{ position: 'absolute', width: 0, height: 0, opacity: 0, pointerEvents: 'none' }}
         />
 
       {/* Large Inviting Center Play Button (Shown when paused and ready) */}

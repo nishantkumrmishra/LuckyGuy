@@ -738,7 +738,7 @@ export default function LibraryTab({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onToggleLike && onToggleLike(track.id || track.filePath || track.title);
+                          onToggleLike && onToggleLike(track);
                         }}
                         style={{
                           background: 'transparent',
@@ -941,7 +941,7 @@ export default function LibraryTab({
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                             {onToggleLike && (
                               <button
-                                onClick={() => onToggleLike(track.id || track.filePath || track.title)}
+                                onClick={() => onToggleLike(track)}
                                 style={{
                                   background: 'transparent',
                                   border: 'none',

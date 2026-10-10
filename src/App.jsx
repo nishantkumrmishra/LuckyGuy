@@ -15,7 +15,9 @@ import PlaylistsTab from './components/PlaylistsTab';
 import SleepTimerModal from './components/SleepTimerModal';
 import SetupWizard from './components/SetupWizard';
 import QueueDrawer from './components/QueueDrawer';
-import { Play, Pause, SkipForward, Maximize2, Sparkles, DownloadCloud, ExternalLink, X, AlertTriangle, RefreshCw } from 'lucide-react';
+import FullScreenPlayer from './components/FullScreenPlayer';
+import AppIcon from './components/AppIcon';
+import { Play, Pause, SkipForward, Maximize2, Sparkles, DownloadCloud, ExternalLink, X, AlertTriangle, RefreshCw, Film, Music as MusicIcon } from 'lucide-react';
 import { CustomIcon } from './components/DuoIcons';
 
 
@@ -571,6 +573,8 @@ export default function App() {
   const [isUpdatingApp, setIsUpdatingApp] = useState(false);
   const [updateAppError, setUpdateAppError] = useState('');
   const [showDevHud, setShowDevHud] = useState(false);
+  const [isFullScreenPlayerOpen, setIsFullScreenPlayerOpen] = useState(false);
+  const [externalMediaPrompt, setExternalMediaPrompt] = useState(null);
 
   const triggerPreviewUpdate = () => {
     setUpdateNotification({
@@ -633,6 +637,20 @@ export default function App() {
         if (data?.type === 'hud') setShowDevHud((prev) => !prev);
       });
       return () => unsub?.();
+    }
+
+    // External Media File Opener (double-click from Windows PC)
+    if (window.electronAPI?.onOpenExternalMedia) {
+      const unsubMedia = window.electronAPI.onOpenExternalMedia((media) => {
+        if (media) setExternalMediaPrompt(media);
+      });
+      return () => unsubMedia?.();
+    }
+
+    if (window.electronAPI?.getInitialMedia) {
+      window.electronAPI.getInitialMedia().then((media) => {
+        if (media) setExternalMediaPrompt(media);
+      }).catch(() => {});
     }
   }, []);
 
@@ -1574,16 +1592,57 @@ export default function App() {
   };
 
   const handleToggleLike = (track) => {
+    if (!track) return;
+    const targetTrack = typeof track === 'string'
+      ? (songs.find((s) => s.id === track || s.filePath === track || s.title === track) || { id: track, filePath: track, title: track })
+      : track;
+
     setLikedTracks((prev) => {
-      const exists = prev.some((t) => t.id === track.id || t.filePath === track.filePath);
+      const exists = prev.some(
+        (t) =>
+          (targetTrack.id && t.id && t.id === targetTrack.id) ||
+          (targetTrack.filePath && t.filePath && t.filePath === targetTrack.filePath) ||
+          (targetTrack.title && t.title && t.title === targetTrack.title)
+      );
       const updated = exists
-        ? prev.filter((t) => t.id !== track.id && t.filePath !== track.filePath)
-        : [...prev, track];
+        ? prev.filter(
+            (t) =>
+              !(targetTrack.id && t.id && t.id === targetTrack.id) &&
+              !(targetTrack.filePath && t.filePath && t.filePath === targetTrack.filePath) &&
+              !(targetTrack.title && t.title && t.title === targetTrack.title)
+          )
+        : [targetTrack, ...prev];
       try {
         localStorage.setItem('localguy-liked-tracks', JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });
+  };
+
+  const handlePlayExternalMedia = () => {
+    if (!externalMediaPrompt) return;
+    const { filePath, fileName, type } = externalMediaPrompt;
+    setExternalMediaPrompt(null);
+
+    if (type === 'video') {
+      setActiveTab('videos');
+      setActiveVideo({
+        id: 'local-' + Date.now(),
+        title: fileName,
+        filePath,
+        streamUrl: formatAudioSrc(filePath),
+        isLocal: true,
+      });
+    } else {
+      const trackObj = {
+        id: 'ext-' + Date.now(),
+        title: fileName.replace(/\.[^/.]+$/, ''),
+        artist: 'Local File',
+        filePath,
+      };
+      handlePlayTrack(trackObj);
+      setIsFullScreenPlayerOpen(true);
+    }
   };
 
   const handleScanLibrary = async () => {
@@ -1792,6 +1851,7 @@ export default function App() {
 
             {activeTab === 'liked' && (
               <LikedSongsTab
+                songs={songs}
                 likedTracks={likedTracks}
                 onPlaySong={handlePlayTrack}
                 onToggleLike={handleToggleLike}
@@ -1980,6 +2040,7 @@ export default function App() {
               isQueueOpen={showQueueDrawer}
               onOpenSleepTimer={() => setShowSleepTimerModal(true)}
               sleepTimerRemaining={sleepTimerRemaining}
+              onOpenFullScreen={() => setIsFullScreenPlayerOpen(true)}
             />
           )}
         </main>
@@ -2139,14 +2200,13 @@ export default function App() {
                   height: '36px',
                   borderRadius: '8px',
                   backgroundColor: 'rgba(124, 92, 191, 0.12)',
-                  color: 'var(--primary, #7c5cbf)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
                 }}
               >
-                <Sparkles size={18} />
+                <AppIcon size={22} />
               </div>
               <div>
                 <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -2269,6 +2329,151 @@ export default function App() {
               Update failed: {updateAppError}
             </div>
           )}
+        </div>
+      )}
+      {/* Full Screen Music Player */}
+      <FullScreenPlayer
+        isOpen={isFullScreenPlayerOpen}
+        onClose={() => setIsFullScreenPlayerOpen(false)}
+        currentTrack={currentTrack}
+        isPlaying={isPlaying}
+        onTogglePlay={handleTogglePlay}
+        onNext={handleNext}
+        onPrevious={handlePrevious}
+        onSeek={handleSeek}
+        currentTime={currentTime}
+        duration={duration}
+        volume={volume}
+        onVolumeChange={handleVolumeChange}
+        isMuted={isMuted}
+        onToggleMute={handleToggleMute}
+        isShuffle={isShuffle}
+        onToggleShuffle={() => setIsShuffle((prev) => !prev)}
+        repeatMode={repeatMode}
+        onToggleRepeat={() => {
+          setRepeatMode((prev) => (prev === 'off' ? 'all' : prev === 'all' ? 'one' : 'off'));
+        }}
+        isLiked={likedTracks.some(
+          (t) => currentTrack && (t.id === currentTrack.id || t.filePath === currentTrack.filePath)
+        )}
+        onToggleLike={() => currentTrack && handleToggleLike(currentTrack)}
+        onToggleQueue={() => setShowQueueDrawer((prev) => !prev)}
+      />
+
+      {/* External Media File Opener Modal */}
+      {externalMediaPrompt && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+          }}
+        >
+          <div
+            style={{
+              maxWidth: '460px',
+              width: '100%',
+              backgroundColor: 'var(--bg-card, #ffffff)',
+              border: '1px solid var(--border-medium, #e2e8f0)',
+              borderRadius: '16px',
+              padding: '24px',
+              boxShadow: '0 24px 60px rgba(0, 0, 0, 0.4)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '12px',
+                  backgroundColor: 'rgba(124, 92, 191, 0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                {externalMediaPrompt.type === 'video' ? (
+                  <Film size={22} color="var(--primary, #7c5cbf)" />
+                ) : (
+                  <AppIcon size={24} />
+                )}
+              </div>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  Play Media in LuckyGuy?
+                </h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '3px 0 0 0' }}>
+                  Would you like to play this {externalMediaPrompt.type} from LuckyGuy?
+                </p>
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: '10px 14px',
+                borderRadius: '8px',
+                backgroundColor: 'var(--bg-main, #f8fafc)',
+                border: '1px solid var(--border-medium)',
+                fontSize: '12.5px',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                wordBreak: 'break-all',
+              }}
+            >
+              {externalMediaPrompt.fileName}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setExternalMediaPrompt(null)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  backgroundColor: 'transparent',
+                  border: '1px solid var(--border-medium)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '12.5px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePlayExternalMedia}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: '8px',
+                  backgroundColor: 'var(--primary, #7c5cbf)',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 4px 14px rgba(124, 92, 191, 0.3)',
+                }}
+              >
+                <Play size={14} fill="#ffffff" />
+                <span>Play Now</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

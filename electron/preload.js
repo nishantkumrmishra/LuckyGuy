@@ -119,5 +119,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (event, data) => callback(data);
     ipcRenderer.on('preview-trigger', handler);
     return () => ipcRenderer.removeListener('preview-trigger', handler);
-  }
+  },
+
+  // Standalone Double-Click Media File Opener
+  onOpenExternalMedia: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('open-external-media', handler);
+    return () => ipcRenderer.removeListener('open-external-media', handler);
+  },
+  getInitialMedia: () => ipcRenderer.invoke('get-initial-media')
 });

@@ -587,6 +587,7 @@ export default function HomeTab({
                                 gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
                                 gap: '12px',
                                 width: '100%',
+                                padding: '8px 2px 10px 2px',
                               }
                             : {
                                 display: 'flex',
@@ -595,7 +596,7 @@ export default function HomeTab({
                                 width: '100%',
                                 overflowX: 'auto',
                                 overflowY: 'hidden',
-                                paddingBottom: '4px',
+                                padding: '8px 4px 10px 4px',
                                 scrollbarWidth: 'none',
                                 msOverflowStyle: 'none',
                                 scrollBehavior: 'smooth',
@@ -611,6 +612,12 @@ export default function HomeTab({
                              (currentTrack.id && track.id && currentTrack.id === track.id));
                           const isTrackPlaying = isCurrent && isPlaying;
                           const art = track.artworkUrl || track.coverArt;
+                          const isTrackLiked = Array.isArray(likedTracks) && likedTracks.some(
+                            (t) =>
+                              (track.id && t.id && t.id === track.id) ||
+                              (track.filePath && t.filePath && t.filePath === track.filePath) ||
+                              (track.title && t.title && t.title === track.title)
+                          );
 
                           return (
                             <div
@@ -636,11 +643,13 @@ export default function HomeTab({
                                   : '0 2px 8px rgba(0,0,0,0.03)',
                               }}
                               onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-3px)';
-                                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.12)';
-                                if (!isCurrent) e.currentTarget.style.borderColor = 'var(--text-muted)';
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 6px 16px rgba(124, 92, 191, 0.14)';
+                                if (!isCurrent) e.currentTarget.style.borderColor = 'var(--primary, #7c5cbf)';
                                 const playBtn = e.currentTarget.querySelector('.card-play-btn');
                                 if (playBtn) playBtn.style.opacity = '1';
+                                const likeBtn = e.currentTarget.querySelector('.card-like-btn');
+                                if (likeBtn) likeBtn.style.opacity = '1';
                               }}
                               onMouseLeave={(e) => {
                                 e.currentTarget.style.transform = 'none';
@@ -650,6 +659,8 @@ export default function HomeTab({
                                 if (!isCurrent) e.currentTarget.style.borderColor = 'var(--border-medium)';
                                 const playBtn = e.currentTarget.querySelector('.card-play-btn');
                                 if (playBtn && !isTrackPlaying) playBtn.style.opacity = '0';
+                                const likeBtn = e.currentTarget.querySelector('.card-like-btn');
+                                if (likeBtn && !isTrackLiked) likeBtn.style.opacity = '0';
                               }}
                               title={`${track.title} • ${track.artist || 'Unknown'}`}
                             >
@@ -677,6 +688,38 @@ export default function HomeTab({
                                 ) : (
                                   <Music size={26} color="var(--primary)" style={{ opacity: 0.6 }} />
                                 )}
+
+                                {/* Hover Like Button on Artwork */}
+                                <button
+                                  className="card-like-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onToggleLike && onToggleLike(track);
+                                  }}
+                                  style={{
+                                    position: 'absolute',
+                                    top: '6px',
+                                    right: '6px',
+                                    width: '28px',
+                                    height: '28px',
+                                    borderRadius: '50%',
+                                    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+                                    backdropFilter: 'blur(6px)',
+                                    color: isTrackLiked ? '#ef4444' : '#ffffff',
+                                    border: 'none',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                                    opacity: isTrackLiked ? 1 : 0,
+                                    transition: 'opacity 0.15s ease, transform 0.15s ease',
+                                    zIndex: 3,
+                                  }}
+                                  title={isTrackLiked ? 'Remove from Liked' : 'Save to Liked Songs'}
+                                >
+                                  <Heart size={14} fill={isTrackLiked ? '#ef4444' : 'none'} />
+                                </button>
 
                                 {/* Hover Play Button on Artwork */}
                                 <button

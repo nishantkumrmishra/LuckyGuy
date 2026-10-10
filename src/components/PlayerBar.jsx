@@ -39,6 +39,7 @@ export default function PlayerBar({
   isQueueOpen,
   isLiked,
   onToggleLike,
+  onOpenFullScreen,
 }) {
   const [playerImageFailed, setPlayerImageFailed] = useState(false);
 
@@ -319,25 +320,37 @@ export default function PlayerBar({
           disabled={!currentTrack}
           title={isPlaying ? 'Pause' : 'Play'}
           style={{
-            width: '40px',
-            height: '40px',
+            width: '38px',
+            height: '38px',
             borderRadius: '50%',
-            backgroundColor: 'var(--player-play-bg, #111111)',
-            color: 'var(--player-play-color, #ffffff)',
-            border: 'none',
+            backgroundColor: 'rgba(124, 92, 191, 0.1)',
+            border: '1.5px solid var(--play-btn-border, #18181b)',
+            color: 'var(--primary, #7c5cbf)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             flexShrink: 0,
-            boxShadow: '0 2px 8px rgba(124, 92, 191, 0.25)',
-            transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+            boxShadow: '0 2px 10px rgba(124, 92, 191, 0.22)',
+            transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--primary, #7c5cbf)';
+            e.currentTarget.style.color = '#ffffff';
+            e.currentTarget.style.borderColor = 'var(--primary, #7c5cbf)';
+            e.currentTarget.style.transform = 'scale(1.05)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(124, 92, 191, 0.1)';
+            e.currentTarget.style.color = 'var(--primary, #7c5cbf)';
+            e.currentTarget.style.borderColor = 'var(--play-btn-border, #18181b)';
+            e.currentTarget.style.transform = 'scale(1)';
           }}
         >
           {isPlaying ? (
-            <DuoPause size={18} inButton={true} />
+            <DuoPause size={18} inButton={false} />
           ) : (
-            <DuoPlay size={18} inButton={true} />
+            <DuoPlay size={18} inButton={false} />
           )}
         </button>
 
@@ -602,11 +615,11 @@ export default function PlayerBar({
           <DuoShuffle size={16} active={isShuffle} />
         </button>
 
-        {/* Fullscreen Button */}
+        {/* Fullscreen Player Button */}
         <button
           className="player-btn"
-          onClick={toggleFullscreen}
-          title="Window Fullscreen"
+          onClick={onOpenFullScreen || toggleFullscreen}
+          title="Full Screen Music Player (F)"
           style={{
             background: 'transparent',
             border: 'none',

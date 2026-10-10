@@ -17,6 +17,48 @@ app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 const isPreviewUpdate = process.argv.includes('--preview-update') || process.env.PREVIEW_UPDATE === '1';
 const isPreviewError = process.argv.includes('--preview-error') || process.env.PREVIEW_ERROR === '1';
 const isPreviewHud = process.argv.includes('--preview-hud') || process.argv.includes('--preview-ui') || process.env.PREVIEW_HUD === '1';
+
+// Standalone Double-Click Media File Opener Logic
+function detectMediaFileArg(argv) {
+  if (!Array.isArray(argv)) return null;
+  const audioExts = ['.mp3', '.m4a', '.wav', '.flac', '.aac', '.ogg', '.wma'];
+  const videoExts = ['.mp4', '.mkv', '.webm', '.avi', '.mov'];
+  for (const arg of argv) {
+    if (!arg || typeof arg !== 'string' || arg.startsWith('--')) continue;
+    try {
+      const ext = path.extname(arg).toLowerCase();
+      if (audioExts.includes(ext) || videoExts.includes(ext)) {
+        if (fs.existsSync(arg)) {
+          return {
+            filePath: arg,
+            fileName: path.basename(arg),
+            type: videoExts.includes(ext) ? 'video' : 'audio',
+            ext,
+          };
+        }
+      }
+    } catch (e) {}
+  }
+  return null;
+}
+
+let pendingExternalMedia = detectMediaFileArg(process.argv);
+
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+      const media = detectMediaFileArg(commandLine);
+      if (media) {
+        mainWindow.webContents.send('open-external-media', media);
+      }
+    }
+  });
+}
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -147,6 +189,11 @@ function createWindow() {
 
   // Handle CLI Preview Triggers on Load
   mainWindow.webContents.on('did-finish-load', () => {
+    if (pendingExternalMedia) {
+      setTimeout(() => {
+        mainWindow?.webContents?.send('open-external-media', pendingExternalMedia);
+      }, 700);
+    }
     if (isPreviewUpdate) {
       setTimeout(() => {
         mainWindow?.webContents?.send('preview-trigger', { type: 'update' });
@@ -1608,3 +1655,5 @@ ipcMain.handle('trigger-preview', (event, type) => {
   mainWindow?.webContents?.send('preview-trigger', { type });
   return true;
 });
+
+ipcMain.handle('get-initial-media', () => pendingExternalMedia);

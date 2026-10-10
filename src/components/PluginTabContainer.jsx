@@ -979,6 +979,7 @@ export default function PluginTabContainer({
   const isAdultPlugin = (plugin?.id || '').toLowerCase().includes('pornhub') ||
     (plugin?.category || '').toLowerCase() === 'adult' ||
     (plugin?.name || '').toLowerCase().includes('pornhub');
+  const isYouTubePlugin = isYouTube;
 
   const handleDownloadSingle = (item, qualityOverride) => {
     if (!onStartDownload) return;
@@ -1558,8 +1559,33 @@ export default function PluginTabContainer({
                     </div>
                   </div>
 
-                  {/* Online Actions: Save to Videos & Add to Playlist */}
+                  {/* Online Actions: Download, Save to Videos & Add to Playlist */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadSingle(activePlayerVideo, selectedQuality)}
+                      style={{
+                        padding: '7px 14px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        backgroundColor: 'var(--primary, #7c5cbf)',
+                        color: '#ffffff',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        boxShadow: '0 2px 8px rgba(124, 92, 191, 0.25)',
+                        transition: 'transform 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-1px)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.transform = 'none')}
+                    >
+                      <DownloadCloud size={14} />
+                      <span>Download {selectedQuality || '1080p'}</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => {

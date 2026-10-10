@@ -105,7 +105,7 @@ class YtDlpWrapper {
             thumbnail: info.thumbnail || '',
             views: info.view_count ? `${(info.view_count / 1000).toFixed(0)}K views` : 'YouTube',
             url: info.webpage_url || targetUrl,
-            streamUrl: info.url || Object.values(streams)[0] || null,
+            streamUrl: muxedStream || info.url || Object.values(streams)[0] || null,
             streams,
             audioStreamUrl,
             formatType: 'VIDEO',

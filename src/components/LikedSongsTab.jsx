@@ -28,11 +28,24 @@ export default function LikedSongsTab({
 }) {
   const [failedImages, setFailedImages] = useState({});
 
-  // Filter library songs to get all liked ones
-  const likedSongs = songs.filter((track) => {
-    const key = track.id || track.filePath || track.title;
-    return likedTracks.includes(key);
-  });
+  // Derive full list of liked songs directly from likedTracks
+  const likedSongs = React.useMemo(() => {
+    if (!Array.isArray(likedTracks)) return [];
+    return likedTracks.map((item) => {
+      if (!item) return null;
+      if (typeof item === 'object') {
+        const matched = (songs || []).find(
+          (s) =>
+            (s.id && item.id && s.id === item.id) ||
+            (s.filePath && item.filePath && s.filePath === item.filePath) ||
+            (s.title && item.title && s.title === item.title)
+        );
+        return matched ? { ...item, ...matched } : item;
+      }
+      const found = (songs || []).find((s) => s.id === item || s.filePath === item || s.title === item);
+      return found || { id: item, title: item, filePath: item };
+    }).filter(Boolean);
+  }, [likedTracks, songs]);
 
   const formatTime = (secs) => {
     if (isNaN(secs) || secs === Infinity || secs <= 0) return '0:00';
