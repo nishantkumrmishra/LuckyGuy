@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import PlayerBar from './components/PlayerBar';
 import HomeTab from './components/HomeTab';
 import LibraryTab from './components/LibraryTab';
+import AdultStreamingTab from './components/AdultStreamingTab';
 import DownloadsTab from './components/DownloadsTab';
 import PluginTabContainer from './components/PluginTabContainer';
 import TelegramTab from './components/TelegramTab';
@@ -213,6 +214,9 @@ export default function App() {
 
   // 2. Downloads: Active tasks + Completed downloads
   const [activeDownloads, setActiveDownloads] = useState([]);
+  const [adultVideos, setAdultVideos] = useState([]);
+  const [activeAdultVideo, setActiveAdultVideo] = useState(null);
+  const [libraryMode, setLibraryMode] = useState('music'); // 'music' | 'adult'
   const [completedDownloads, setCompletedDownloads] = useState(() => {
     try {
       const saved = localStorage.getItem("localguy-downloads");
@@ -446,6 +450,21 @@ export default function App() {
   // Real-time disk verification: Ensure library, downloads & trash only contain actual existing files
   useEffect(() => {
     if (!window.electronAPI) return;
+
+    // 0. Sync adult videos from backend
+    const refreshAdultVideos = async () => {
+      if (window.electronAPI?.getAdultVideos) {
+        try {
+          const list = await window.electronAPI.getAdultVideos();
+          if (Array.isArray(list)) {
+            setAdultVideos(list);
+          }
+        } catch (e) {
+          console.warn('Failed to load adult videos:', e);
+        }
+      }
+    };
+    refreshAdultVideos();
 
     // 1. Sync & verify backend library songs
     if (window.electronAPI.getSongs) {
@@ -1062,6 +1081,35 @@ export default function App() {
   };
 
   // Playback logic
+  const refreshAdultVideos = async () => {
+    if (window.electronAPI?.getAdultVideos) {
+      try {
+        const list = await window.electronAPI.getAdultVideos();
+        if (Array.isArray(list)) {
+          setAdultVideos(list);
+        }
+      } catch (e) {
+        console.warn('Failed to load adult videos:', e);
+      }
+    }
+  };
+
+  const handlePlayAdultVideo = (video) => {
+    setIsPlaying(false);
+    setActiveAdultVideo(video);
+    setActiveTab('adult');
+  };
+
+  const handleDeleteAdultVideo = async (video) => {
+    if (activeAdultVideo?.id === video.id) {
+      setActiveAdultVideo(null);
+    }
+    setAdultVideos((prev) => prev.filter((v) => v.id !== video.id && v.filePath !== video.filePath));
+    if (video.filePath && window.electronAPI?.deleteAdultVideo) {
+      await window.electronAPI.deleteAdultVideo(video.filePath);
+    }
+  };
+
   const handlePlayTrack = (track, newQueue = null) => {
     if (!track) return;
 
@@ -1257,6 +1305,19 @@ export default function App() {
               />
             )}
 
+                        {activeTab === 'adult' && (
+              <AdultStreamingTab
+                videos={adultVideos}
+                activeVideo={activeAdultVideo}
+                onPlayVideo={handlePlayAdultVideo}
+                onClosePlayer={() => setActiveAdultVideo(null)}
+                onDeleteVideo={handleDeleteAdultVideo}
+                onRefreshVideos={refreshAdultVideos}
+                onOpenFolder={handleOpenFolder}
+                downloadFolder="C:\\Users\\nishant\\Videos"
+              />
+            )}
+
             {activeTab === 'library' && (
               <LibraryTab
                 songs={songs}
@@ -1413,7 +1474,7 @@ export default function App() {
           </div>
 
           {/* Persistent Player Bar at Bottom (Never on video/plugin/telegram tabs, only when track is active) */}
-          {!activeTab.startsWith('plugin-') && activeTab !== 'telegram' && currentTrack && (
+          {!activeTab.startsWith('plugin-') && activeTab !== 'telegram' && activeTab !== 'adult' && currentTrack && (
             <PlayerBar
             currentTrack={currentTrack}
             isPlaying={isPlaying}

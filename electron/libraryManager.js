@@ -814,6 +814,126 @@ class LibraryManager {
       repairedAudioCount,
     };
   }
+
+  filePathToFileUrl(filePath) {
+    if (!filePath) return '';
+    if (filePath.startsWith('file://')) return filePath;
+    const normalized = filePath.split('\\').join('/');
+    const segments = normalized.split('/').map((seg, i) => i === 0 && seg.includes(':') ? seg : encodeURIComponent(seg));
+    return 'file:///' + segments.join('/');
+  }
+
+  getAdultVideos(customDirs = []) {
+    const validVideoExts = new Set(['.mp4', '.mkv', '.webm', '.mov', '.avi']);
+    const homeDir = os.homedir();
+    const videoDirs = [
+      path.join(homeDir, 'Videos'),
+      path.join(homeDir, 'Downloads'),
+      ...(Array.isArray(customDirs) ? customDirs : [customDirs])
+    ].filter(Boolean);
+
+    const targetDirs = [...new Set(videoDirs.map(d => path.resolve(d)))].filter(d => fs.existsSync(d));
+
+    try {
+      if (fs.existsSync(this.ledgerFile)) {
+        this.ledger = JSON.parse(fs.readFileSync(this.ledgerFile, 'utf8'));
+      }
+    } catch (e) {}
+
+    const videoMap = new Map();
+
+    for (const item of (this.ledger || [])) {
+      if (item.filePath && fs.existsSync(item.filePath)) {
+        const ext = path.extname(item.filePath).toLowerCase();
+        const isVideo = item.formatType === 'VIDEO' || validVideoExts.has(ext);
+        if (isVideo) {
+          const normPath = path.resolve(item.filePath).toLowerCase();
+          try {
+            const stat = fs.statSync(item.filePath);
+            videoMap.set(normPath, {
+              id: item.id || Buffer.from(item.filePath).toString('base64').replace(/=/g, ''),
+              title: item.title || path.basename(item.filePath, ext),
+              artist: item.artist || item.uploader || 'Adult Video',
+              album: item.platform || 'Adult Library',
+              quality: item.quality || '1080p',
+              artworkUrl: item.artworkUrl || '',
+              filePath: item.filePath,
+              streamUrl: this.filePathToFileUrl(item.filePath),
+              fileSize: stat.size,
+              formattedSize: (stat.size / (1024 * 1024)).toFixed(1) + ' MB',
+              duration: item.duration || 0,
+              dateFormatted: item.dateFormatted || new Date(stat.mtimeMs).toLocaleDateString(),
+              modifiedAt: stat.mtimeMs,
+              formatType: 'VIDEO',
+              mediaType: 'video',
+            });
+          } catch (e) {}
+        }
+      }
+    }
+
+    for (const dir of targetDirs) {
+      try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isFile()) {
+            const ext = path.extname(entry.name).toLowerCase();
+            if (validVideoExts.has(ext)) {
+              const fullPath = path.join(dir, entry.name);
+              const normPath = path.resolve(fullPath).toLowerCase();
+              if (!videoMap.has(normPath)) {
+                try {
+                  const stat = fs.statSync(fullPath);
+                  const title = path.basename(entry.name, ext);
+                  videoMap.set(normPath, {
+                    id: Buffer.from(fullPath).toString('base64').replace(/=/g, ''),
+                    title,
+                    artist: 'Adult Video',
+                    album: 'Adult Library',
+                    quality: 'HD',
+                    artworkUrl: '',
+                    filePath: fullPath,
+                    streamUrl: this.filePathToFileUrl(fullPath),
+                    fileSize: stat.size,
+                    formattedSize: (stat.size / (1024 * 1024)).toFixed(1) + ' MB',
+                    duration: 0,
+                    dateFormatted: new Date(stat.mtimeMs).toLocaleDateString(),
+                    modifiedAt: stat.mtimeMs,
+                    formatType: 'VIDEO',
+                    mediaType: 'video',
+                  });
+                } catch (e) {}
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    const result = Array.from(videoMap.values());
+    result.sort((a, b) => (b.modifiedAt || 0) - (a.modifiedAt || 0));
+    return result;
+  }
+
+  deleteAdultVideo(filePath) {
+    if (!filePath || !fs.existsSync(filePath)) return { success: false, error: 'File does not exist' };
+    try {
+      const { shell } = require('electron');
+      if (shell && shell.trashItem) {
+        shell.trashItem(filePath);
+      } else {
+        fs.unlinkSync(filePath);
+      }
+      return { success: true };
+    } catch (e) {
+      try {
+        fs.unlinkSync(filePath);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    }
+  }
 }
 
 module.exports = LibraryManager;

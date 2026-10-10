@@ -27,6 +27,19 @@ export default function CustomVideoPlayer({
   const progressTrackRef = useRef(null);
   const hideControlsTimeoutRef = useRef(null);
   const lastExtractedUrlRef = useRef(null);
+  const getFileUrl = (fp) => {
+    if (!fp) return '';
+    if (fp.startsWith('file://')) return fp;
+    const normalized = fp.replace(/\\/g, '/');
+    const segments = normalized.split('/').map((seg, i) => i === 0 && seg.includes(':') ? seg : encodeURIComponent(seg));
+    return 'file:///' + segments.join('/');
+  };
+
+  const localSrc = video?.streamUrl && video.streamUrl.startsWith('file:')
+    ? video.streamUrl
+    : (video?.filePath ? getFileUrl(video.filePath) : '');
+  const isLocalFile = Boolean(localSrc);
+
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);

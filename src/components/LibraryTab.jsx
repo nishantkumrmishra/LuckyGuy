@@ -1,3 +1,4 @@
+import AdultStreamingTab from './AdultStreamingTab';
 import ContextMenu from './ContextMenu';
 import EditMetadataModal from './EditMetadataModal';
 import React, { useState, useMemo } from 'react';
@@ -13,6 +14,8 @@ import {
   ArrowLeft,
   LayoutList,
   LayoutGrid,
+  Music,
+  Film,
 } from 'lucide-react';
 import { CustomIcon } from './DuoIcons';
 
@@ -32,7 +35,21 @@ export default function LibraryTab({
   onNavigateToHome,
   likedTracks = [],
   onToggleLike,
+  adultVideos = [],
+  activeAdultVideo = null,
+  onPlayAdultVideo,
+  onCloseAdultPlayer,
+  onDeleteAdultVideo,
+  onRefreshAdultVideos,
+  libraryMode = 'music',
+  onSetLibraryMode,
 }) {
+  const [internalMode, setInternalMode] = useState('music');
+  const currentLibraryMode = onSetLibraryMode ? libraryMode : internalMode;
+  const handleSetLibraryMode = (mode) => {
+    if (onSetLibraryMode) onSetLibraryMode(mode);
+    else setInternalMode(mode);
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFolder, setSelectedFolder] = useState(null); // null = overview folders grid, string = opened folder name
   const [contextMenu, setContextMenu] = useState(null);
@@ -127,6 +144,69 @@ export default function LibraryTab({
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  if (currentLibraryMode === 'adult') {
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+        {!activeAdultVideo && (
+          <div style={{ display: 'flex', alignItems: 'center', padding: '16px 32px 0 32px', backgroundColor: 'var(--bg-main)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '8px', padding: '3px' }}>
+              <button
+                onClick={() => handleSetLibraryMode('music')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: 'var(--text-secondary)',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                <Music size={13} />
+                <span>Music ({songs.length})</span>
+              </button>
+              <button
+                onClick={() => handleSetLibraryMode('adult')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: 'rgba(124, 92, 191, 0.15)',
+                  color: 'var(--primary, #7c5cbf)',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                }}
+              >
+                <Film size={13} />
+                <span>Adult Videos ({adultVideos.length})</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        <AdultStreamingTab
+          videos={adultVideos}
+          activeVideo={activeAdultVideo}
+          onPlayVideo={onPlayAdultVideo}
+          onClosePlayer={onCloseAdultPlayer}
+          onDeleteVideo={onDeleteAdultVideo}
+          onRefreshVideos={onRefreshAdultVideos}
+          onOpenFolder={onOpenFolder}
+          downloadFolder={downloadFolder}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className="content-area fade-in"
@@ -200,6 +280,50 @@ export default function LibraryTab({
               : `${folders.length} ${folders.length === 1 ? 'folder' : 'folders'} • ${songs.length} tracks`}
           </span>
         </div>
+
+        {!selectedFolder && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '8px', padding: '3px' }}>
+            <button
+              onClick={() => handleSetLibraryMode('music')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 12px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: 'rgba(124, 92, 191, 0.15)',
+                color: 'var(--primary, #7c5cbf)',
+                fontSize: '12px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+              }}
+            >
+              <Music size={13} />
+              <span>Music ({songs.length})</span>
+            </button>
+            <button
+              onClick={() => handleSetLibraryMode('adult')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 12px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                color: 'var(--text-secondary)',
+                fontSize: '12px',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              <Film size={13} />
+              <span>Adult Videos ({adultVideos.length})</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* VIEW 1: FOLDERS OVERVIEW GRID (Playlist Style) */}

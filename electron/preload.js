@@ -63,6 +63,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   verifyFilesExist: (paths) => ipcRenderer.invoke('verify-files-exist', paths),
   checkFileExists: (filePath) => ipcRenderer.invoke('check-file-exists', filePath),
   getSongs: () => ipcRenderer.invoke('library-get-songs'),
+  getAdultVideos: (customDirs) => ipcRenderer.invoke('library-get-adult-videos', customDirs),
+  deleteAdultVideo: (filePath) => ipcRenderer.invoke('library-delete-adult-video', filePath),
   scanLocalMusic: (dirs) => ipcRenderer.invoke('library-scan', dirs),
   getPlaylists: () => ipcRenderer.invoke('library-get-playlists'),
   createPlaylist: (title) => ipcRenderer.invoke('library-create-playlist', title),

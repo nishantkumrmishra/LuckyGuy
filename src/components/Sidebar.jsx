@@ -35,6 +35,7 @@ export default function Sidebar({
   activeDownloadCount = 0,
   trashCount = 0,
   likedCount = 0,
+  adultVideoCount = 0,
   theme = 'light',
   onToggleTheme,
   pluginTabs = [],
@@ -416,6 +417,35 @@ export default function Sidebar({
                 </div>
                 <span style={labelStyle}>Library</span>
               </div>
+            </div>
+
+            {/* Adult Videos / Streaming */}
+            <div
+              style={navItemStyle(activeTab === 'adult')}
+              onClick={() => setActiveTab('adult')}
+              title={isMini ? 'Adult Videos' : ''}
+            >
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '20px' }}>
+                  <Film size={18} color={activeTab === 'adult' ? 'var(--primary, #7c5cbf)' : 'var(--duo-stroke, currentColor)'} />
+                </div>
+                <span style={labelStyle}>Adult</span>
+              </div>
+
+              {adultVideoCount > 0 && !isMini && (
+                <span
+                  style={{
+                    fontSize: '10.5px',
+                    fontWeight: 600,
+                    padding: '1px 6px',
+                    borderRadius: '999px',
+                    backgroundColor: 'rgba(124, 92, 191, 0.12)',
+                    color: 'var(--primary, #7c5cbf)',
+                  }}
+                >
+                  {adultVideoCount}
+                </span>
+              )}
             </div>
 
 
