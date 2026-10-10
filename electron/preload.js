@@ -1,7 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('electronAPI', {
-  minimize: () => ipcRenderer.send('window-minimize'),
+contextBridge.exposeInMainWorld('electronAPI', {\n  minimize: () => ipcRenderer.send('window-minimize'),
   minimizeWindow: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
   maximizeWindow: () => ipcRenderer.send('window-maximize'),
@@ -84,6 +83,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openDirectoryDialog: () => ipcRenderer.invoke('pick-folder'),
   getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+
+  // Portal Cache & yt-dlp Integrations
+  getPortalCache: (portalId) => ipcRenderer.invoke('portal-cache-get', portalId),
+  savePortalCache: (portalId, items) => ipcRenderer.invoke('portal-cache-save', portalId, items),
+  clearPortalCache: (portalId) => ipcRenderer.invoke('portal-cache-clear', portalId),
+  ytdlpExtract: (url) => ipcRenderer.invoke('ytdlp-extract', url),
+  ytdlpSearch: (query, limit) => ipcRenderer.invoke('ytdlp-search', query, limit),
+
   crawlPortal: (url) => ipcRenderer.invoke('crawl-portal', url),
   bypassAgeVerification: () => ipcRenderer.invoke('bypass-age-verification'),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),

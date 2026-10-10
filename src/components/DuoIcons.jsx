@@ -221,137 +221,380 @@ export const DuoSettings = ({ size = 20, active = false, className = '' }) => (
   </svg>
 );
 
-// Duo-Tone Play Button
-export const DuoPlay = ({ size = 20, className = '' }) => (
+// Duo-Tone Play Button (Recreated with Duo-Tone Geometry & Accents)
+export const DuoPlay = ({ size = 20, inButton = false, className = '' }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
     <path
-      d="M8 5.5v13l11-6.5L8 5.5z"
-      fill="var(--duo-purple, #7c5cbf)"
+      d="M7.5 5.2a1.2 1.2 0 011.83-1.03l10.2 6.8a1.2 1.2 0 010 2.06l-10.2 6.8A1.2 1.2 0 017.5 18.8V5.2z"
+      fill={inButton ? "#ffffff" : "var(--duo-purple, #7c5cbf)"}
+      stroke={inButton ? "none" : "var(--duo-stroke, currentColor)"}
+      strokeWidth="1"
+      strokeLinejoin="round"
+    />
+    <circle
+      cx="11.5"
+      cy="12"
+      r="1.8"
+      fill={inButton ? "var(--duo-purple, #7c5cbf)" : "#ffffff"}
+    />
+  </svg>
+);
+
+// Duo-Tone Pause Button (Recreated with Duo-Tone Dual-Pill Geometry)
+export const DuoPause = ({ size = 20, inButton = false, className = '' }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
+    <rect
+      x="6.5"
+      y="5"
+      width="4"
+      height="14"
+      rx="2"
+      fill={inButton ? "#ffffff" : "var(--duo-purple, #7c5cbf)"}
+    />
+    <rect
+      x="13.5"
+      y="5"
+      width="4"
+      height="14"
+      rx="2"
+      fill={inButton ? "var(--duo-purple-light, #c084fc)" : "var(--duo-stroke, currentColor)"}
+    />
+  </svg>
+);
+
+// Duo-Tone Skip Next Button (Recreated with Duo-Tone Layered Chevrons & Pill Stop)
+export const DuoSkipNext = ({ size = 18, className = '' }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
+    {/* First rear triangle */}
+    <path
+      d="M4.5 6.5L12 12l-7.5 5.5v-11z"
       stroke="var(--duo-stroke, currentColor)"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+      fill="rgba(124, 92, 191, 0.15)"
+    />
+    {/* Second forward triangle */}
+    <path
+      d="M11.5 6.5L18.5 12l-7 5.5v-11z"
+      fill="var(--duo-purple, #7c5cbf)"
+      stroke="var(--duo-purple, #7c5cbf)"
+      strokeWidth="1.2"
+      strokeLinejoin="round"
+    />
+    {/* Stop bar */}
+    <rect
+      x="18"
+      y="5.5"
+      width="2.5"
+      height="13"
+      rx="1.2"
+      fill="var(--duo-purple, #7c5cbf)"
+    />
+  </svg>
+);
+
+// Duo-Tone Skip Previous Button (Recreated with Duo-Tone Layered Chevrons & Pill Stop)
+export const DuoSkipPrev = ({ size = 18, className = '' }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
+    {/* Stop bar */}
+    <rect
+      x="3.5"
+      y="5.5"
+      width="2.5"
+      height="13"
+      rx="1.2"
+      fill="var(--duo-purple, #7c5cbf)"
+    />
+    {/* First back triangle */}
+    <path
+      d="M19.5 17.5L12 12l7.5-5.5v11z"
+      stroke="var(--duo-stroke, currentColor)"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+      fill="rgba(124, 92, 191, 0.15)"
+    />
+    {/* Second front triangle */}
+    <path
+      d="M12.5 17.5L5.5 12l7-5.5v11z"
+      fill="var(--duo-purple, #7c5cbf)"
+      stroke="var(--duo-purple, #7c5cbf)"
       strokeWidth="1.2"
       strokeLinejoin="round"
     />
   </svg>
 );
 
-// Duo-Tone Pause Button
-export const DuoPause = ({ size = 20, className = '' }) => (
-  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
-    <line x1="8" y1="5.5" x2="8" y2="18.5" stroke="var(--duo-purple, #7c5cbf)" strokeWidth="3" strokeLinecap="round" />
-    <line x1="16" y1="5.5" x2="16" y2="18.5" stroke="var(--duo-purple, #7c5cbf)" strokeWidth="3" strokeLinecap="round" />
-  </svg>
-);
-
-// Duo-Tone Skip Next Button
-export const DuoSkipNext = ({ size = 18, className = '' }) => (
-  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
-    <path d="M5 6l7 6-7 6V6z" fill="var(--duo-stroke, currentColor)" />
-    <path d="M12 6l7 6-7 6V6z" fill="var(--duo-purple, #7c5cbf)" />
-    <line x1="20" y1="6" x2="20" y2="18" stroke="var(--duo-stroke, currentColor)" strokeWidth="2" strokeLinecap="round" />
-  </svg>
-);
-
-// Duo-Tone Skip Previous Button
-export const DuoSkipPrev = ({ size = 18, className = '' }) => (
-  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
-    <line x1="4" y1="6" x2="4" y2="18" stroke="var(--duo-stroke, currentColor)" strokeWidth="2" strokeLinecap="round" />
-    <path d="M19 18l-7-6 7-6v12z" fill="var(--duo-stroke, currentColor)" />
-    <path d="M12 18l-7-6 7-6v12z" fill="var(--duo-purple, #7c5cbf)" />
-  </svg>
-);
-
-// Duo-Tone Volume Speaker Icon
+// Duo-Tone Volume Speaker Icon (Recreated with Speaker Body & Purple Acoustic Waves)
 export const DuoVolume = ({ size = 18, muted = false, className = '' }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
-    <path d="M11 5L6 9H3v6h3l5 4V5z" fill="var(--duo-stroke, currentColor)" />
+    {/* Speaker Body */}
+    <path
+      d="M11 5L6 9H3.5A1.5 1.5 0 002 10.5v3A1.5 1.5 0 003.5 15H6l5 4V5z"
+      stroke="var(--duo-stroke, currentColor)"
+      strokeWidth="1.8"
+      strokeLinejoin="round"
+      fill="rgba(124, 92, 191, 0.15)"
+    />
+    <circle cx="6" cy="12" r="1.5" fill="var(--duo-purple, #7c5cbf)" />
     {muted ? (
       <>
-        <line x1="16" y1="9" x2="21" y2="14" stroke="var(--duo-purple, #7c5cbf)" strokeWidth="2" strokeLinecap="round" />
-        <line x1="21" y1="9" x2="16" y2="14" stroke="var(--duo-purple, #7c5cbf)" strokeWidth="2" strokeLinecap="round" />
+        <line x1="15.5" y1="9.5" x2="21.5" y2="15.5" stroke="var(--duo-purple, #7c5cbf)" strokeWidth="2.2" strokeLinecap="round" />
+        <line x1="21.5" y1="9.5" x2="15.5" y2="15.5" stroke="var(--duo-purple, #7c5cbf)" strokeWidth="2.2" strokeLinecap="round" />
       </>
     ) : (
       <>
-        <path d="M15.5 8.5a5 5 0 010 7" stroke="var(--duo-purple, #7c5cbf)" strokeWidth="2" strokeLinecap="round" />
+        {/* Inner Wave */}
         <path
-          d="M18.5 6a8.5 8.5 0 010 12"
+          d="M15 9a4.5 4.5 0 010 6"
           stroke="var(--duo-purple, #7c5cbf)"
           strokeWidth="2"
           strokeLinecap="round"
-          strokeDasharray="1.5 2"
+        />
+        {/* Outer Wave */}
+        <path
+          d="M18.5 6.5a8 8 0 010 11"
+          stroke="var(--duo-purple, #7c5cbf)"
+          strokeWidth="2"
+          strokeLinecap="round"
         />
       </>
     )}
   </svg>
 );
 
-// Duo-Tone Heart / Favorite Track Icon
+// Duo-Tone Heart / Favorite Track Icon (Recreated with Floating Glow Dot)
 export const DuoHeart = ({ size = 16, liked = false, className = '' }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
     <path
       d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"
       stroke={liked ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
       strokeWidth="1.8"
-      fill={liked ? 'var(--duo-purple, #7c5cbf)' : 'none'}
+      fill={liked ? 'var(--duo-purple, #7c5cbf)' : 'rgba(124, 92, 191, 0.08)'}
       strokeLinejoin="round"
     />
-    {!liked && <circle cx="12" cy="11" r="2.2" fill="var(--duo-purple, #7c5cbf)" />}
+    <circle
+      cx="12"
+      cy="10.5"
+      r="2"
+      fill={liked ? '#ffffff' : 'var(--duo-purple, #7c5cbf)'}
+    />
   </svg>
 );
 
-// Duo-Tone Shuffle Play Icon
+// Duo-Tone Sleep Timer Stopwatch Icon
+export const DuoTimer = ({ size = 16, active = false, className = '' }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
+    <circle
+      cx="12"
+      cy="13"
+      r="8"
+      stroke={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
+      strokeWidth="1.8"
+      fill={active ? 'rgba(124, 92, 191, 0.15)' : 'none'}
+    />
+    {/* Crown Button */}
+    <path
+      d="M12 2v3M10 2h4"
+      stroke="var(--duo-purple, #7c5cbf)"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    {/* Side Trigger */}
+    <path
+      d="M18.5 6.5l-1.5 1.5"
+      stroke="var(--duo-purple, #7c5cbf)"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    />
+    {/* Hands */}
+    <line
+      x1="12"
+      y1="13"
+      x2="12"
+      y2="8.5"
+      stroke={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <line
+      x1="12"
+      y1="13"
+      x2="15.5"
+      y2="13"
+      stroke="var(--duo-purple, #7c5cbf)"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <circle cx="12" cy="13" r="1.5" fill="var(--duo-purple, #7c5cbf)" />
+  </svg>
+);
+
+// Duo-Tone Queue Drawer Icon with Eighth Note Badge
+export const DuoQueue = ({ size = 16, active = false, className = '' }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
+    {/* List bars */}
+    <line
+      x1="3"
+      y1="6"
+      x2="13"
+      y2="6"
+      stroke={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <line
+      x1="3"
+      y1="12"
+      x2="11"
+      y2="12"
+      stroke={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <line
+      x1="3"
+      y1="18"
+      x2="13"
+      y2="18"
+      stroke={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    {/* Duo-tone Musical Note on right */}
+    <path
+      d="M16 16.5V7.5a1 1 0 011-1h3.5v2.5H18v7.5a2.5 2.5 0 11-2-2.45z"
+      fill="var(--duo-purple, #7c5cbf)"
+    />
+    <circle cx="15.5" cy="17.5" r="2" fill="var(--duo-purple, #7c5cbf)" stroke="var(--duo-stroke, currentColor)" strokeWidth="0.8" />
+  </svg>
+);
+
+// Duo-Tone Shuffle Play Icon (Recreated with Intersection Curve & Center Dot)
 export const DuoShuffle = ({ size = 16, active = false, className = '' }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
-    <path d="M16 3h5v5" stroke="var(--duo-purple, #7c5cbf)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M4 20l6.5-6.5M21 3l-7 7" stroke="var(--duo-purple, #7c5cbf)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path
+      d="M16 3h5v5"
+      stroke="var(--duo-purple, #7c5cbf)"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M4 20l6.5-6.5M21 3l-7 7"
+      stroke={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
     <path
       d="M4 4l16 16"
       stroke={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
-      strokeWidth="2"
+      strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
     <path
       d="M21 16v5h-5"
-      stroke={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
+      stroke="var(--duo-purple, #7c5cbf)"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
+    {active && <circle cx="12" cy="12" r="2" fill="var(--duo-purple, #7c5cbf)" />}
   </svg>
 );
 
-// Duo-Tone Repeat Cycle Icon
-export const DuoRepeat = ({ size = 16, mode = 'off', className = '' }) => (
+// Duo-Tone Repeat Cycle Icon (Recreated with Smooth Looping Arrows & One-Badge)
+export const DuoRepeat = ({ size = 16, mode = 'off', className = '' }) => {
+  const active = mode !== 'off';
+  return (
+    <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M17 2l4 4-4 4"
+        stroke="var(--duo-purple, #7c5cbf)"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3 11V9a4 4 0 014-4h14"
+        stroke={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7 22l-4-4 4-4"
+        stroke="var(--duo-purple, #7c5cbf)"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M21 13v2a4 4 0 01-4 4H3"
+        stroke={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {mode === 'one' ? (
+        <text
+          x="12"
+          y="15.5"
+          fill="var(--duo-purple, #7c5cbf)"
+          fontSize="9"
+          fontWeight="900"
+          textAnchor="middle"
+          fontFamily="system-ui, -apple-system, sans-serif"
+        >
+          1
+        </text>
+      ) : active ? (
+        <circle cx="12" cy="12" r="2" fill="var(--duo-purple, #7c5cbf)" />
+      ) : null}
+    </svg>
+  );
+};
+
+// Duo-Tone Maximize / Fullscreen Icon
+export const DuoMaximize = ({ size = 16, className = '' }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
-    <path d="M17 2l4 4-4 4" stroke="var(--duo-purple, #7c5cbf)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M3 11V9a4 4 0 014-4h14" stroke="var(--duo-purple, #7c5cbf)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    {/* Top Left */}
     <path
-      d="M7 22l-4-4 4-4"
-      stroke={mode !== 'off' ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
-      strokeWidth="2"
+      d="M9 3H4a1 1 0 00-1 1v5"
+      stroke="var(--duo-stroke, currentColor)"
+      strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
+    <circle cx="5" cy="5" r="1.2" fill="var(--duo-purple, #7c5cbf)" />
+    {/* Top Right */}
     <path
-      d="M21 13v2a4 4 0 01-4 4H3"
-      stroke={mode !== 'off' ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
-      strokeWidth="2"
+      d="M15 3h5a1 1 0 011 1v5"
+      stroke="var(--duo-purple, #7c5cbf)"
+      strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
-    {mode === 'one' && (
-      <text
-        x="12"
-        y="15"
-        fill="var(--duo-purple, #7c5cbf)"
-        fontSize="8"
-        fontWeight="800"
-        textAnchor="middle"
-        fontFamily="sans-serif"
-      >
-        1
-      </text>
-    )}
+    <circle cx="19" cy="5" r="1.2" fill="var(--duo-purple, #7c5cbf)" />
+    {/* Bottom Right */}
+    <path
+      d="M15 21h5a1 1 0 001-1v-5"
+      stroke="var(--duo-stroke, currentColor)"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <circle cx="19" cy="19" r="1.2" fill="var(--duo-purple, #7c5cbf)" />
+    {/* Bottom Left */}
+    <path
+      d="M9 21H4a1 1 0 01-1-1v-5"
+      stroke="var(--duo-purple, #7c5cbf)"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <circle cx="5" cy="19" r="1.2" fill="var(--duo-purple, #7c5cbf)" />
   </svg>
 );
 

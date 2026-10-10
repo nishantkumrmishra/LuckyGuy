@@ -176,6 +176,31 @@ const defaultTelegramExtension = {
   repoUrl: "https://github.com/nishantkumrmishra/LuckyGuy--extensions/tree/main/extensions/telegram"
 };
 
+const defaultYouTubeExtension = {
+  id: "luckyguy-ext-youtube",
+  name: "YouTube",
+  version: "1.0.0",
+  type: "hybrid",
+  rating: "all",
+  description: "High-speed YouTube video & audio streaming engine powered by yt-dlp.",
+  author: "LuckyGuy Core",
+  category: "Video & Media Downloader",
+  entry: "index.js",
+  mediaTypes: ["video", "audio"],
+  capabilities: [
+    "stream",
+    "download",
+    "metadata",
+    "search",
+    "videoPlayer"
+  ],
+  supportedUrls: [
+    "*://*.youtube.com/*",
+    "*://youtu.be/*"
+  ],
+  enabled: true
+};
+
 export default function App() {
   const downloadCompletionMap = useRef(new Map()).current;
   const isQueueCancelledRef = useRef(false);
@@ -203,10 +228,13 @@ export default function App() {
         if (!list.some(e => e.id === 'luckyguy-ext-telegram')) {
           list.push(defaultTelegramExtension);
         }
-        try {
-          localStorage.setItem('luckyguy-extensions', JSON.stringify(list));
-        } catch (e) {}
       }
+      if (!list.some(e => e.id === 'luckyguy-ext-youtube')) {
+        list.push(defaultYouTubeExtension);
+      }
+      try {
+        localStorage.setItem('luckyguy-extensions', JSON.stringify(list));
+      } catch (e) {}
       return list;
     } catch {
       return [];
@@ -218,6 +246,28 @@ export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [pluginNavState, setPluginNavState] = useState(null);
+  const [visitedPluginTabs, setVisitedPluginTabs] = useState(() => {
+    const initial = new Set();
+    try {
+      const saved = localStorage.getItem('localguy-active-tab') || 'home';
+      if (saved.startsWith('plugin-')) {
+        initial.add(saved.replace('plugin-', ''));
+      }
+    } catch {}
+    return initial;
+  });
+
+  useEffect(() => {
+    if (activeTab.startsWith('plugin-')) {
+      const pid = activeTab.replace('plugin-', '');
+      setVisitedPluginTabs((prev) => {
+        if (prev.has(pid)) return prev;
+        const next = new Set(prev);
+        next.add(pid);
+        return next;
+      });
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (!activeTab.startsWith('plugin-')) {
@@ -1553,32 +1603,40 @@ export default function App() {
               />
             )}
 
-            {/* DYNAMIC PLUGIN-DECLARED TAB ROUTING */}
-            {activeTab.startsWith('plugin-') && (() => {
-              const pluginId = activeTab.replace('plugin-', '');
-              const matchedPlugin = pluginTabs.find((p) => p.id === pluginId);
-              if (!matchedPlugin) return null;
-              if (matchedPlugin.id?.includes('telegram')) {
-                return (
-                  <TelegramTab
-                    key={matchedPlugin.id}
-                    plugin={matchedPlugin}
-                    onStartDownload={handleStartDownload}
-                    preferences={preferences}
-                    onOpenFolder={handleOpenFolder}
-                  />
-                );
-              }
+            {/* DYNAMIC PLUGIN-DECLARED TABS (Preserved in DOM so playing video & scroll position persist across tab switches) */}
+            {pluginTabs.map((matchedPlugin) => {
+              const isCurrent = activeTab === `plugin-${matchedPlugin.id}`;
+              if (!visitedPluginTabs.has(matchedPlugin.id) && !isCurrent) return null;
               return (
-                <PluginTabContainer
+                <div
                   key={matchedPlugin.id}
-                  plugin={matchedPlugin}
-                  onStartDownload={handleStartDownload}
-                  preferences={preferences}
-                  onOpenFolder={handleOpenFolder}
-                />
+                  style={{
+                    display: isCurrent ? 'flex' : 'none',
+                    flex: 1,
+                    height: '100%',
+                    width: '100%',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {matchedPlugin.id?.includes('telegram') ? (
+                    <TelegramTab
+                      plugin={matchedPlugin}
+                      onStartDownload={handleStartDownload}
+                      preferences={preferences}
+                      onOpenFolder={handleOpenFolder}
+                    />
+                  ) : (
+                    <PluginTabContainer
+                      plugin={matchedPlugin}
+                      onStartDownload={handleStartDownload}
+                      preferences={preferences}
+                      onOpenFolder={handleOpenFolder}
+                    />
+                  )}
+                </div>
               );
-            })()}
+            })}
 
             {activeTab === 'settings' && (
               <SettingsTab

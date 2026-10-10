@@ -12,6 +12,7 @@ const os = require('os');
 const fs = require('fs');
 
 const youtubeExtractor = require('./extractors/youtube');
+const ytdlpExtractor = require('./extractors/ytdlp');
 const spotifyExtractor = require('./extractors/spotify');
 const jiosaavnExtractor = require('./extractors/jiosaavn');
 const pornhubExtractor = require('./extractors/pornhub');
@@ -248,16 +249,31 @@ ipcMain.handle('extract-url', async (event, url) => {
     return { error: 'Could not extract playlist or track details from Spotify link. Please verify the URL or network connection.' };
   }
 
-  // 2. YouTube
-  const ytVideoId = youtubeExtractor.extractVideoId(trimmed);
-  if (ytVideoId) {
-    const meta = await youtubeExtractor.fetchVideoMetadata(ytVideoId);
-    if (meta) {
-      return {
-        platform: 'YouTube',
-        type: 'track',
-        ...meta
-      };
+  // 2. YouTube (yt-dlp first for robust decryption & direct stream resolution)
+  const isYouTube = trimmed.includes('youtube.com') || trimmed.includes('youtu.be');
+  if (isYouTube) {
+    try {
+      const ytdlpMeta = await ytdlpExtractor.extractInfo(trimmed);
+      if (ytdlpMeta && (ytdlpMeta.streamUrl || Object.keys(ytdlpMeta.streams || {}).length > 0)) {
+        return {
+          platform: 'YouTube',
+          type: 'track',
+          ...ytdlpMeta
+        };
+      }
+    } catch (e) {
+      console.warn('[YtDlp] Extract failed, attempting Innertube fallback:', e.message);
+    }
+    const ytVideoId = youtubeExtractor.extractVideoId(trimmed);
+    if (ytVideoId) {
+      const meta = await youtubeExtractor.fetchVideoMetadata(ytVideoId);
+      if (meta) {
+        return {
+          platform: 'YouTube',
+          type: 'track',
+          ...meta
+        };
+      }
     }
     return { error: 'Could not extract audio metadata from YouTube link.' };
   }
@@ -529,6 +545,70 @@ ipcMain.handle('crawl-portal', async (event, targetUrl) => {
   });
 });
 
+
+// Portal Disk Cache
+const portalCacheDir = path.join(userDataDir, 'portal_cache');
+if (!fs.existsSync(portalCacheDir)) {
+  try { fs.mkdirSync(portalCacheDir, { recursive: true }); } catch (e) {}
+}
+
+ipcMain.handle('portal-cache-get', async (event, portalId) => {
+  try {
+    const cleanId = (portalId || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const cacheFile = path.join(portalCacheDir, `${cleanId}.json`);
+    if (fs.existsSync(cacheFile)) {
+      const data = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+      return data;
+    }
+  } catch (err) {
+    console.warn('[PortalCache] Read error:', err.message);
+  }
+  return null;
+});
+
+ipcMain.handle('portal-cache-save', async (event, portalId, items) => {
+  try {
+    const cleanId = (portalId || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const cacheFile = path.join(portalCacheDir, `${cleanId}.json`);
+    if (!fs.existsSync(portalCacheDir)) {
+      fs.mkdirSync(portalCacheDir, { recursive: true });
+    }
+    fs.writeFileSync(cacheFile, JSON.stringify(items || [], null, 2), 'utf8');
+    return true;
+  } catch (err) {
+    console.warn('[PortalCache] Write error:', err.message);
+    return false;
+  }
+});
+
+ipcMain.handle('portal-cache-clear', async (event, portalId) => {
+  try {
+    const cleanId = (portalId || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const cacheFile = path.join(portalCacheDir, `${cleanId}.json`);
+    if (fs.existsSync(cacheFile)) {
+      fs.unlinkSync(cacheFile);
+      return true;
+    }
+  } catch (err) {}
+  return false;
+});
+
+ipcMain.handle('ytdlp-extract', async (event, url) => {
+  try {
+    return await ytdlpExtractor.extractInfo(url);
+  } catch (e) {
+    return { error: e.message };
+  }
+});
+
+ipcMain.handle('ytdlp-search', async (event, query, limit) => {
+  try {
+    return await ytdlpExtractor.search(query, limit || 20);
+  } catch (e) {
+    return [];
+  }
+});
+
 ipcMain.handle('search-jiosaavn', async (event, query) => {
   return await jiosaavnExtractor.searchTrack(query);
 });
@@ -702,6 +782,15 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
       }
     } catch (e) {
       console.warn('Could not resolve direct stream for download:', e.message);
+    }
+  } else if ((streamUrl.includes('youtube.com') || streamUrl.includes('youtu.be')) && !streamUrl.includes('googlevideo.com')) {
+    try {
+      const ytVid = await ytdlpExtractor.extractInfo(streamUrl);
+      if (ytVid && (ytVid.streamUrl || ytVid.streams)) {
+        streamUrl = ytVid.streams?.[taskConfig.qualityLabel] || ytVid.streamUrl;
+      }
+    } catch (e) {
+      console.warn('Could not resolve YouTube stream via yt-dlp:', e.message);
     }
   }
 

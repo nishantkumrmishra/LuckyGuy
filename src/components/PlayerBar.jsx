@@ -8,13 +8,11 @@ import {
   DuoHeart,
   DuoShuffle,
   DuoRepeat,
+  DuoTimer,
+  DuoQueue,
+  DuoMaximize,
   CustomIcon
 } from './DuoIcons';
-import {
-  ListMusic,
-  Maximize2,
-  Timer
-} from 'lucide-react';
 
 export default function PlayerBar({
   currentTrack,
@@ -328,14 +326,14 @@ export default function PlayerBar({
             justifyContent: 'center',
             cursor: 'pointer',
             flexShrink: 0,
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.15)',
-            transition: 'transform 0.1s ease',
+            boxShadow: '0 2px 8px rgba(124, 92, 191, 0.25)',
+            transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
           }}
         >
           {isPlaying ? (
-            <DuoPause size={18} />
+            <DuoPause size={18} inButton={true} />
           ) : (
-            <DuoPlay size={18} />
+            <DuoPlay size={18} inButton={true} />
           )}
         </button>
 
@@ -478,7 +476,7 @@ export default function PlayerBar({
             }}
             title={isLiked ? 'Remove from Liked' : 'Like Track'}
           >
-            <DuoHeart size={15} liked={isLiked} />
+            <DuoHeart size={16} liked={isLiked} />
           </button>
         )}
       </div>
@@ -509,7 +507,7 @@ export default function PlayerBar({
             flexShrink: 0,
           }}
         >
-          <DuoVolume size={16} muted={isMuted || volume === 0} />
+          <DuoVolume size={18} muted={isMuted || volume === 0} />
         </button>
 
         {/* Volume Scrub Track */}
@@ -542,7 +540,7 @@ export default function PlayerBar({
             flexShrink: 0,
           }}
         >
-          <Timer size={15} />
+          <DuoTimer size={16} active={!!sleepTimerRemaining} />
         </button>
 
         {/* Queue Drawer Button */}
@@ -561,7 +559,7 @@ export default function PlayerBar({
             flexShrink: 0,
           }}
         >
-          <ListMusic size={15} />
+          <DuoQueue size={16} active={isQueueOpen} />
         </button>
 
         {/* Repeat Button */}
@@ -579,7 +577,7 @@ export default function PlayerBar({
             flexShrink: 0,
           }}
         >
-          <DuoRepeat size={15} mode={repeatMode} />
+          <DuoRepeat size={16} mode={repeatMode} />
         </button>
 
         {/* Shuffle Button */}
@@ -597,7 +595,7 @@ export default function PlayerBar({
             flexShrink: 0,
           }}
         >
-          <DuoShuffle size={15} active={isShuffle} />
+          <DuoShuffle size={16} active={isShuffle} />
         </button>
 
         {/* Fullscreen Button */}
@@ -616,7 +614,7 @@ export default function PlayerBar({
             flexShrink: 0,
           }}
         >
-          <Maximize2 size={15} />
+          <DuoMaximize size={16} />
         </button>
       </div>
     </div>

@@ -96,6 +96,7 @@ export default function PluginTabContainer({
   const [filterRuleInput, setFilterRuleInput] = useState('');
   
   // Media State
+  const [quickSearchText, setQuickSearchText] = useState('');
   const [isIndexing, setIsIndexing] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [pageNumber, setPageNumber] = useState(1);
@@ -165,11 +166,29 @@ export default function PluginTabContainer({
     } catch (e) {}
   };
 
-  const handleWebReload = () => {
+  const handleWebReload = async () => {
+    setIsIndexing(true);
     try {
       if (webviewRef.current?.reload) webviewRef.current.reload();
       else if (iframeRef.current) iframeRef.current.src = activeUrl;
     } catch (e) {}
+
+    let liveItems = [];
+    if (window.electronAPI?.crawlPortal) {
+      try {
+        liveItems = await window.electronAPI.crawlPortal(activeUrl);
+      } catch (e) {}
+    }
+
+    const fresh = (liveItems && liveItems.length > 0)
+      ? deduplicateVideos(liveItems)
+      : deduplicateVideos(generateIndexedVideos(selectedCategory, 1));
+
+    setCrawledMedia(fresh);
+    setIsIndexing(false);
+    if (window.electronAPI?.savePortalCache) {
+      window.electronAPI.savePortalCache(cachePortalId, fresh);
+    }
   };
 
   // Determine portal category and tag
@@ -521,13 +540,38 @@ export default function PluginTabContainer({
   }, [activeUrl, viewMode, onNavRegister, resolveDomainAlias, handleWebBack, handleWebForward, handleWebReload]);
 
 
-  // Initial Indexing on load or category change
+  // Persistent Disk Caching & Smart Content Blending
+  const cachePortalId = plugin.id || 'pornhub';
+
   useEffect(() => {
     let isMounted = true;
-    setIsIndexing(true);
     setPageNumber(1);
 
-    const runIndexing = async () => {
+    const loadCachedOrFresh = async () => {
+      let cached = null;
+      if (window.electronAPI?.getPortalCache) {
+        try {
+          cached = await window.electronAPI.getPortalCache(cachePortalId);
+        } catch (e) {}
+      }
+
+      if (!isMounted) return;
+
+      if (Array.isArray(cached) && cached.length > 0) {
+        // Cache file exists: load it immediately so data stays stable across launches
+        // Also blend half fresh new videos with old data so it discovers new content without wiping out
+        const freshSeed = generateIndexedVideos(selectedCategory, 1);
+        const blended = deduplicateVideos([...freshSeed.slice(0, 8), ...cached]);
+        setCrawledMedia(blended);
+        setIsIndexing(false);
+        if (window.electronAPI?.savePortalCache) {
+          window.electronAPI.savePortalCache(cachePortalId, blended);
+        }
+        return;
+      }
+
+      // If caching file was removed or is missing: generate brand new data
+      setIsIndexing(true);
       let liveItems = [];
       if (window.electronAPI?.crawlPortal) {
         try {
@@ -537,23 +581,25 @@ export default function PluginTabContainer({
 
       if (!isMounted) return;
 
-      if (liveItems && liveItems.length > 0) {
-        setCrawledMedia(deduplicateVideos(liveItems));
-      } else {
-        const items = generateIndexedVideos(selectedCategory, 1);
-        setCrawledMedia(deduplicateVideos(items));
-      }
+      const items = (liveItems && liveItems.length > 0)
+        ? deduplicateVideos(liveItems)
+        : deduplicateVideos(generateIndexedVideos(selectedCategory, 1));
+
+      setCrawledMedia(items);
       setIsIndexing(false);
       setBlockedAdsCount(prev => prev + 14);
+
+      if (window.electronAPI?.savePortalCache) {
+        window.electronAPI.savePortalCache(cachePortalId, items);
+      }
     };
 
-    const timer = setTimeout(runIndexing, 400);
+    loadCachedOrFresh();
 
     return () => {
       isMounted = false;
-      clearTimeout(timer);
     };
-  }, [plugin.id, activeUrl, selectedCategory, deduplicateVideos]);
+  }, [plugin.id, selectedCategory, deduplicateVideos]);
 
   // Infinite Scroll Trigger
   const handleLoadMore = useCallback(async () => {
@@ -575,9 +621,15 @@ export default function PluginTabContainer({
       nextItems = generateIndexedVideos(selectedCategory, nextPage);
     }
 
-    setCrawledMedia(prev => deduplicateVideos([...prev, ...nextItems]));
+    setCrawledMedia(prev => {
+      const updated = deduplicateVideos([...prev, ...nextItems]);
+      if (window.electronAPI?.savePortalCache) {
+        window.electronAPI.savePortalCache(cachePortalId, updated);
+      }
+      return updated;
+    });
     setIsLoadingMore(false);
-  }, [isLoadingMore, isIndexing, pageNumber, activeUrl, selectedCategory, deduplicateVideos]);
+  }, [isLoadingMore, isIndexing, pageNumber, activeUrl, selectedCategory, deduplicateVideos, cachePortalId]);
 
   // Observer for Infinite Scroll sentinel
   useEffect(() => {
@@ -594,25 +646,26 @@ export default function PluginTabContainer({
     return () => observer.disconnect();
   }, [handleLoadMore, isIndexing, isLoadingMore]);
 
-  // Webview lifecycle listeners
+  // Webview lifecycle listeners (no auto-refresh disruption)
   useEffect(() => {
     const webview = webviewRef.current;
     if (!webview) return;
 
+    // Only extract if completely empty to populate initial state
     const onFinish = () => {
-      setTimeout(extractVideosFromWebview, 800);
+      if (crawledMedia.length === 0) {
+        extractVideosFromWebview();
+      }
     };
 
-    webview.addEventListener('dom-ready', onFinish);
     webview.addEventListener('did-finish-load', onFinish);
 
     return () => {
       try {
-        webview.removeEventListener('dom-ready', onFinish);
         webview.removeEventListener('did-finish-load', onFinish);
       } catch (e) {}
     };
-  }, [activeUrl]);
+  }, [crawledMedia.length]);
 
   const toggleAdBlock = () => {
     setIsAdBlockEnabled(prev => {
@@ -991,7 +1044,7 @@ export default function PluginTabContainer({
               if (target) {
                 let resolved = resolveDomainAlias(target);
                 if (!resolved.startsWith('http://') && !resolved.startsWith('https://')) {
-                  resolved = 'https://www.pornhub.org/video/search?search=' + encodeURIComponent(resolved);
+                  resolved = isPornhub ? ('https://www.pornhub.org/video/search?search=' + encodeURIComponent(resolved)) : ('https://' + resolved);
                 }
                 setActiveUrl(resolved);
                 setInputUrl(resolved);
@@ -1002,7 +1055,7 @@ export default function PluginTabContainer({
             }}
             style={{
               flex: 1,
-              maxWidth: '650px',
+              maxWidth: '480px',
               display: 'flex',
               alignItems: 'center',
             }}
@@ -1036,6 +1089,93 @@ export default function PluginTabContainer({
                   fontFamily: 'monospace',
                 }}
               />
+            </div>
+          </form>
+
+          {/* Quick Search Bar Beside Address Bar */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const q = (quickSearchText || '').trim();
+              if (!q) return;
+              let targetSearchUrl;
+              if (isPornhub) {
+                targetSearchUrl = 'https://www.pornhub.org/video/search?search=' + encodeURIComponent(q);
+              } else if (isTelegram) {
+                targetSearchUrl = 'https://t.me/s/' + encodeURIComponent(q.replace('@', ''));
+              } else {
+                targetSearchUrl = `${activeUrl}${activeUrl.includes('?') ? '&' : '?'}q=${encodeURIComponent(q)}`;
+              }
+              setActiveUrl(targetSearchUrl);
+              setInputUrl(targetSearchUrl);
+              setIsIndexing(true);
+              if (webviewRef.current?.loadURL) {
+                try { webviewRef.current.loadURL(targetSearchUrl); } catch(err) {}
+              }
+              if (window.electronAPI?.crawlPortal) {
+                window.electronAPI.crawlPortal(targetSearchUrl).then(items => {
+                  if (items && items.length > 0) {
+                    setCrawledMedia(deduplicateVideos(items));
+                    if (window.electronAPI?.savePortalCache) {
+                      window.electronAPI.savePortalCache(cachePortalId, items);
+                    }
+                  }
+                  setIsIndexing(false);
+                }).catch(() => setIsIndexing(false));
+              }
+            }}
+            style={{
+              flex: 1,
+              maxWidth: '340px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                height: '34px',
+                backgroundColor: 'var(--bg-main, #f8fafc)',
+                borderRadius: '6px',
+                border: '1px solid var(--border-medium, #e2e8f0)',
+                padding: '0 10px',
+                gap: '8px',
+              }}
+            >
+              <Search size={14} color="var(--primary, #7c5cbf)" />
+              <input
+                type="text"
+                value={quickSearchText}
+                onChange={(e) => setQuickSearchText(e.target.value)}
+                placeholder={isPornhub ? "Search Pornhub videos..." : "Search media..."}
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  background: 'transparent',
+                  outline: 'none',
+                  fontSize: '12px',
+                  color: 'var(--text-primary)',
+                }}
+              />
+              {quickSearchText && (
+                <button
+                  type="button"
+                  onClick={() => setQuickSearchText('')}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    color: 'var(--text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  <X size={13} />
+                </button>
+              )}
             </div>
           </form>
 
