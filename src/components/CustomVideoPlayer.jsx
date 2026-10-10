@@ -415,7 +415,7 @@ export default function CustomVideoPlayer({
       />
 
       {/* Large Inviting Center Play Button (Shown when paused and ready) */}
-      {!isPlaying && !isResolving && !isBuffering && !hasError && (
+      {!isPlaying && !isResolving && !hasError && (
         <div
           onClick={(e) => {
             e.stopPropagation();
@@ -473,7 +473,7 @@ export default function CustomVideoPlayer({
       )}
 
       {/* Subtle Buffering Spinner (When playing and waiting for chunks) */}
-      {isBuffering && !isResolving && (
+      {isPlaying && isBuffering && !isResolving && (
         <div
           style={{
             position: 'absolute',

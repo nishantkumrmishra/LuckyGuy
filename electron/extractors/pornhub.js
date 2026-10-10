@@ -1,5 +1,18 @@
 const PORNHUB_REGEX = /(?:pornhub\.(?:org|com))\/(?:view_video\.php\?viewkey=)([a-zA-Z0-9_-]+)/;
 
+let netFetch = null;
+function getFetch() {
+  if (netFetch) return netFetch;
+  try {
+    const electron = require('electron');
+    if (electron && electron.net && typeof electron.net.fetch === 'function') {
+      netFetch = electron.net.fetch.bind(electron.net);
+      return netFetch;
+    }
+  } catch (e) {}
+  return globalThis.fetch;
+}
+
 function isPornhubUrl(url) {
   if (!url) return false;
   return url.includes('pornhub.org') || url.includes('pornhub.com');
@@ -16,15 +29,17 @@ async function extractPornhubVideo(url) {
   if (!vkey) return null;
 
   const targetUrl = `https://www.pornhub.org/view_video.php?viewkey=${vkey}`;
+  const fetchFn = getFetch();
+
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 9000);
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-    const resp = await fetch(targetUrl, {
+    const resp = await fetchFn(targetUrl, {
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Cookie': 'accessAgeDisclaimerPH=1; platform=pc; bs=1;'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        'Cookie': 'accessAgeDisclaimerPH=1; platform=pc; bs=1; hasVisited=1; age_verified=1;'
       }
     });
     clearTimeout(timeoutId);
@@ -50,12 +65,12 @@ async function extractPornhubVideo(url) {
     if (mp4Def && mp4Def.videoUrl) {
       try {
         const mController = new AbortController();
-        const mTimeoutId = setTimeout(() => mController.abort(), 6000);
-        const mResp = await fetch(mp4Def.videoUrl, {
+        const mTimeoutId = setTimeout(() => mController.abort(), 8000);
+        const mResp = await fetchFn(mp4Def.videoUrl, {
           signal: mController.signal,
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Cookie': 'accessAgeDisclaimerPH=1; platform=pc; bs=1;'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+            'Cookie': 'accessAgeDisclaimerPH=1; platform=pc; bs=1; hasVisited=1; age_verified=1;'
           }
         });
         clearTimeout(mTimeoutId);
@@ -110,8 +125,8 @@ async function extractPornhubVideo(url) {
       ext: '.mp4',
       headers: {
         'Referer': 'https://www.pornhub.org/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Cookie': 'accessAgeDisclaimerPH=1; platform=pc; bs=1;'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        'Cookie': 'accessAgeDisclaimerPH=1; platform=pc; bs=1; hasVisited=1; age_verified=1;'
       }
     };
   } catch (err) {
