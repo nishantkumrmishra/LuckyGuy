@@ -1,11 +1,12 @@
 import React from 'react';
-import { AlertTriangle, RefreshCw, Copy, Check, ExternalLink } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Copy, Check, ExternalLink, Eye, ArrowLeft } from 'lucide-react';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
       hasError: false,
+      isPreview: false,
       error: null,
       errorInfo: null,
       copied: false,
@@ -21,15 +22,72 @@ export default class ErrorBoundary extends React.Component {
     this.setState({ errorInfo });
   }
 
+  componentDidMount() {
+    // Global listener for preview triggers
+    window.__luckyguy_trigger_error_preview = this.triggerPreviewError;
+
+    const handleCustomPreview = (e) => {
+      if (e?.detail?.type === 'error') {
+        this.triggerPreviewError();
+      }
+    };
+    window.addEventListener('luckyguy:preview-trigger', handleCustomPreview);
+
+    if (window.electronAPI?.onPreviewTrigger) {
+      this.unsubPreview = window.electronAPI.onPreviewTrigger((data) => {
+        if (data?.type === 'error') {
+          this.triggerPreviewError();
+        }
+      });
+    }
+
+    // Check on startup if --preview-error was passed
+    if (window.electronAPI?.getPreviewArgs) {
+      window.electronAPI.getPreviewArgs().then((args) => {
+        if (args?.error) {
+          this.triggerPreviewError();
+        }
+      }).catch(() => {});
+    }
+  }
+
+  componentWillUnmount() {
+    if (typeof this.unsubPreview === 'function') {
+      this.unsubPreview();
+    }
+  }
+
+  triggerPreviewError = () => {
+    const mockErr = new Error("TypeError: Cannot read properties of undefined (reading 'streamUrl')");
+    mockErr.stack = `TypeError: Cannot read properties of undefined (reading 'streamUrl')
+    at CustomVideoPlayer.handleStreamResolution (src/components/CustomVideoPlayer.jsx:189:12)
+    at HTMLVideoElement.handleMediaCanPlay (src/components/CustomVideoPlayer.jsx:245:18)
+    at renderWithHooks (react-dom.development.js:15486)
+    at updateFunctionComponent (react-dom.development.js:19617)
+    at beginWork (react-dom.development.js:21601)`;
+
+    this.setState({
+      hasError: true,
+      isPreview: true,
+      error: mockErr,
+      errorInfo: {
+        componentStack: `\n    in CustomVideoPlayer (at PluginTabContainer.jsx:426)\n    in PluginTabContainer (at App.jsx:1924)\n    in main (at App.jsx:1890)\n    in div (at App.jsx:1850)\n    in App (at main.jsx:25)`,
+      },
+    });
+  };
+
+  handleExitPreview = () => {
+    this.setState({
+      hasError: false,
+      isPreview: false,
+      error: null,
+      errorInfo: null,
+    });
+  };
+
   handleCopy = () => {
     const { error, errorInfo } = this.state;
-    const text = `LuckyGuy Crash Report:
-Error: ${error?.toString() || 'Unknown Error'}
-Stack:
-${error?.stack || 'No stack trace'}
-
-Component Stack:
-${errorInfo?.componentStack || 'No component stack'}`;
+    const text = `LuckyGuy Crash Report:\nError: ${error?.toString() || 'Unknown Error'}\nStack:\n${error?.stack || 'No stack trace'}\n\nComponent Stack:\n${errorInfo?.componentStack || 'No component stack'}`;
 
     navigator.clipboard.writeText(text).then(() => {
       this.setState({ copied: true });
@@ -99,7 +157,7 @@ ${errorInfo?.componentStack || 'No component stack'}`;
 
   render() {
     if (this.state.hasError) {
-      const { error, errorInfo, copied } = this.state;
+      const { error, errorInfo, copied, isPreview } = this.state;
       const errorText = `${error?.toString()}\n\nComponent Trace:${errorInfo?.componentStack || ''}\n\nStack:\n${error?.stack || ''}`;
 
       const savedTheme = (() => {
@@ -145,8 +203,50 @@ ${errorInfo?.componentStack || 'No component stack'}`;
             padding: '32px',
             boxSizing: 'border-box',
             userSelect: 'text',
+            position: 'relative',
           }}
         >
+          {isPreview && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '8px 16px',
+                backgroundColor: 'rgba(124, 92, 191, 0.15)',
+                border: '1px solid rgba(124, 92, 191, 0.4)',
+                borderRadius: '9999px',
+                backdropFilter: 'blur(8px)',
+                zIndex: 100,
+              }}
+            >
+              <span style={{ fontSize: '12px', fontWeight: 600, color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Eye size={14} /> UI Preview Mode: Crash & Error Diagnostics Screen
+              </span>
+              <button
+                type="button"
+                onClick={this.handleExitPreview}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '4px 10px',
+                  borderRadius: '9999px',
+                  backgroundColor: '#7c5cbf',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <ArrowLeft size={12} /> Exit Preview & Return to App
+              </button>
+            </div>
+          )}
+
           <div
             style={{
               maxWidth: '740px',
@@ -228,8 +328,8 @@ ${errorInfo?.componentStack || 'No component stack'}`;
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
                     <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
                   </svg>
-                  <span>Post Problem on GitHub</span>
-                  <ExternalLink size={12} style={{ opacity: 0.8 }} />
+                  <span>Report on GitHub</span>
+                  <ExternalLink size={12} style={{ opacity: 0.7 }} />
                 </button>
 
                 <button
@@ -241,16 +341,16 @@ ${errorInfo?.componentStack || 'No component stack'}`;
                     gap: '6px',
                     padding: '8px 14px',
                     borderRadius: '6px',
-                    backgroundColor: '#7c5cbf',
-                    border: 'none',
-                    color: '#ffffff',
+                    backgroundColor: 'transparent',
+                    border: styles.btnReloadBorder,
+                    color: styles.titleColor,
                     fontSize: '12.5px',
-                    fontWeight: 600,
+                    fontWeight: 500,
                     cursor: 'pointer',
                   }}
                 >
-                  {copied ? <Check size={14} /> : <Copy size={14} />}
-                  <span>{copied ? 'Copied to Clipboard!' : 'Copy Error Report'}</span>
+                  {copied ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
+                  <span>{copied ? 'Copied Diagnostics!' : 'Copy Diagnostics'}</span>
                 </button>
 
                 <button
@@ -271,7 +371,7 @@ ${errorInfo?.componentStack || 'No component stack'}`;
                   }}
                 >
                   <RefreshCw size={14} />
-                  <span>Reload Application</span>
+                  <span>Reload App</span>
                 </button>
               </div>
 
@@ -279,15 +379,17 @@ ${errorInfo?.componentStack || 'No component stack'}`;
                 type="button"
                 onClick={this.handleResetState}
                 style={{
-                  background: 'transparent',
+                  background: 'none',
                   border: 'none',
                   color: styles.linkResetColor,
-                  fontSize: '11.5px',
-                  cursor: 'pointer',
+                  fontSize: '11px',
                   textDecoration: 'underline',
+                  cursor: 'pointer',
+                  padding: '4px 6px',
                 }}
+                title="Clears stored active tab and custom extensions if a bad plugin is causing the crash"
               >
-                Reset Extensions State
+                Reset App Cache & State
               </button>
             </div>
           </div>

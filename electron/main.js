@@ -1,12 +1,22 @@
 // Benign navigation interruption handler (suppresses ERR_ABORTED -3 when switching tabs/categories)
 process.on("unhandledRejection", (reason) => {
-  if (reason && (String(reason).includes("ERR_ABORTED") || String(reason).includes("(-3)"))) {
-    return;
+  if (reason) {
+    const str = String(reason);
+    if (str.includes("ERR_ABORTED") || str.includes("(-3)") || str.includes("ERR_FAILED") || str.includes("Navigation failed")) {
+      return;
+    }
   }
-  console.warn("Unhandled Rejection:", reason);
 });
-const { app, BrowserWindow, ipcMain, dialog, shell, globalShortcut, session } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, globalShortcut, session, net } = require('electron');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+app.commandLine.appendSwitch('disable-logging');
+app.commandLine.appendSwitch('log-level', '3'); // FATAL only (silences internal Chromium terminal logs)
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+
+// Preview & Diagnostics CLI Flags
+const isPreviewUpdate = process.argv.includes('--preview-update') || process.env.PREVIEW_UPDATE === '1';
+const isPreviewError = process.argv.includes('--preview-error') || process.env.PREVIEW_ERROR === '1';
+const isPreviewHud = process.argv.includes('--preview-hud') || process.argv.includes('--preview-ui') || process.env.PREVIEW_HUD === '1';
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -130,9 +140,25 @@ function createWindow() {
     if (validatedURL && (validatedURL.includes('pornhub') || validatedURL.startsWith('http://') || validatedURL.startsWith('https://'))) {
       return;
     }
-    console.warn(`Primary app failed to load (${errorCode}: ${errorDescription}), falling back to built dist/index.html`);
     if (fs.existsSync(indexPath)) {
       mainWindow.loadFile(indexPath);
+    }
+  });
+
+  // Handle CLI Preview Triggers on Load
+  mainWindow.webContents.on('did-finish-load', () => {
+    if (isPreviewUpdate) {
+      setTimeout(() => {
+        mainWindow?.webContents?.send('preview-trigger', { type: 'update' });
+      }, 500);
+    } else if (isPreviewError) {
+      setTimeout(() => {
+        mainWindow?.webContents?.send('preview-trigger', { type: 'error' });
+      }, 500);
+    } else if (isPreviewHud) {
+      setTimeout(() => {
+        mainWindow?.webContents?.send('preview-trigger', { type: 'hud' });
+      }, 500);
     }
   });
 
@@ -446,185 +472,121 @@ ipcMain.handle('crawl-portal', async (event, targetUrl) => {
       const results = await ytdlpExtractor.search(q, 25);
       return results || [];
     } catch (err) {
-      console.warn('[crawl-portal] YouTube search failed:', err.message);
       return [];
     }
   }
 
+  // Pure HTTP fetch - Zero background browser window overhead
+  try {
+    const fetchFn = (session.defaultSession && net && typeof net.fetch === 'function') ? net.fetch.bind(net) : globalThis.fetch;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6500);
 
-  return new Promise((resolve) => {
-    let crawlWin = null;
-    let resolved = false;
-
-    const finish = (result) => {
-      if (!resolved) {
-        resolved = true;
-        try {
-          if (crawlWin && !crawlWin.isDestroyed()) crawlWin.destroy();
-        } catch (e) {}
-        resolve(result || []);
+    const resp = await fetchFn(crawlUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        'Cookie': 'accessAgeDisclaimerPH=1; platform=pc; bs=1; hasVisited=1; age_verified=1;'
       }
-    };
+    });
+    clearTimeout(timeout);
+    if (!resp.ok) return [];
+    const html = await resp.text();
 
-    // Timeout safety: 5 seconds max
-    const timeout = setTimeout(() => {
-      finish([]);
-    }, 5500);
+    const items = [];
+    const seen = new Set();
 
-    try {
-      crawlWin = new BrowserWindow({
-        show: false,
-        width: 1280,
-        height: 800,
-        webPreferences: {
-          offscreen: true,
-          nodeIntegration: false,
-          contextIsolation: true,
-          webSecurity: false,
-        }
-      });
+    // 1. Match Pornhub Videos
+    const cardRegex = new RegExp('<li[^>]+(?:class="[^"]*videoBox[^"]*"|data-video-vkey="([^"]+)")([\\s\\S]*?)<\\/li>', 'gi');
+    let match;
+    while ((match = cardRegex.exec(html)) !== null) {
+      const block = match[0];
+      const vkeyMatch = block.match(/data-video-vkey="([a-zA-Z0-9_-]+)"/) || block.match(/href="[^"]*viewkey=([a-zA-Z0-9_-]+)/);
+      const vkey = vkeyMatch ? vkeyMatch[1] : null;
+      if (!vkey || seen.has(vkey)) continue;
+      seen.add(vkey);
 
-      crawlWin.webContents.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36');
+      const titleMatch = block.match(/title="([^"]+)"/) || block.match(/<span[^>]*class="[^"]*title[^"]*"[^>]*>([\s\S]*?)<a[^>]*>([^<]+)<\/a>/i);
+      let title = titleMatch ? (titleMatch[1] || titleMatch[2] || '').trim() : '';
+      title = title.replace(/&amp;/g, '&').replace(/&#039;/g, "'").replace(/&quot;/g, '"');
+      if (!title || /^\d+:\d+(:\d+)?$/.test(title)) {
+        title = 'Featured Video ' + vkey.substring(0, 8);
+      }
 
-      crawlWin.webContents.on('did-finish-load', async () => {
-        try {
-          await new Promise(r => setTimeout(r, 600));
-          if (crawlWin.isDestroyed()) return;
+      const imgMatch = block.match(/data-mediumthumb="([^"]+)"/) || block.match(/data-image="([^"]+)"/) || block.match(/data-thumb_url="([^"]+)"/) || block.match(/src="([^"]+)"/);
+      let thumbnail = imgMatch ? imgMatch[1] : '';
 
-          const extracted = await crawlWin.webContents.executeJavaScript(`
-            (() => {
-              const items = [];
-              const seen = new Set();
-              const nodes = document.querySelectorAll('li.videoBox, li[data-video-vkey]');
-              nodes.forEach((el, i) => {
-                const linkEl = el.querySelector('a[href*="viewkey="]');
-                const vkey = el.getAttribute('data-video-vkey') || linkEl?.href?.match(/viewkey=([a-zA-Z0-9_-]+)/)?.[1];
-                if (!vkey || seen.has(vkey)) return;
-                seen.add(vkey);
+      const durMatch = block.match(/<var[^>]*class="[^"]*duration[^"]*"[^>]*>([^<]+)<\/var>/i);
+      const duration = durMatch ? durMatch[1].trim() : '12:00';
 
-                const titleEl = el.querySelector('span.title a, .thumbnailTitle, .title a, .videoTitle');
-                const imgEl = el.querySelector('img');
-                let title = titleEl?.getAttribute('title') || titleEl?.textContent?.trim() || imgEl?.getAttribute('title') || imgEl?.getAttribute('alt') || '';
-                if (!title || /^\d+:\d+(:\d+)?$/.test(title.trim())) {
-                  const alt = imgEl?.getAttribute('alt') || imgEl?.getAttribute('title');
-                  if (alt && !/^\d+:\d+(:\d+)?$/.test(alt.trim())) {
-                    title = alt;
-                  }
-                }
-                title = (title || '')
-                  .replace(/&amp;/g, '&')
-                  .replace(/&#039;/g, "'")
-                  .replace(/&quot;/g, '"')
-                  .replace(/^Video\s*\d+:\d+\s*/i, '')
-                  .replace(/^\d+:\d+(:\d+)?\s*[-–:]?\s*/, '')
-                  .trim();
-                if (!title || /^\d+:\d+(:\d+)?$/.test(title)) {
-                  title = 'Featured Video ' + (vkey ? vkey.substring(0, 8) : '');
-                }
+      const viewsMatch = block.match(/<var[^>]*>([^<]+)<\/var>\s*(?:views)?/i);
+      const views = viewsMatch ? viewsMatch[1].trim() + ' views' : '1.2M views';
 
-                let thumbnail = imgEl?.getAttribute('data-mediumthumb') || imgEl?.getAttribute('data-image') || imgEl?.getAttribute('data-thumb_url') || imgEl?.getAttribute('data-src') || imgEl?.getAttribute('src') || '';
-                if (thumbnail.startsWith('data:image/gif') || !thumbnail.startsWith('http')) {
-                  if (imgEl && imgEl.attributes) {
-                    for (let a = 0; a < imgEl.attributes.length; a++) {
-                      const attr = imgEl.attributes[a];
-                      if (attr.value && attr.value.startsWith('http') && (attr.name.includes('thumb') || attr.name.includes('image') || attr.name.includes('src'))) {
-                        thumbnail = attr.value;
-                        break;
-                      }
-                    }
-                  }
-                }
-                const duration = el.querySelector('.duration, var.duration')?.textContent?.trim() || '12:00';
-                const views = el.querySelector('.views var, .views')?.textContent?.trim() || '1.2M views';
-                const rating = el.querySelector('.value, .rating')?.textContent?.trim() || '96%';
-                const uploader = el.querySelector('.usernameWrap a, .username, .channelName a')?.textContent?.trim() || 'Verified Creator';
-                if (title && thumbnail && !thumbnail.startsWith('data:image/gif')) {
-                  items.push({
-                    id: 'ph-' + vkey,
-                    title,
-                    thumbnail,
-                    duration,
-                    quality: '1080p 60fps',
-                    views,
-                    rating,
-                    author: uploader,
-                    url: 'https://www.pornhub.org/view_video.php?viewkey=' + vkey,
-                    streamUrl: null
-                  });
-                }
-              });
-              
-              // Telegram Channel & Post Crawler
-              const tgNodes = document.querySelectorAll(".tgme_widget_message_wrap");
-              tgNodes.forEach((msg, i) => {
-                const vid = msg.querySelector("video");
-                const photo = msg.querySelector(".tgme_widget_message_photo_wrap");
-                const textEl = msg.querySelector(".tgme_widget_message_text");
-                const durEl = msg.querySelector(".message_video_duration");
-                const viewsEl = msg.querySelector(".tgme_widget_message_views");
-                const linkEl = msg.querySelector(".tgme_widget_message_date");
+      const authorMatch = block.match(/class="[^"]*(?:username|channelName)[^"]*"[^>]*>[\s\S]*?<a[^>]*>([^<]+)<\/a>/i);
+      const author = authorMatch ? authorMatch[1].trim() : 'Creator';
 
-                let videoSrc = vid ? vid.getAttribute("src") : null;
-                let photoSrc = "";
-                if (photo) {
-                  const bg = photo.style.backgroundImage || "";
-                  const m = bg.match(/url\(["\x27]?(.*?)[\"\x27]?\)/);
-                  if (m) photoSrc = m[1];
-                }
-
-                if (!videoSrc && !photoSrc) return;
-                const key = videoSrc || photoSrc;
-                if (seen.has(key)) return;
-                seen.add(key);
-
-                const title = textEl ? textEl.textContent.trim().substring(0, 90) : (videoSrc ? "Telegram Video Post" : "Telegram Photo Post");
-                items.push({
-                  id: "tg-" + i + "-" + Date.now().toString(36),
-                  title,
-                  thumbnail: photoSrc || "",
-                  imageUrl: photoSrc || null,
-                  mediaType: videoSrc ? "video" : "image",
-                  formatType: videoSrc ? "VIDEO" : "IMAGE",
-                  duration: durEl ? durEl.textContent.trim() : (videoSrc ? "HD Video" : "Original Photo"),
-                  quality: "1080p HD",
-                  views: viewsEl ? viewsEl.textContent.trim() + " views" : "Telegram Post",
-                  rating: "99%",
-                  author: "Telegram Channel",
-                  url: linkEl?.href || window.location.href,
-                  streamUrl: videoSrc || null,
-                  directStreamUrl: videoSrc || null,
-                  ext: videoSrc ? ".mp4" : ".jpg"
-                });
-              });
-
-              return items.slice(0, 48);
-            })()
-          `);
-
-          clearTimeout(timeout);
-          finish(extracted || []);
-        } catch (e) {
-          clearTimeout(timeout);
-          finish([]);
-        }
-      });
-
-      crawlWin.webContents.on('did-fail-load', () => {
-        clearTimeout(timeout);
-        finish([]);
-      });
-
-      crawlWin.loadURL(crawlUrl).catch(() => {
-        clearTimeout(timeout);
-        finish([]);
-      });
-    } catch (e) {
-      clearTimeout(timeout);
-      finish([]);
+      if (title && thumbnail && !thumbnail.startsWith('data:image/gif')) {
+        items.push({
+          id: 'ph-' + vkey,
+          title,
+          thumbnail,
+          duration,
+          quality: '1080p 60fps',
+          views,
+          rating: '96%',
+          author,
+          url: 'https://www.pornhub.org/view_video.php?viewkey=' + vkey,
+          streamUrl: null
+        });
+      }
     }
-  });
-});
 
+    // 2. Match Telegram Channel Posts
+    const tgRegex = new RegExp('<div[^>]*class="[^"]*tgme_widget_message_wrap[^"]*"[\\s\\S]*?<\\/div>\\s*<\\/div>\\s*<\\/div>', 'gi');
+    let tgMatch;
+    let tgIdx = 0;
+    while ((tgMatch = tgRegex.exec(html)) !== null) {
+      const block = tgMatch[0];
+      const videoSrcMatch = block.match(/<video[^>]*src="([^"]+)"/i);
+      const photoSrcMatch = block.match(/style="[^"]*background-image:\s*url\(['"]?([^'"]+)['"]?\)/i);
+      const videoSrc = videoSrcMatch ? videoSrcMatch[1] : null;
+      const photoSrc = photoSrcMatch ? photoSrcMatch[1] : '';
+      if (!videoSrc && !photoSrc) continue;
+
+      const key = videoSrc || photoSrc;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const textMatch = block.match(/<div[^>]*class="[^"]*tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+      const text = textMatch ? textMatch[1].replace(/<[^>]+>/g, '').trim().substring(0, 90) : (videoSrc ? 'Telegram Video Post' : 'Telegram Photo Post');
+
+      const dateLinkMatch = block.match(/<a[^>]*class="[^"]*tgme_widget_message_date[^"]*"[^>]*href="([^"]+)"/i);
+      const postUrl = dateLinkMatch ? dateLinkMatch[1] : crawlUrl;
+
+      items.push({
+        id: 'tg-' + (++tgIdx) + '-' + Date.now().toString(36),
+        title: text,
+        thumbnail: photoSrc || '',
+        imageUrl: photoSrc || null,
+        mediaType: videoSrc ? 'video' : 'image',
+        formatType: videoSrc ? 'VIDEO' : 'IMAGE',
+        duration: videoSrc ? 'HD Video' : 'Original Photo',
+        quality: '1080p HD',
+        views: 'Telegram Post',
+        rating: '99%',
+        author: 'Telegram Channel',
+        url: postUrl,
+        streamUrl: videoSrc || null,
+        directStreamUrl: videoSrc || null,
+        ext: videoSrc ? '.mp4' : '.jpg'
+      });
+    }
+
+    return items.slice(0, 48);
+  } catch (err) {
+    return [];
+  }
+});
 
 // Portal Disk Cache
 const portalCacheDir = path.join(userDataDir, 'portal_cache');
@@ -1634,3 +1596,15 @@ ipcMain.handle('download-and-install-update', async (event, downloadUrl, assetNa
 });
 
 ipcMain.handle('check-for-updates', async () => checkAppUpdates(false));
+
+// UI State Preview & Inspector Handlers
+ipcMain.handle('get-preview-args', () => ({
+  update: isPreviewUpdate,
+  error: isPreviewError,
+  hud: isPreviewHud,
+}));
+
+ipcMain.handle('trigger-preview', (event, type) => {
+  mainWindow?.webContents?.send('preview-trigger', { type });
+  return true;
+});

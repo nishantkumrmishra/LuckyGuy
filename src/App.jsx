@@ -15,7 +15,7 @@ import PlaylistsTab from './components/PlaylistsTab';
 import SleepTimerModal from './components/SleepTimerModal';
 import SetupWizard from './components/SetupWizard';
 import QueueDrawer from './components/QueueDrawer';
-import { Play, Pause, SkipForward, Maximize2, Sparkles, DownloadCloud, ExternalLink, X } from 'lucide-react';
+import { Play, Pause, SkipForward, Maximize2, Sparkles, DownloadCloud, ExternalLink, X, AlertTriangle, RefreshCw } from 'lucide-react';
 import { CustomIcon } from './components/DuoIcons';
 
 
@@ -570,6 +570,43 @@ export default function App() {
   const [updateDownloadProgress, setUpdateDownloadProgress] = useState(null);
   const [isUpdatingApp, setIsUpdatingApp] = useState(false);
   const [updateAppError, setUpdateAppError] = useState('');
+  const [showDevHud, setShowDevHud] = useState(false);
+
+  const triggerPreviewUpdate = () => {
+    setUpdateNotification({
+      available: true,
+      currentVersion: '1.1.0',
+      latestVersion: '1.2.0',
+      releaseUrl: 'https://github.com/nishantkumrmishra/LuckyGuy/releases/tag/v1.2.0',
+      downloadUrl: 'https://github.com/nishantkumrmishra/LuckyGuy/releases/download/v1.2.0/LuckyGuy-Setup-1.2.0.exe',
+      assetName: 'LuckyGuy-Setup-1.2.0.exe',
+      releaseNotes: "### 🚀 What's New in LuckyGuy v1.2.0\n• ⚡ Lightning-fast direct media extraction\n• 🎨 UI Preview & Diagnostics Studio\n• 🎧 Crystal-clear audio synchronization engine\n• 📦 Offline companion thumbnails with zero data loss"
+    });
+  };
+
+  const triggerPreviewError = () => {
+    window.dispatchEvent(new CustomEvent('luckyguy:preview-trigger', { detail: { type: 'error' } }));
+  };
+
+  const simulateUpdateDownload = () => {
+    triggerPreviewUpdate();
+    setIsUpdatingApp(true);
+    setUpdateDownloadProgress(0);
+    let p = 0;
+    const interval = setInterval(() => {
+      p += 15;
+      if (p > 100) {
+        clearInterval(interval);
+        setUpdateDownloadProgress(100);
+        setTimeout(() => {
+          setIsUpdatingApp(false);
+          setUpdateDownloadProgress(null);
+        }, 800);
+      } else {
+        setUpdateDownloadProgress(p);
+      }
+    }, 320);
+  };
 
   useEffect(() => {
     if (window.electronAPI?.onUpdateDownloadProgress) {
@@ -577,6 +614,38 @@ export default function App() {
         setUpdateDownloadProgress(prog.percent || 0);
       });
     }
+  }, []);
+
+  // UI Preview CLI Arguments & IPC Trigger Listeners
+  useEffect(() => {
+    if (window.electronAPI?.getPreviewArgs) {
+      window.electronAPI.getPreviewArgs().then((args) => {
+        if (args?.update) triggerPreviewUpdate();
+        if (args?.error) triggerPreviewError();
+        if (args?.hud) setShowDevHud(true);
+      }).catch(() => {});
+    }
+
+    if (window.electronAPI?.onPreviewTrigger) {
+      const unsub = window.electronAPI.onPreviewTrigger((data) => {
+        if (data?.type === 'update') triggerPreviewUpdate();
+        if (data?.type === 'error') triggerPreviewError();
+        if (data?.type === 'hud') setShowDevHud((prev) => !prev);
+      });
+      return () => unsub?.();
+    }
+  }, []);
+
+  // Global Keyboard Shortcut: F10 or Ctrl+Shift+D toggles Dev UI Preview HUD
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'F10' || (e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd'))) {
+        e.preventDefault();
+        setShowDevHud((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const handleApplyUpdate = async () => {
@@ -1837,6 +1906,9 @@ export default function App() {
                   setPlaylists([]);
                   localStorage.clear();
                 }}
+                onTriggerPreviewUpdate={triggerPreviewUpdate}
+                onTriggerPreviewError={triggerPreviewError}
+                onSimulateUpdateDownload={simulateUpdateDownload}
               />
             )}
 
@@ -1935,6 +2007,108 @@ export default function App() {
           onSetTimer={(seconds) => setSleepTimerRemaining(seconds)}
           currentRemaining={sleepTimerRemaining}
         />
+      )}
+
+      {/* Floating Developer UI Preview HUD */}
+      {showDevHud && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '36px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '7px 14px',
+            borderRadius: '9999px',
+            backgroundColor: 'rgba(15, 23, 42, 0.94)',
+            border: '1px solid rgba(124, 92, 191, 0.55)',
+            boxShadow: '0 16px 36px rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(12px)',
+            color: '#f8fafc',
+            fontSize: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: '#a78bfa', paddingRight: '8px', borderRight: '1px solid rgba(255,255,255,0.18)' }}>
+            <Sparkles size={14} /> Dev UI Studio
+          </div>
+          <button
+            type="button"
+            onClick={triggerPreviewUpdate}
+            style={{
+              padding: '4px 10px',
+              borderRadius: '9999px',
+              backgroundColor: '#7c5cbf',
+              color: '#ffffff',
+              border: 'none',
+              fontSize: '11px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <DownloadCloud size={12} /> Test Update Banner
+          </button>
+          <button
+            type="button"
+            onClick={simulateUpdateDownload}
+            style={{
+              padding: '4px 10px',
+              borderRadius: '9999px',
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              color: '#ffffff',
+              border: '1px solid rgba(255,255,255,0.2)',
+              fontSize: '11px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <RefreshCw size={11} /> Simulate Progress
+          </button>
+          <button
+            type="button"
+            onClick={triggerPreviewError}
+            style={{
+              padding: '4px 10px',
+              borderRadius: '9999px',
+              backgroundColor: 'rgba(239, 68, 68, 0.2)',
+              color: '#fca5a5',
+              border: '1px solid rgba(239, 68, 68, 0.4)',
+              fontSize: '11px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <AlertTriangle size={12} /> Test Crash Screen
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowDevHud(false)}
+            style={{
+              padding: '4px',
+              borderRadius: '9999px',
+              backgroundColor: 'transparent',
+              color: 'rgba(255,255,255,0.6)',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title="Close Dev Toolbar (F10 to toggle)"
+          >
+            <X size={14} />
+          </button>
+        </div>
       )}
 
       {/* Floating Update Available Banner / Notification */}

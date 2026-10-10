@@ -109,5 +109,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (event, data) => callback(data);
     ipcRenderer.on('update-available', handler);
     return () => ipcRenderer.removeListener('update-available', handler);
+  },
+
+  // UI Previews & Diagnostics APIs
+  getPreviewArgs: () => ipcRenderer.invoke('get-preview-args'),
+  triggerPreview: (type) => ipcRenderer.invoke('trigger-preview', type),
+  onPreviewTrigger: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('preview-trigger', handler);
+    return () => ipcRenderer.removeListener('preview-trigger', handler);
   }
 });

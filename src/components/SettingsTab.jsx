@@ -43,6 +43,9 @@ export default function SettingsTab({
   installedExtensions = [],
   onUpdateExtensions,
   onNavigateTab,
+  onTriggerPreviewUpdate,
+  onTriggerPreviewError,
+  onSimulateUpdateDownload,
 }) {
   const [downloadFolder, setDownloadFolder] = useState(preferences?.downloadFolder || 'C:\\Users\
 ishant\\Music');
@@ -834,6 +837,100 @@ ishant\\Music');
                     )}
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* Developer & UI Preview Studio Card */}
+            <div
+              style={{
+                padding: '16px 18px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-medium, #e2e8f0)',
+                backgroundColor: 'var(--bg-card, #ffffff)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={15} color="var(--primary, #7c5cbf)" />
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    UI State Preview & Inspector Studio
+                  </span>
+                </div>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  Hotkeys: <kbd style={{ padding: '2px 5px', borderRadius: '4px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-medium)' }}>F10</kbd> or <kbd style={{ padding: '2px 5px', borderRadius: '4px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-medium)' }}>Ctrl+Shift+D</kbd>
+                </span>
+              </div>
+
+              <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.45' }}>
+                Simulate and test rare application states on demand (Update Available notification, full Crash / Error diagnostic screen, and progress bars) to inspect and refine design.
+              </p>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={onTriggerPreviewUpdate}
+                  style={{
+                    padding: '7px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-medium)',
+                    backgroundColor: 'var(--bg-main)',
+                    color: 'var(--text-primary)',
+                    fontSize: '11.5px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <DownloadCloud size={13} color="var(--primary, #7c5cbf)" />
+                  <span>Preview Update Banner</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onSimulateUpdateDownload}
+                  style={{
+                    padding: '7px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-medium)',
+                    backgroundColor: 'var(--bg-main)',
+                    color: 'var(--text-primary)',
+                    fontSize: '11.5px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <RefreshCw size={13} />
+                  <span>Simulate Download Progress</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onTriggerPreviewError}
+                  style={{
+                    padding: '7px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.06)',
+                    color: '#ef4444',
+                    fontSize: '11.5px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <AlertCircle size={13} />
+                  <span>Preview Crash Screen</span>
+                </button>
               </div>
             </div>
           </div>
