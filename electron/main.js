@@ -179,6 +179,18 @@ app.whenReady().then(() => {
     // Auto-inject 18+ age verification disclaimer cookies into outbound requests
     session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
       const requestHeaders = Object.assign({}, details.requestHeaders);
+      // Inject valid Referer and Origin for YouTube embeds & direct streams (fixes YouTube Error 153)
+      if (
+        details.url.includes('youtube.com') ||
+        details.url.includes('youtube-nocookie.com') ||
+        details.url.includes('googlevideo.com') ||
+        details.url.includes('ytimg.com')
+      ) {
+        requestHeaders['Referer'] = 'https://www.youtube.com/';
+        requestHeaders['Origin'] = 'https://www.youtube.com';
+        requestHeaders['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
+      }
+
       if (details.url.includes('pornhub.org') || details.url.includes('pornhub.com') || details.url.includes('phncdn.com')) {
         let existingCookie = requestHeaders['Cookie'] || requestHeaders['cookie'] || '';
         if (!existingCookie.includes('accessAgeDisclaimerPH')) {

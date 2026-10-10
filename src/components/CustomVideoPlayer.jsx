@@ -430,7 +430,7 @@ export default function CustomVideoPlayer({
       {useIframeFallback && ytVideoId ? (
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
           <iframe
-            src={`https://www.youtube-nocookie.com/embed/${ytVideoId}?autoplay=1&enablejsapi=1`}
+            src={`https://www.youtube.com/embed/${ytVideoId}?autoplay=1&enablejsapi=1`}
             title={titleToShow}
             style={{
               width: '100%',
@@ -439,6 +439,7 @@ export default function CustomVideoPlayer({
               display: 'block',
             }}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
             allowFullScreen
           />
         </div>
