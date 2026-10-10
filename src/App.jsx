@@ -1651,6 +1651,9 @@ export default function App() {
                 onRefreshVideos={refreshVideos}
                 onOpenFolder={handleOpenFolder}
                 downloadFolder="C:\\Users\\nishant\\Videos"
+                playlists={playlists}
+                onCreatePlaylist={handleCreatePlaylist}
+                onAddToPlaylist={handleAddTrackToPlaylist}
               />
             )}
 

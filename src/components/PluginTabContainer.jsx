@@ -562,6 +562,7 @@ export default function PluginTabContainer({
     if (onNavRegister) {
       onNavRegister({
         url: activeUrl,
+        isLoading: isIndexing || isLoadingMore,
         viewMode: viewMode,
         onBack: handleWebBack,
         onForward: handleWebForward,

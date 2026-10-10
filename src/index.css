@@ -5140,3 +5140,29 @@ h6 {
   width: 0 !important;
   height: 0 !important;
 }
+
+/* Video Card & List Item Enhancements */
+.clean-video-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-color: var(--primary, #7c5cbf) !important;
+}
+
+.clean-video-card:hover .thumb-play-icon {
+  opacity: 1 !important;
+}
+
+.clean-video-card .thumb-play-icon {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.clean-video-card:hover .list-play-overlay {
+  opacity: 1 !important;
+}
+
+@keyframes titlebarPulse {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(50%); }
+  100% { transform: translateX(200%); }
+}

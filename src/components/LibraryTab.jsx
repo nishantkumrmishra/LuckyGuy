@@ -214,6 +214,8 @@ export default function LibraryTab({
           onRefreshVideos={handleRefreshVid}
           onOpenFolder={onOpenFolder}
           downloadFolder={downloadFolder}
+          playlists={playlists}
+          onAddToPlaylist={onAddToPlaylist}
         />
       </div>
     );

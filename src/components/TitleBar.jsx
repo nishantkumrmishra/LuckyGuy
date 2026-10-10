@@ -23,6 +23,27 @@ export default function TitleBar({
   const [recentSearches, setRecentSearches] = useState([]);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [navLoading, setNavLoading] = useState(false);
+  const [progressPercent, setProgressPercent] = useState(0);
+
+  // Smooth loading animation whenever navigating or loading web/portal/search
+  useEffect(() => {
+    if (pluginNav?.isLoading || navLoading) {
+      setProgressPercent(28);
+      const t1 = setTimeout(() => setProgressPercent(68), 160);
+      const t2 = setTimeout(() => setProgressPercent(88), 450);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    } else {
+      if (progressPercent > 0) {
+        setProgressPercent(100);
+        const t = setTimeout(() => setProgressPercent(0), 400);
+        return () => clearTimeout(t);
+      }
+    }
+  }, [pluginNav?.isLoading, navLoading]);
 
   const inputRef = useRef(null);
   const searchContainerRef = useRef(null);
@@ -192,7 +213,7 @@ export default function TitleBar({
           <div style={{ display: 'flex', alignItems: 'center', gap: '3px', WebkitAppRegion: 'no-drag' }}>
             <button
               type="button"
-              onClick={() => pluginNav.onBack?.()}
+              onClick={() => { setNavLoading(true); pluginNav.onBack?.(); setTimeout(() => setNavLoading(false), 600); }}
               title="Go Back"
               style={{
                 display: 'flex',
@@ -212,7 +233,7 @@ export default function TitleBar({
             </button>
             <button
               type="button"
-              onClick={() => pluginNav.onForward?.()}
+              onClick={() => { setNavLoading(true); pluginNav.onForward?.(); setTimeout(() => setNavLoading(false), 600); }}
               title="Go Forward"
               style={{
                 display: 'flex',
@@ -232,7 +253,7 @@ export default function TitleBar({
             </button>
             <button
               type="button"
-              onClick={() => pluginNav.onReload?.()}
+              onClick={() => { setNavLoading(true); pluginNav.onReload?.(); setTimeout(() => setNavLoading(false), 900); }}
               title="Reload"
               style={{
                 display: 'flex',
@@ -256,7 +277,7 @@ export default function TitleBar({
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              pluginNav.onNavigate?.(webInputUrl);
+              setNavLoading(true); pluginNav.onNavigate?.(webInputUrl); setTimeout(() => setNavLoading(false), 900);
             }}
             style={{
               flex: 1,
@@ -527,6 +548,34 @@ export default function TitleBar({
         )}
       </div>
 
+      )}
+
+      {/* Sleek transparent animated progress bar along the bottom of the TitleBar */}
+      {progressPercent > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '2.5px',
+            backgroundColor: 'rgba(124, 92, 191, 0.08)',
+            overflow: 'hidden',
+            zIndex: 100,
+            pointerEvents: 'none',
+          }}
+        >
+          <div
+            style={{
+              height: '100%',
+              width: `${progressPercent}%`,
+              background: 'linear-gradient(90deg, var(--primary, #7c5cbf), #c084fc, #38bdf8)',
+              boxShadow: '0 0 10px rgba(124, 92, 191, 0.7)',
+              transition: progressPercent === 100 ? 'width 0.15s ease, opacity 0.35s ease' : 'width 0.35s cubic-bezier(0.1, 0.8, 0.2, 1)',
+              opacity: progressPercent === 100 ? 0 : 1,
+            }}
+          />
+        </div>
       )}
 
       {/* Windows window controls on top right */}
