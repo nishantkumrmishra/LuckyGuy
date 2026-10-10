@@ -28,6 +28,7 @@ export default function CustomVideoPlayer({
   const progressTrackRef = useRef(null);
   const hideControlsTimeoutRef = useRef(null);
   const lastExtractedUrlRef = useRef(null);
+  const hlsRef = useRef(null);
   const getFileUrl = (fp) => {
     if (!fp) return '';
     if (fp.startsWith('file://')) return fp;
@@ -95,8 +96,7 @@ export default function CustomVideoPlayer({
   };
 
   const ytVideoId = getYouTubeVideoId(video?.url, video?.id);
-  const [useIframeFallback, setUseIframeFallback] = useState(false);
-  
+    
   const [resolvedStreams, setResolvedStreams] = useState(video?.streams || {});
   const [currentStreamSrc, setCurrentStreamSrc] = useState(
     localSrc || (video?.streams && video?.streams[selectedQuality]) || video?.streamUrl || ''
@@ -202,11 +202,71 @@ export default function CustomVideoPlayer({
     resolveStreams();
   }, [resolveStreams]);
 
-  // When currentStreamSrc changes, trigger load and attempt playback
+  // When currentStreamSrc changes, attach HLS stream or native media
   useEffect(() => {
-    if (currentStreamSrc && videoRef.current) {
-      setHasError(false);
-      const v = videoRef.current;
+    if (!currentStreamSrc || !videoRef.current) return;
+    setHasError(false);
+    const v = videoRef.current;
+
+    // Cleanup previous HLS instance
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    const isHls =
+      currentStreamSrc.includes('.m3u8') ||
+      currentStreamSrc.includes('hls_playlist') ||
+      currentStreamSrc.includes('manifest.googlevideo.com');
+
+    if (isHls && Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+        backBufferLength: 90,
+      });
+      hlsRef.current = hls;
+
+      hls.loadSource(currentStreamSrc);
+      hls.attachMedia(v);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        setIsResolving(false);
+        setIsBuffering(false);
+        setHasError(false);
+        v.play()
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch(() => {
+            setIsPlaying(false);
+          });
+      });
+
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              hls.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              hls.recoverMediaError();
+              break;
+            default:
+              hls.destroy();
+              setHasError(true);
+              break;
+          }
+        }
+      });
+
+      return () => {
+        if (hlsRef.current) {
+          hlsRef.current.destroy();
+          hlsRef.current = null;
+        }
+      };
+    } else {
       if (v.src !== currentStreamSrc) {
         v.src = currentStreamSrc;
       }
@@ -218,7 +278,6 @@ export default function CustomVideoPlayer({
           setIsResolving(false);
         })
         .catch(() => {
-          // If browser requires user click, remain paused with big play button visible
           setIsPlaying(false);
           setIsResolving(false);
         });
@@ -413,7 +472,7 @@ export default function CustomVideoPlayer({
       ref={containerRef}
       onMouseMove={resetHideTimer}
       onMouseLeave={() => isPlaying && setShowControls(false)}
-      onClick={useIframeFallback ? undefined : togglePlay}
+      onClick={togglePlay}
       style={{
         position: 'relative',
         width: '100%',
@@ -426,21 +485,6 @@ export default function CustomVideoPlayer({
         userSelect: 'none',
       }}
     >
-      {useIframeFallback && ytVideoId ? (
-        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-          <webview
-            src={`https://www.youtube.com/embed/${ytVideoId}?autoplay=1&enablejsapi=1`}
-            httpreferrer="https://www.youtube.com/"
-            style={{
-              width: '100%',
-              height: '100%',
-              border: 'none',
-              display: 'block',
-            }}
-            allowpopups="false"
-          />
-        </div>
-      ) : (
         /* Native Video Element */
         <video
           ref={videoRef}
@@ -477,12 +521,7 @@ export default function CustomVideoPlayer({
           onError={() => {
             setIsResolving(false);
             setIsBuffering(false);
-            if (ytVideoId) {
-              setUseIframeFallback(true);
-              setHasError(false);
-            } else {
-              setHasError(true);
-            }
+            setHasError(true);
           }}
           style={{
             width: '100%',
@@ -493,7 +532,6 @@ export default function CustomVideoPlayer({
             cursor: 'pointer',
           }}
         />
-      )}
 
       {/* Large Inviting Center Play Button (Shown when paused and ready) */}
       {!isPlaying && !isResolving && !hasError && (
@@ -614,31 +652,7 @@ export default function CustomVideoPlayer({
               <RotateCcw size={14} />
               <span>Reload Stream</span>
             </button>
-            {ytVideoId && (
-              <button
-                type="button"
-                onClick={() => {
-                  setUseIframeFallback(true);
-                  setHasError(false);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 18px',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: '#ef4444',
-                  color: '#ffffff',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                <Play size={14} fill="#fff" />
-                <span>Play via YouTube Player</span>
-              </button>
-            )}
+            
           </div>
         </div>
       )}
@@ -705,29 +719,7 @@ export default function CustomVideoPlayer({
 
         {/* Video Quality Indicator Badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {ytVideoId && !isLocalFile && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setUseIframeFallback(!useIframeFallback);
-                setHasError(false);
-              }}
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.18)',
-                backdropFilter: 'blur(8px)',
-                color: '#ffffff',
-                fontSize: '11px',
-                fontWeight: 600,
-                padding: '3px 9px',
-                borderRadius: '4px',
-                border: '1px solid rgba(255, 255, 255, 0.25)',
-                cursor: 'pointer',
-              }}
-            >
-              {useIframeFallback ? 'YouTube Player' : 'Direct Stream'}
-            </button>
-          )}
+          
           <span
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -740,12 +732,11 @@ export default function CustomVideoPlayer({
               border: '1px solid rgba(255, 255, 255, 0.3)',
             }}
           >
-            {useIframeFallback ? 'HD' : selectedQuality}
+            {selectedQuality}
           </span>
         </div>
       </div>
 
-      {!useIframeFallback && (
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -1054,7 +1045,6 @@ export default function CustomVideoPlayer({
           </div>
         </div>
       </div>
-      )}
     </div>
   );
 }
