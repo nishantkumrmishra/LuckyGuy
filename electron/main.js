@@ -385,6 +385,17 @@ ipcMain.handle('extract-url', async (event, url) => {
   // 2. YouTube (yt-dlp first for robust decryption & direct stream resolution)
   const isYouTube = trimmed.includes('youtube.com') || trimmed.includes('youtu.be');
   if (isYouTube) {
+    const isPlaylist = trimmed.includes('list=') || trimmed.includes('/playlist');
+    if (isPlaylist) {
+      try {
+        const plMeta = await ytdlpExtractor.extractPlaylist(trimmed);
+        if (plMeta && plMeta.tracks && plMeta.tracks.length > 0) {
+          return plMeta;
+        }
+      } catch (plErr) {
+        console.warn('[YtDlp] Playlist extraction error, trying single video:', plErr.message);
+      }
+    }
     try {
       const ytdlpMeta = await ytdlpExtractor.extractInfo(trimmed);
       if (ytdlpMeta && (ytdlpMeta.streamUrl || Object.keys(ytdlpMeta.streams || {}).length > 0)) {
@@ -1032,6 +1043,12 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     try { fs.mkdirSync(youtubeVideosDir, { recursive: true }); } catch (e) {}
   }
 
+  const cleanPlaylist = taskConfig.playlistName
+    ? taskConfig.playlistName.replace(/[/\\?%*:|"<>]/g, '_').trim()
+    : null;
+  const cleanChannel = (taskConfig.channel || taskConfig.artist || 'Creator')
+    .replace(/[/\\?%*:|"<>]/g, '_').trim();
+
   if (taskConfig.customFolder && typeof taskConfig.customFolder === "string" && taskConfig.customFolder.trim()) {
     targetDir = taskConfig.customFolder.trim();
   } else if (isVideo && isAdultVideo) {
@@ -1039,18 +1056,25 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     targetDir = adultPornHubDir;
   } else if (isVideo && isYouTubeVideo) {
     ext = ".mp4";
-    targetDir = youtubeVideosDir;
+    targetDir = cleanPlaylist ? path.join(youtubeVideosDir, cleanPlaylist) : youtubeVideosDir;
   } else if (isVideo) {
     ext = ".mp4";
-    targetDir = userVideosDir;
+    targetDir = cleanPlaylist ? path.join(userVideosDir, cleanPlaylist) : userVideosDir;
   } else if (isImage) {
     ext = ".jpg";
     targetDir = userPicturesDir;
-  } else if (shouldOrganize) {
-    const cleanGenre = (genre && genre !== "Music") ? genre.replace(/[\/\\?%*:|"<>]/g, "_") : "Pop";
-    targetDir = path.join(preferences.downloadFolder, cleanGenre);
   } else {
-    targetDir = preferences.downloadFolder;
+    // Audio / Music downloads
+    if (cleanPlaylist && !taskConfig.isMusic) {
+      targetDir = path.join(preferences.downloadFolder, cleanPlaylist || cleanChannel);
+    } else if (cleanPlaylist && taskConfig.isMusic) {
+      targetDir = path.join(preferences.downloadFolder, cleanPlaylist);
+    } else if (shouldOrganize) {
+      const cleanGenre = (genre && genre !== "Music") ? genre.replace(/[/\\?%*:|"<>]/g, "_") : "Pop";
+      targetDir = path.join(preferences.downloadFolder, cleanGenre);
+    } else {
+      targetDir = preferences.downloadFolder;
+    }
   }
 
   if (!fs.existsSync(targetDir)) {
@@ -1061,7 +1085,7 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
   if (taskConfig.destinationPath) {
     if (isVideo && isYouTubeVideo && !taskConfig.customFolder) {
       const fileName = path.basename(taskConfig.destinationPath);
-      targetPath = path.join(youtubeVideosDir, fileName);
+      targetPath = path.join(targetDir, fileName);
     } else {
       targetPath = taskConfig.destinationPath;
     }

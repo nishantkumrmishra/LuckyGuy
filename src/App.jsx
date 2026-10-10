@@ -178,38 +178,6 @@ const defaultTelegramExtension = {
   repoUrl: "https://github.com/nishantkumrmishra/LuckyGuy--extensions/tree/main/extensions/telegram"
 };
 
-const defaultYouTubeExtension = {
-  id: "luckyguy-ext-youtube",
-  name: "YouTube",
-  version: "1.1.0",
-  type: "portal",
-  rating: "all",
-  description: "High-speed YouTube video & audio extractor powered by yt-dlp with format selection and MP4 direct download.",
-  author: "LuckyGuy Core",
-  category: "Video & Media",
-  entry: "index.js",
-  mediaTypes: ["video", "audio"],
-  tab: {
-    title: "YouTube",
-    icon: "Youtube",
-    url: "https://www.youtube.com",
-    viewLayout: "grid",
-    themeColor: "#FF0000"
-  },
-  capabilities: [
-    "stream",
-    "crawlPage",
-    "download",
-    "metadata",
-    "search",
-    "videoPlayer"
-  ],
-  supportedUrls: [
-    "*://*.youtube.com/*",
-    "*://youtu.be/*"
-  ],
-  enabled: true
-};
 
 export default function App() {
   const downloadCompletionMap = useRef(new Map()).current;
@@ -235,26 +203,7 @@ export default function App() {
       const hadTelegraph = list.some(e => e.id === 'luckyguy-ext-telegraph');
       if (hadTelegraph) {
         list = list.filter(e => e.id !== 'luckyguy-ext-telegraph');
-        if (!list.some(e => e.id === 'luckyguy-ext-telegram')) {
-          list.push(defaultTelegramExtension);
-        }
       }
-      const ytIdx = list.findIndex(e => e.id === 'luckyguy-ext-youtube');
-      if (ytIdx === -1) {
-        list.push(defaultYouTubeExtension);
-      } else {
-        if (!list[ytIdx].tab || !list[ytIdx].tab.url) {
-          list[ytIdx] = {
-            ...defaultYouTubeExtension,
-            ...list[ytIdx],
-            tab: defaultYouTubeExtension.tab,
-            enabled: list[ytIdx].enabled !== undefined ? list[ytIdx].enabled : true
-          };
-        }
-      }
-      try {
-        localStorage.setItem('luckyguy-extensions', JSON.stringify(list));
-      } catch (e) {}
       return list;
     } catch {
       return [];
@@ -1076,14 +1025,20 @@ export default function App() {
         const tSampleFilename = `${tCleanArtist}${tCleanTitle}.m4a`;
 
         const tTaskId = 'dl-' + Date.now() + '-' + Math.random().toString(36).substring(7);
+        const formatType = t.formatType || (resolvedTrack.formatType || 'AUDIO');
         tasksToQueue.push({
           id: tTaskId,
+          url: t.url,
           title: itemTitle,
           artist: itemArtist,
           album: resolvedTrack.title || 'Playlist',
+          playlistName: resolvedTrack.title,
+          channel: t.channel || resolvedTrack.author,
+          isMusic: t.isMusic !== false,
           artworkUrl: itemCover,
           duration: Math.round((t.durationMs || 215000) / 1000),
-          format: 'MP3 320k',
+          format: formatType === 'VIDEO' ? 'MP4 1080p' : 'MP3 320k',
+          formatType,
           size: 'In Queue',
           speed: 'Waiting in queue...',
           progress: 0,
@@ -1186,6 +1141,10 @@ export default function App() {
                 )
               );
 
+              if (!tStreamUrl && task.url) {
+                tStreamUrl = task.url;
+              }
+
               if (tStreamUrl && window.electronAPI?.startDownload) {
                 const completionPromise = new Promise((resolve) => {
                   downloadCompletionMap.set(task.id, resolve);
@@ -1194,19 +1153,23 @@ export default function App() {
                       downloadCompletionMap.delete(task.id);
                       resolve(false);
                     }
-                  }, 120000); // 2 minute per-track safety timeout
+                  }, 180000); // 3 minute per-track safety timeout
                 });
 
                 await window.electronAPI.startDownload({
                   id: task.id,
                   url: tStreamUrl,
+                  originalUrl: task.url,
                   title: task.title,
                   artist: task.artist,
                   album: tAlbum,
+                  playlistName: task.playlistName,
+                  channel: task.channel,
+                  isMusic: task.isMusic,
                   artworkUrl: tArtwork,
                   duration: task.duration,
-                  destinationPath: null, // Auto-organizes into genre subfolder!
-                  formatType: 'AUDIO',
+                  destinationPath: null,
+                  formatType: task.formatType || 'AUDIO',
                   qualityLabel: tBitrate,
                 });
 

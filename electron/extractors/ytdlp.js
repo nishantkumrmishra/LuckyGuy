@@ -118,6 +118,100 @@ class YtDlpWrapper {
     });
   }
 
+  async extractPlaylist(targetUrl) {
+    return new Promise((resolve, reject) => {
+      const args = [
+        '--dump-single-json',
+        '--flat-playlist',
+        '--no-warnings',
+        '--skip-download',
+      ];
+
+      const ffmpegDir = this.resolveFfmpeg();
+      if (ffmpegDir) {
+        args.push('--ffmpeg-location', ffmpegDir);
+      }
+
+      args.push(targetUrl);
+
+      execFile(this.binPath, args, { maxBuffer: 30 * 1024 * 1024 }, (err, stdout, stderr) => {
+        if (err || !stdout) {
+          return reject(new Error(stderr || err?.message || 'Could not extract playlist information'));
+        }
+
+        try {
+          const data = JSON.parse(stdout);
+          const entries = Array.isArray(data.entries) ? data.entries : [];
+          const playlistTitle = data.title || 'YouTube Playlist';
+          const playlistAuthor = data.uploader || data.channel || 'YouTube Creator';
+
+          const tracks = entries.map((entry, index) => {
+            const rawTitle = entry.title || ('Track ' + (index + 1));
+            let title = rawTitle;
+            let artist = entry.uploader || entry.channel || playlistAuthor;
+            if (rawTitle.includes(' - ')) {
+              const parts = rawTitle.split(' - ');
+              artist = parts[0].trim();
+              title = parts.slice(1).join(' - ').trim();
+            }
+
+            const cleanArtist = artist.replace(/\s*-\s*Topic$/i, '').trim();
+
+            const isMusic = Boolean(
+              (entry.categories && entry.categories.includes('Music')) ||
+              (data.categories && data.categories.includes('Music')) ||
+              (artist && artist.toLowerCase().includes('- topic')) ||
+              (entry.channel && entry.channel.toLowerCase().includes('- topic')) ||
+              /official\s*(music\s*video|audio|lyric|remix|song|soundtrack)/i.test(rawTitle)
+            );
+
+            const videoId = entry.id || entry.url;
+            const fullUrl = videoId ? (videoId.startsWith('http') ? videoId : ('https://www.youtube.com/watch?v=' + videoId)) : targetUrl;
+
+            let cover = '';
+            if (Array.isArray(entry.thumbnails) && entry.thumbnails.length > 0) {
+              cover = entry.thumbnails[entry.thumbnails.length - 1].url || '';
+            } else if (entry.id) {
+              cover = 'https://i.ytimg.com/vi/' + entry.id + '/hqdefault.jpg';
+            }
+
+            return {
+              id: entry.id ? ('yt-' + entry.id) : ('yt-pl-' + index),
+              title,
+              artist: cleanArtist,
+              album: playlistTitle,
+              duration: entry.duration || 0,
+              durationMs: (entry.duration || 0) * 1000,
+              url: fullUrl,
+              coverUrl: cover,
+              isMusic,
+              channel: entry.uploader || entry.channel || playlistAuthor,
+              playlistName: playlistTitle,
+              formatType: 'VIDEO',
+              mediaType: 'video',
+            };
+          });
+
+          resolve({
+            id: data.id || 'yt-playlist',
+            title: playlistTitle,
+            artist: playlistAuthor,
+            author: playlistAuthor,
+            platform: 'YouTube',
+            type: 'playlist',
+            artworkUrl: (Array.isArray(data.thumbnails) && data.thumbnails.length > 0)
+              ? data.thumbnails[data.thumbnails.length - 1].url
+              : (tracks[0]?.coverUrl || ''),
+            itemCount: tracks.length,
+            tracks,
+          });
+        } catch (parseErr) {
+          reject(parseErr);
+        }
+      });
+    });
+  }
+
   async search(query, limit = 15) {
     return new Promise((resolve) => {
       const args = [
