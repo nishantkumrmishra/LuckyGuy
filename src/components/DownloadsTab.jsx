@@ -45,6 +45,7 @@ export default function DownloadsTab({
   const [urlInput, setUrlInput] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState('MP3 320k');
+  const [mediaDownloadMode, setMediaDownloadMode] = useState('auto'); // 'auto' | 'audio' | 'video'
   const [selectedQuality, setSelectedQuality] = useState('320kbps');
   const [filterTab, setFilterTab] = useState('all'); // 'all' | 'downloading' | 'completed'
 
@@ -67,45 +68,60 @@ export default function DownloadsTab({
     } catch (e) {}
   };
 
-  const detectPlatform = (text) => {
-    if (!text || !text.trim()) return { name: 'Stream', color: 'var(--text-secondary)', bg: 'var(--bg-main)' };
+  const detectPlatform = (text, mode = 'auto') => {
+    if (!text || !text.trim()) {
+      if (mode === 'audio') return { name: 'Audio (Music)', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)', detectedType: 'audio' };
+      if (mode === 'video') return { name: 'Video (MP4)', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.12)', detectedType: 'video' };
+      return { name: 'Stream', color: 'var(--text-secondary)', bg: 'var(--bg-main)', detectedType: 'audio' };
+    }
     const lower = text.toLowerCase().trim();
 
-    for (const ext of installedExtensions) {
-      if (ext.enabled) {
-        const extNameLower = (ext.name || '').toLowerCase();
-        const isAudioUniversal = ext.id === 'luckyguy-ext-universal-audio' || ext.type === 'audio' || extNameLower.includes('audio') || extNameLower.includes('music');
-        if ((isAudioUniversal || extNameLower.includes('youtube')) && (lower.includes('youtube.com') || lower.includes('youtu.be'))) {
-          return { name: 'YouTube Audio', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)' };
-        }
-        if ((isAudioUniversal || extNameLower.includes('spotify')) && lower.includes('spotify.com')) {
-          return { name: 'Spotify Music', color: '#1db954', bg: 'rgba(29, 185, 84, 0.12)' };
-        }
-        if ((isAudioUniversal || extNameLower.includes('jiosaavn')) && lower.includes('jiosaavn.com')) {
-          return { name: 'JioSaavn 320k', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.12)' };
-        }
-        if ((isAudioUniversal || extNameLower.includes('soundcloud')) && lower.includes('soundcloud.com')) {
-          return { name: 'SoundCloud Stream', color: '#f97316', bg: 'rgba(249, 115, 22, 0.12)' };
-        }
-      }
+    if (lower.includes('spotify.com')) {
+      return { name: 'Spotify Music', color: '#1db954', bg: 'rgba(29, 185, 84, 0.12)', detectedType: 'audio' };
     }
-
-    // If no matching extension is enabled, fall back to neutral Direct Stream or Search
-    if (lower.startsWith('http://') || lower.startsWith('https://')) return { name: 'Direct Stream', color: 'var(--primary, #7c5cbf)', bg: 'rgba(124, 92, 191, 0.12)' };
-    if (lower.startsWith('http://') || lower.startsWith('https://')) return { name: 'Direct Stream', color: 'var(--primary, #7c5cbf)', bg: 'rgba(124, 92, 191, 0.12)' };
-    return { name: 'Search', color: 'var(--text-secondary)', bg: 'var(--bg-main)' };
+    if (lower.includes('jiosaavn.com')) {
+      return { name: 'JioSaavn 320k', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.12)', detectedType: 'audio' };
+    }
+    if (lower.includes('pornhub.com') || lower.includes('phncdn.com')) {
+      return { name: 'Pornhub Video', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)', detectedType: 'video' };
+    }
+    if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
+      if (mode === 'audio' || lower.includes('music.youtube.com')) {
+        return { name: 'YouTube Audio', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)', detectedType: 'audio' };
+      }
+      return { name: 'YouTube Video', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.12)', detectedType: 'video' };
+    }
+    if (lower.includes('soundcloud.com')) {
+      return { name: 'SoundCloud Audio', color: '#f97316', bg: 'rgba(249, 115, 22, 0.12)', detectedType: 'audio' };
+    }
+    if (lower.startsWith('http://') || lower.startsWith('https://')) {
+      if (mode === 'video' || /\.(mp4|mkv|webm|avi|mov)(\?|$)/i.test(lower)) {
+        return { name: 'Video Stream', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.12)', detectedType: 'video' };
+      }
+      return { name: 'Audio Stream', color: 'var(--primary, #7c5cbf)', bg: 'rgba(124, 92, 191, 0.12)', detectedType: 'audio' };
+    }
+    return { name: 'Search Song', color: 'var(--text-secondary)', bg: 'var(--bg-main)', detectedType: 'audio' };
   };
 
-  const platform = detectPlatform(urlInput);
+  const platform = detectPlatform(urlInput, mediaDownloadMode);
 
   const handleTriggerDownload = () => {
     const raw = urlInput.trim();
     if (!raw) return;
 
+    const plat = detectPlatform(raw, mediaDownloadMode);
+    const effectiveType = mediaDownloadMode === 'auto'
+      ? (plat.detectedType || 'audio')
+      : mediaDownloadMode;
+
+    const isVideo = effectiveType === 'video';
+
     if (onStartDownload) {
       onStartDownload(raw, {
-        format: selectedFormat,
-        quality: selectedQuality,
+        formatType: isVideo ? 'VIDEO' : 'AUDIO',
+        mediaType: isVideo ? 'video' : 'audio',
+        format: isVideo ? 'MP4 1080p' : 'MP3 320k',
+        quality: isVideo ? '1080p HD' : '320kbps',
       });
     }
     setUrlInput('');
@@ -125,14 +141,23 @@ export default function DownloadsTab({
 
   // Determine media type for thumbnail & badge
   const getMediaType = (item) => {
+    if (item.formatType === 'AUDIO' || (item.format && /mp3|m4a|flac|320k/i.test(item.format))) {
+      return { type: 'audio', label: 'MP3', Icon: Music, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' };
+    }
+    if (item.formatType === 'VIDEO' || (item.format && /mp4|1080p|720p|video/i.test(item.format))) {
+      return { type: 'video', label: 'MP4', Icon: Film, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.1)' };
+    }
     const raw = (item.filePath || item.destinationPath || item.title || '').toLowerCase();
-    if (raw.endsWith('.mp4') || raw.endsWith('.mkv') || raw.endsWith('.webm') || item.formatType === 'VIDEO') {
+    if (raw.endsWith('.m4a') || raw.endsWith('.mp3') || (item.destinationPath && item.destinationPath.includes('Music'))) {
+      return { type: 'audio', label: 'MP3', Icon: Music, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' };
+    }
+    if (raw.endsWith('.mp4') || raw.endsWith('.mkv') || raw.endsWith('.webm')) {
       return { type: 'video', label: 'MP4', Icon: Film, color: '#0284c7', bg: 'rgba(2, 132, 199, 0.1)' };
     }
     if (raw.endsWith('.jpg') || raw.endsWith('.jpeg') || raw.endsWith('.png') || raw.endsWith('.webp')) {
       return { type: 'image', label: 'IMAGE', Icon: ImageIcon, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' };
     }
-    return { type: 'audio', label: item.format || 'MP3', Icon: Music, color: 'var(--primary, #7c5cbf)', bg: 'rgba(124, 92, 191, 0.1)' };
+    return { type: 'audio', label: item.format || 'MP3', Icon: Music, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' };
   };
 
   // Normalized list of items according to current tab filter
@@ -317,7 +342,87 @@ export default function DownloadsTab({
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* Segmented Media Download Mode Selector */}
+            <div style={{
+              display: 'inline-flex',
+              padding: '3px',
+              borderRadius: '9px',
+              backgroundColor: 'var(--bg-main)',
+              border: '1px solid var(--border-medium)',
+              gap: '2px'
+            }}>
+              <button
+                type="button"
+                onClick={() => setMediaDownloadMode('audio')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '5px 11px',
+                  borderRadius: '7px',
+                  border: 'none',
+                  fontSize: '11.5px',
+                  fontWeight: mediaDownloadMode === 'audio' ? 700 : 500,
+                  backgroundColor: mediaDownloadMode === 'audio' ? 'var(--primary, #7c5cbf)' : 'transparent',
+                  color: mediaDownloadMode === 'audio' ? '#ffffff' : 'var(--text-secondary)',
+                  boxShadow: mediaDownloadMode === 'audio' ? '0 1px 4px rgba(124, 92, 191, 0.3)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                title="Save as Audio (Music Library)"
+              >
+                <Music size={13} />
+                <span>Audio (Music)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMediaDownloadMode('video')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '5px 11px',
+                  borderRadius: '7px',
+                  border: 'none',
+                  fontSize: '11.5px',
+                  fontWeight: mediaDownloadMode === 'video' ? 700 : 500,
+                  backgroundColor: mediaDownloadMode === 'video' ? 'var(--primary, #7c5cbf)' : 'transparent',
+                  color: mediaDownloadMode === 'video' ? '#ffffff' : 'var(--text-secondary)',
+                  boxShadow: mediaDownloadMode === 'video' ? '0 1px 4px rgba(124, 92, 191, 0.3)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                title="Save as Video (Videos Folder)"
+              >
+                <Film size={13} />
+                <span>Video (MP4)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMediaDownloadMode('auto')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '5px 11px',
+                  borderRadius: '7px',
+                  border: 'none',
+                  fontSize: '11.5px',
+                  fontWeight: mediaDownloadMode === 'auto' ? 700 : 500,
+                  backgroundColor: mediaDownloadMode === 'auto' ? 'var(--bg-card)' : 'transparent',
+                  color: mediaDownloadMode === 'auto' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  boxShadow: mediaDownloadMode === 'auto' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                title="Smart Auto-Detect based on link"
+              >
+                <Sparkles size={12} color="var(--primary, #7c5cbf)" />
+                <span>Auto</span>
+              </button>
+            </div>
+
             {onOpenFolder && (
               <button
                 onClick={() => onOpenFolder(downloadFolder)}

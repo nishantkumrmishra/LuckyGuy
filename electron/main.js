@@ -870,8 +870,14 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
   } else if ((streamUrl.includes('youtube.com') || streamUrl.includes('youtu.be')) && !streamUrl.includes('googlevideo.com')) {
     try {
       const ytVid = await ytdlpExtractor.extractInfo(streamUrl);
-      if (ytVid && (ytVid.streamUrl || ytVid.streams)) {
-        streamUrl = ytVid.streams?.[taskConfig.qualityLabel] || ytVid.streamUrl;
+      if (ytVid) {
+        if ((taskConfig.formatType === 'AUDIO' || taskConfig.mediaType === 'audio') && ytVid.audioStreamUrl) {
+          streamUrl = ytVid.audioStreamUrl;
+        } else if (ytVid.streams?.[taskConfig.qualityLabel]) {
+          streamUrl = ytVid.streams[taskConfig.qualityLabel];
+        } else {
+          streamUrl = ytVid.streamUrl || Object.values(ytVid.streams || {})[0] || streamUrl;
+        }
       }
     } catch (e) {
       console.warn('Could not resolve YouTube stream via yt-dlp:', e.message);
@@ -890,14 +896,40 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
   const itunesArtwork = enriched?.artworkUrl || '';
   const artworkUrl = taskConfig.artworkUrl || itunesArtwork || '';
 
-  const isVideo = taskConfig.formatType === 'VIDEO' || (streamUrl && streamUrl.includes('.mp4')) || (taskConfig.format && taskConfig.format.includes('MP4'));
+  const isExplicitAudio = taskConfig.formatType === 'AUDIO' || taskConfig.mediaType === 'audio' || (taskConfig.format && /mp3|m4a|flac|wav|aac|320k|audio/i.test(taskConfig.format));
+  const isExplicitVideo = taskConfig.formatType === 'VIDEO' || taskConfig.mediaType === 'video' || (taskConfig.format && /mp4|mkv|webm|avi|mov|video/i.test(taskConfig.format));
   const isImage = taskConfig.formatType === 'IMAGE' || (streamUrl && (streamUrl.includes('.jpg') || streamUrl.includes('.png')));
+
+  let isVideo = false;
+  if (isExplicitAudio) {
+    isVideo = false;
+  } else if (isExplicitVideo) {
+    isVideo = true;
+  } else {
+    // Auto-detection based on platform and URL
+    const isAdult = (taskConfig.isAdult === true ||
+      taskConfig.category === 'adult' ||
+      (taskConfig.artist && /pornhub/i.test(taskConfig.artist)) ||
+      (taskConfig.author && /pornhub/i.test(taskConfig.author)) ||
+      (taskConfig.pluginId && /pornhub/i.test(taskConfig.pluginId)) ||
+      (taskConfig.url && (taskConfig.url.includes('phncdn') || taskConfig.url.includes('pornhub'))));
+
+    if (isAdult) {
+      isVideo = true;
+    } else if (taskConfig.url && (taskConfig.url.includes('spotify.com') || taskConfig.url.includes('jiosaavn.com') || taskConfig.url.includes('music.youtube.com'))) {
+      isVideo = false;
+    } else if (streamUrl && /\.(mp4|mkv|webm|avi|mov)(\?|$)/i.test(streamUrl) && !streamUrl.includes('saavn.cdn') && !streamUrl.includes('jiosaavn')) {
+      isVideo = true;
+    }
+  }
 
   let ext = '.m4a';
   if (isVideo) {
     ext = '.mp4';
   } else if (isImage) {
     ext = '.jpg';
+  } else if (taskConfig.format && /mp3/i.test(taskConfig.format)) {
+    ext = '.mp3';
   } else if (taskConfig.url && (taskConfig.url.includes('.mp3') || taskConfig.url.includes('youtube.com') || taskConfig.url.includes('googlevideo.com'))) {
     ext = '.mp3';
   }
@@ -1001,7 +1033,8 @@ downloadManager.on('completed', async (snap) => {
     }
   }
 
-  const isVideoDownload = snap.formatType === 'VIDEO' || (targetPath && /\.(mp4|mkv|webm|avi|mov)$/i.test(targetPath));
+  const isExplicitAudioDownload = snap.formatType === 'AUDIO' || (snap.format && /mp3|m4a|flac|wav|320k/i.test(snap.format));
+  const isVideoDownload = !isExplicitAudioDownload && (snap.formatType === 'VIDEO' || (targetPath && /\.(mp4|mkv|webm|avi|mov)$/i.test(targetPath) && !targetDir.toLowerCase().includes('music')));
   if (isVideoDownload && targetPath) {
     const videoBase = targetPath.replace(/\.[^/.]+$/, '');
     const thumbPath = `${videoBase}.jpg`;

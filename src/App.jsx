@@ -806,7 +806,10 @@ export default function App() {
     if (!trimmed) return;
 
     // Direct routing for Video and Image downloads from plugins
-    const isVideo = options.formatType === "VIDEO" || options.mediaType === "video" || (options.format && options.format.includes("MP4"));
+    const isExplicitAudio = options.formatType === "AUDIO" || options.mediaType === "audio" || (options.format && /mp3|m4a|flac|wav|aac|320k/i.test(options.format));
+    const isExplicitVideo = options.formatType === "VIDEO" || options.mediaType === "video" || (options.format && /mp4|1080p|720p/i.test(options.format));
+    const isSpotify = trimmed.includes('spotify.com');
+    const isVideo = !isExplicitAudio && !isSpotify && (isExplicitVideo || (options.format && options.format.includes("MP4")));
     const isImage = options.formatType === "IMAGE" || options.mediaType === "image" || (options.format && options.format.includes("JPG"));
     const isFile = options.formatType === "FILE" || options.mediaType === "file";
 
