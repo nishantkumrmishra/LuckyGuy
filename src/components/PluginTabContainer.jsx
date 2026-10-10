@@ -116,7 +116,6 @@ export default function PluginTabContainer({
   });
   const [activeLightboxImage, setActiveLightboxImage] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
-  const [downloadSuccessMsg, setDownloadSuccessMsg] = useState('');
   const [ageVerificationBypassed, setAgeVerificationBypassed] = useState(true);
   const [selectedQuality, setSelectedQuality] = useState('1080p');
   const [customDownloadFolder, setCustomDownloadFolder] = useState(() => {
@@ -905,8 +904,7 @@ export default function PluginTabContainer({
       category: isAdultPlugin ? 'adult' : (plugin?.category || 'media'),
       customFolder: customDownloadFolder || (plugin.id?.includes('telegram') ? preferences?.telegramDownloadFolder : null)
     });
-    setDownloadSuccessMsg(`Queued "${item.title}" (${chosenQuality}) for download!`);
-    setTimeout(() => setDownloadSuccessMsg(''), 3500);
+
   };
 
   const handleDownloadSelected = () => {
@@ -930,10 +928,8 @@ export default function PluginTabContainer({
         customFolder: customDownloadFolder || null
       });
     });
-    setDownloadSuccessMsg(`Queued ${toDownload.length} items for batch download!`);
     setSelectedIds(new Set());
     setIsSelectMode(false);
-    setTimeout(() => setDownloadSuccessMsg(''), 3500);
   };
 
   const handleCopyLink = (item) => {
@@ -1297,25 +1293,7 @@ export default function PluginTabContainer({
         </div>
       )}
 
-      {/* Download Alert Notice */}
-      {downloadSuccessMsg && (
-        <div
-          style={{
-            padding: '8px 24px',
-            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-            color: '#10b981',
-            fontSize: '12px',
-            fontWeight: 600,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            borderBottom: '1px solid rgba(16, 185, 129, 0.2)',
-          }}
-        >
-          <Check size={14} />
-          <span>{downloadSuccessMsg}</span>
-        </div>
-      )}
+
 
       {/* ========================================================================= */}
       {/* 1. IN-PAGE WATCH VIEW (70%-80% Left, 20%-30% Right, More videos below) */}
