@@ -225,8 +225,8 @@ export const DuoSettings = ({ size = 20, active = false, className = '' }) => (
 export const DuoPlay = ({ size = 20, inButton = false, className = '' }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
     <path
-      d="M7.5 5.2a1.2 1.2 0 011.83-1.03l10.2 6.8a1.2 1.2 0 010 2.06l-10.2 6.8A1.2 1.2 0 017.5 18.8V5.2z"
-      fill={inButton ? "#ffffff" : "var(--duo-purple, #7c5cbf)"}
+      d="M8 5.14v13.72a1 1 0 001.52.85l11.43-6.86a1 1 0 000-1.7L9.52 4.29A1 1 0 008 5.14z"
+      fill={inButton ? "currentColor" : "var(--duo-purple, #7c5cbf)"}
       stroke={inButton ? "none" : "var(--duo-stroke, currentColor)"}
       strokeWidth="1"
       strokeLinejoin="round"
@@ -244,20 +244,21 @@ export const DuoPlay = ({ size = 20, inButton = false, className = '' }) => (
 export const DuoPause = ({ size = 20, inButton = false, className = '' }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
     <rect
-      x="6.5"
+      x="6"
       y="5"
-      width="4"
+      width="3.8"
       height="14"
-      rx="2"
-      fill={inButton ? "#ffffff" : "var(--duo-purple, #7c5cbf)"}
+      rx="1.9"
+      fill={inButton ? "currentColor" : "var(--duo-purple, #7c5cbf)"}
     />
     <rect
-      x="13.5"
+      x="14.2"
       y="5"
-      width="4"
+      width="3.8"
       height="14"
-      rx="2"
-      fill={inButton ? "var(--duo-purple-light, #c084fc)" : "var(--duo-stroke, currentColor)"}
+      rx="1.9"
+      fill={inButton ? "currentColor" : "var(--duo-purple-light, #c084fc)"}
+      opacity={inButton ? "0.9" : "1"}
     />
   </svg>
 );

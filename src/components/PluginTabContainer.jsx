@@ -194,6 +194,7 @@ export default function PluginTabContainer({
   // Determine portal category and tag
   const isPornhub = plugin.id?.includes('pornhub') || (activeUrl || '').includes('pornhub');
   const isTelegram = plugin.id?.includes('telegram') || (activeUrl || '').includes('t.me') || (activeUrl || '').includes('telesco.pe');
+  const isTelegraph = plugin.id?.includes('telegraph') || (activeUrl || '').includes('telegra.ph');
   const isArchiveMovies = plugin.id?.includes('archive') || (activeUrl || '').includes('archive.org');
   const isRadio = plugin.id?.includes('radio') || (activeUrl || '').includes('radio');
 
@@ -548,49 +549,55 @@ export default function PluginTabContainer({
     setPageNumber(1);
 
     const loadCachedOrFresh = async () => {
-      let cached = null;
-      if (window.electronAPI?.getPortalCache) {
-        try {
-          cached = await window.electronAPI.getPortalCache(cachePortalId);
-        } catch (e) {}
-      }
-
-      if (!isMounted) return;
-
-      if (Array.isArray(cached) && cached.length > 0) {
-        // Cache file exists: load it immediately so data stays stable across launches
-        // Also blend half fresh new videos with old data so it discovers new content without wiping out
-        const freshSeed = generateIndexedVideos(selectedCategory, 1);
-        const blended = deduplicateVideos([...freshSeed.slice(0, 8), ...cached]);
-        setCrawledMedia(blended);
-        setIsIndexing(false);
-        if (window.electronAPI?.savePortalCache) {
-          window.electronAPI.savePortalCache(cachePortalId, blended);
+      try {
+        let cached = null;
+        if (window.electronAPI?.getPortalCache) {
+          try {
+            cached = await window.electronAPI.getPortalCache(cachePortalId);
+          } catch (e) {}
         }
-        return;
-      }
 
-      // If caching file was removed or is missing: generate brand new data
-      setIsIndexing(true);
-      let liveItems = [];
-      if (window.electronAPI?.crawlPortal) {
-        try {
-          liveItems = await window.electronAPI.crawlPortal(activeUrl);
-        } catch (e) {}
-      }
+        if (!isMounted) return;
 
-      if (!isMounted) return;
+        if (Array.isArray(cached) && cached.length > 0) {
+          const freshSeed = generateIndexedVideos(selectedCategory, 1);
+          const blended = deduplicateVideos([...freshSeed.slice(0, 8), ...cached]);
+          setCrawledMedia(blended);
+          setIsIndexing(false);
+          if (window.electronAPI?.savePortalCache) {
+            window.electronAPI.savePortalCache(cachePortalId, blended);
+          }
+          return;
+        }
 
-      const items = (liveItems && liveItems.length > 0)
-        ? deduplicateVideos(liveItems)
-        : deduplicateVideos(generateIndexedVideos(selectedCategory, 1));
+        // Instant seed load - eliminate infinite skeleton shimmer immediately
+        const initialSeed = deduplicateVideos(generateIndexedVideos(selectedCategory, 1));
+        setCrawledMedia(initialSeed);
+        setIsIndexing(false);
 
-      setCrawledMedia(items);
-      setIsIndexing(false);
-      setBlockedAdsCount(prev => prev + 14);
-
-      if (window.electronAPI?.savePortalCache) {
-        window.electronAPI.savePortalCache(cachePortalId, items);
+        // Background live crawl without blocking UI
+        if (window.electronAPI?.crawlPortal) {
+          try {
+            const liveItems = await window.electronAPI.crawlPortal(activeUrl);
+            if (isMounted && Array.isArray(liveItems) && liveItems.length > 0) {
+              const updated = deduplicateVideos([...liveItems, ...initialSeed]);
+              setCrawledMedia(updated);
+              setBlockedAdsCount(prev => prev + 14);
+              if (window.electronAPI?.savePortalCache) {
+                window.electronAPI.savePortalCache(cachePortalId, updated);
+              }
+            }
+          } catch (e) {}
+        }
+      } catch (err) {
+        console.warn('Error loading media portal items:', err);
+        if (isMounted) {
+          setCrawledMedia(deduplicateVideos(generateIndexedVideos(selectedCategory, 1)));
+        }
+      } finally {
+        if (isMounted) {
+          setIsIndexing(false);
+        }
       }
     };
 

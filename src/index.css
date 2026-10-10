@@ -1803,11 +1803,10 @@ h6 {
   cursor: not-allowed !important;
 }
 
-.player-btn.play-pause-btn {
-  background-color: var(--player-play-bg) !important;
-  color: var(--player-play-color) !important;
-  width: 40px !important;
-  height: 40px !important;
+.player-btn.play-pause-btn,
+.player-btn.control-btn-play {
+  width: 42px !important;
+  height: 42px !important;
   border-radius: 50% !important;
   display: flex !important;
   align-items: center !important;
@@ -1816,17 +1815,61 @@ h6 {
   padding: 0 !important;
   box-sizing: border-box !important;
   cursor: pointer !important;
-  transition: background-color 0.2s ease, transform 0.2s ease !important;
+  flex-shrink: 0 !important;
+  transition: background-color 0.18s ease, transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease !important;
 }
 
-.player-btn.play-pause-btn:hover:not(:disabled) {
-  background-color: var(--player-play-hover) !important;
-  color: var(--player-play-color) !important;
-  transform: scale(1.05) !important;
+/* Light Mode: Solid Deep Black Button (#111111) with High Contrast Crisp Icon */
+[data-theme='light'] .player-btn.play-pause-btn,
+[data-theme='light'] .player-btn.control-btn-play,
+:root:not([data-theme='dark']) .player-btn.play-pause-btn,
+:root:not([data-theme='dark']) .player-btn.control-btn-play {
+  background-color: #111111 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35) !important;
 }
 
-.player-btn.play-pause-btn:active:not(:disabled) {
+[data-theme='light'] .player-btn.play-pause-btn:hover:not(:disabled),
+[data-theme='light'] .player-btn.control-btn-play:hover:not(:disabled),
+:root:not([data-theme='dark']) .player-btn.play-pause-btn:hover:not(:disabled),
+:root:not([data-theme='dark']) .player-btn.control-btn-play:hover:not(:disabled) {
+  background-color: #27272a !important;
+  color: #ffffff !important;
+  transform: scale(1.08) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* Dark Mode: Solid Crisp White Button (#f4f4f5) with Deep Dark Icon */
+[data-theme='dark'] .player-btn.play-pause-btn,
+[data-theme='dark'] .player-btn.control-btn-play {
+  background-color: #f4f4f5 !important;
+  color: #0f0f0f !important;
+  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.15) !important;
+}
+
+[data-theme='dark'] .player-btn.play-pause-btn:hover:not(:disabled),
+[data-theme='dark'] .player-btn.control-btn-play:hover:not(:disabled) {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  transform: scale(1.08) !important;
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.25) !important;
+}
+
+.player-btn.play-pause-btn:active:not(:disabled),
+.player-btn.control-btn-play:active:not(:disabled) {
   transform: scale(0.95) !important;
+}
+
+.player-btn.active,
+.player-btn.repeat-btn.active {
+  color: var(--primary, #7c5cbf) !important;
+  background-color: rgba(124, 92, 191, 0.12) !important;
+}
+
+.player-btn.active:hover,
+.player-btn.repeat-btn.active:hover {
+  color: var(--primary, #7c5cbf) !important;
+  background-color: rgba(124, 92, 191, 0.2) !important;
 }
 
 .ytm-progress-container {

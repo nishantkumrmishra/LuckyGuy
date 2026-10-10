@@ -2,21 +2,21 @@ import React, { useEffect, useState } from 'react';
 
 export const WindowControls = () => {
   const [isMaximized, setIsMaximized] = useState(false);
-  const hasAPI = typeof window !== 'undefined' && !!window.electronAPI;
 
   useEffect(() => {
-    if (!hasAPI || !window.electronAPI) return;
+    const api = window.electronAPI;
+    if (!api) return;
 
-    if (window.electronAPI.getWindowState) {
-      window.electronAPI.getWindowState().then((state) => {
+    if (api.getWindowState) {
+      api.getWindowState().then((state) => {
         if (state && typeof state.isMaximized === 'boolean') {
           setIsMaximized(state.isMaximized);
         }
       }).catch(() => {});
     }
 
-    if (window.electronAPI.onWindowStateChanged) {
-      const unsubscribe = window.electronAPI.onWindowStateChanged((state) => {
+    if (api.onWindowStateChanged) {
+      const unsubscribe = api.onWindowStateChanged((state) => {
         if (state && typeof state.isMaximized === 'boolean') {
           setIsMaximized(state.isMaximized);
         }
@@ -25,54 +25,69 @@ export const WindowControls = () => {
         if (unsubscribe) unsubscribe();
       };
     }
-  }, [hasAPI]);
+  }, []);
 
   const handleMinimize = (e) => {
     e?.preventDefault();
     e?.stopPropagation();
-    if (window.electronAPI?.minimize) {
-      window.electronAPI.minimize();
-    } else if (window.electronAPI?.minimizeWindow) {
-      window.electronAPI.minimizeWindow();
-    }
+    const api = window.electronAPI;
+    if (api?.minimize) api.minimize();
+    else if (api?.minimizeWindow) api.minimizeWindow();
   };
 
   const handleMaximize = (e) => {
     e?.preventDefault();
     e?.stopPropagation();
-    if (window.electronAPI?.maximize) {
-      window.electronAPI.maximize();
-    } else if (window.electronAPI?.maximizeWindow) {
-      window.electronAPI.maximizeWindow();
-    }
+    const api = window.electronAPI;
+    if (api?.maximize) api.maximize();
+    else if (api?.maximizeWindow) api.maximizeWindow();
   };
 
   const handleClose = (e) => {
     e?.preventDefault();
     e?.stopPropagation();
-    if (window.electronAPI?.close) {
-      window.electronAPI.close();
-    } else if (window.electronAPI?.closeWindow) {
-      window.electronAPI.closeWindow();
-    }
+    const api = window.electronAPI;
+    if (api?.close) api.close();
+    else if (api?.closeWindow) api.closeWindow();
   };
 
   return (
     <div
       className="window-controls-container"
       style={{
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        display: 'flex',
+        alignItems: 'center',
+        height: '38px',
         WebkitAppRegion: 'no-drag',
-        zIndex: 9999,
+        zIndex: 99999,
         pointerEvents: 'auto',
       }}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       <button
         type="button"
         className="window-control-btn minimize"
         onClick={handleMinimize}
+        onMouseDown={(e) => e.stopPropagation()}
         title="Minimize"
         aria-label="Minimize"
-        style={{ WebkitAppRegion: 'no-drag', pointerEvents: 'auto' }}
+        style={{
+          width: '46px',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'transparent',
+          border: 'none',
+          outline: 'none',
+          cursor: 'pointer',
+          color: 'var(--text-primary, #333333)',
+          WebkitAppRegion: 'no-drag',
+          pointerEvents: 'auto',
+        }}
       >
         <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor" style={{ pointerEvents: 'none' }}>
           <rect width="10" height="1" />
@@ -82,9 +97,23 @@ export const WindowControls = () => {
         type="button"
         className="window-control-btn maximize"
         onClick={handleMaximize}
+        onMouseDown={(e) => e.stopPropagation()}
         title={isMaximized ? "Restore" : "Maximize"}
         aria-label={isMaximized ? "Restore" : "Maximize"}
-        style={{ WebkitAppRegion: 'no-drag', pointerEvents: 'auto' }}
+        style={{
+          width: '46px',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'transparent',
+          border: 'none',
+          outline: 'none',
+          cursor: 'pointer',
+          color: 'var(--text-primary, #333333)',
+          WebkitAppRegion: 'no-drag',
+          pointerEvents: 'auto',
+        }}
       >
         {isMaximized ? (
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1" style={{ pointerEvents: 'none' }}>
@@ -101,9 +130,23 @@ export const WindowControls = () => {
         type="button"
         className="window-control-btn close"
         onClick={handleClose}
+        onMouseDown={(e) => e.stopPropagation()}
         title="Close"
         aria-label="Close"
-        style={{ WebkitAppRegion: 'no-drag', pointerEvents: 'auto' }}
+        style={{
+          width: '46px',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'transparent',
+          border: 'none',
+          outline: 'none',
+          cursor: 'pointer',
+          color: 'var(--text-primary, #333333)',
+          WebkitAppRegion: 'no-drag',
+          pointerEvents: 'auto',
+        }}
       >
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.1" style={{ pointerEvents: 'none' }}>
           <path d="M1 1 L9 9 M9 1 L1 9" />

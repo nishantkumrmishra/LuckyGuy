@@ -1,11 +1,13 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('electronAPI', {\n  minimize: () => ipcRenderer.send('window-minimize'),
+contextBridge.exposeInMainWorld('electronAPI', {
+  minimize: () => ipcRenderer.send('window-minimize'),
   minimizeWindow: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
   maximizeWindow: () => ipcRenderer.send('window-maximize'),
   close: () => ipcRenderer.send('window-close'),
   closeWindow: () => ipcRenderer.send('window-close'),
+  toggleFullscreen: () => ipcRenderer.send('window-toggle-fullscreen'),
   getWindowState: () => ipcRenderer.invoke('window-get-state'),
   onWindowStateChanged: (callback) => {
     if (typeof callback !== 'function') return () => {};

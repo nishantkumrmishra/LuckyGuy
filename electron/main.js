@@ -212,25 +212,71 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// Window controls
+function getTargetWindow(event) {
+  if (event && event.sender) {
+    const senderWin = BrowserWindow.fromWebContents(event.sender);
+    if (senderWin && !senderWin.isDestroyed()) return senderWin;
+  }
+  const focused = BrowserWindow.getFocusedWindow();
+  if (focused && !focused.isDestroyed()) return focused;
+  if (mainWindow && !mainWindow.isDestroyed()) return mainWindow;
+  const all = BrowserWindow.getAllWindows();
+  return all.length > 0 ? all[0] : null;
+}
+
+// Window controls (Support both .send and .invoke)
 ipcMain.on('window-minimize', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  const win = getTargetWindow(event);
   win?.minimize();
 });
+ipcMain.handle('window-minimize', (event) => {
+  const win = getTargetWindow(event);
+  win?.minimize();
+  return true;
+});
+
 ipcMain.on('window-maximize', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  const win = getTargetWindow(event);
   if (!win) return;
   if (win.isMaximized()) win.unmaximize();
   else win.maximize();
 });
+ipcMain.handle('window-maximize', (event) => {
+  const win = getTargetWindow(event);
+  if (!win) return false;
+  if (win.isMaximized()) win.unmaximize();
+  else win.maximize();
+  return win.isMaximized();
+});
+
 ipcMain.on('window-close', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  const win = getTargetWindow(event);
   win?.close();
 });
+ipcMain.handle('window-close', (event) => {
+  const win = getTargetWindow(event);
+  win?.close();
+  return true;
+});
+
+ipcMain.on('window-toggle-fullscreen', (event) => {
+  const win = getTargetWindow(event);
+  if (win) win.setFullScreen(!win.isFullScreen());
+});
+ipcMain.handle('window-toggle-fullscreen', (event) => {
+  const win = getTargetWindow(event);
+  if (win) {
+    win.setFullScreen(!win.isFullScreen());
+    return win.isFullScreen();
+  }
+  return false;
+});
+
 ipcMain.handle('window-get-state', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  const win = getTargetWindow(event);
   return { isMaximized: win ? win.isMaximized() : false };
 });
+
 
 // URL Extractor & Resolver
 ipcMain.handle('extract-url', async (event, url) => {

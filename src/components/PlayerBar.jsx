@@ -246,6 +246,10 @@ export default function PlayerBar({
   const toggleFullscreen = () => {
     if (window.electronAPI?.toggleFullscreen) {
       window.electronAPI.toggleFullscreen();
+    } else if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {});
     }
   };
 
@@ -310,7 +314,7 @@ export default function PlayerBar({
         </button>
 
         <button
-          className="player-btn control-btn-play"
+          className="player-btn play-pause-btn control-btn-play"
           onClick={onTogglePlay}
           disabled={!currentTrack}
           title={isPlaying ? 'Pause' : 'Play'}
