@@ -306,6 +306,21 @@ export default function App() {
   // 2. Downloads: Active tasks + Completed downloads
   const [activeDownloads, setActiveDownloads] = useState([]);
   const [videos, setVideos] = useState([]);
+  // Global Audio/Video Synchronization in App.jsx
+  useEffect(() => {
+    const handleGlobalMediaPlayback = (e) => {
+      // If a video starts playing from anywhere (Videos tab or any plugin extension tab), pause background audio music
+      if (e.detail?.source === 'video') {
+        if (audioRef.current && !audioRef.current.paused) {
+          audioRef.current.pause();
+        }
+        setIsPlaying(false);
+      }
+    };
+    window.addEventListener('luckyguy-media-playback', handleGlobalMediaPlayback);
+    return () => window.removeEventListener('luckyguy-media-playback', handleGlobalMediaPlayback);
+  }, []);
+
   const [activeVideo, setActiveVideo] = useState(null);
   const [savedOnlineVideos, setSavedOnlineVideos] = useState(() => {
     try {
@@ -1266,9 +1281,15 @@ export default function App() {
   };
 
   const handlePlayVideo = (video) => {
+    if (audioRef.current && !audioRef.current.paused) {
+      audioRef.current.pause();
+    }
     setIsPlaying(false);
     setActiveVideo(video);
     setActiveTab('videos');
+    window.dispatchEvent(new CustomEvent('luckyguy-media-playback', {
+      detail: { source: 'video', playerId: 'videos-tab-' + (video?.id || '') }
+    }));
   };
 
   const handleDeleteVideo = async (video) => {
@@ -1322,6 +1343,14 @@ export default function App() {
       return;
     }
 
+    // Audio song -> pause any active video in Videos tab or extension tabs
+    if (activeVideo) {
+      setActiveVideo(null);
+    }
+    window.dispatchEvent(new CustomEvent('luckyguy-media-playback', {
+      detail: { source: 'audio', playerId: 'global-audio' }
+    }));
+
     // Audio song -> standard music player playback
     let resolvedPath = track.filePath || track.destinationPath;
     if (window.electronAPI?.resolveAudioPath && (resolvedPath || track.title)) {
@@ -1363,6 +1392,9 @@ export default function App() {
   };
 
   const handleResume = () => {
+    window.dispatchEvent(new CustomEvent('luckyguy-media-playback', {
+      detail: { source: 'audio', playerId: 'global-audio' }
+    }));
     if (audioRef.current && audioRef.current.src) {
       audioRef.current
         .play()
@@ -1714,6 +1746,13 @@ export default function App() {
                       savedOnlineVideos={savedOnlineVideos}
                       onSaveToVideos={handleSaveToVideos}
                       onNavigateHome={() => setActiveTab('home')}
+                      onVideoPlay={() => {
+                        if (audioRef.current && !audioRef.current.paused) {
+                          audioRef.current.pause();
+                        }
+                        setIsPlaying(false);
+                        if (activeVideo) setActiveVideo(null);
+                      }}
                     />
                   )}
                 </div>

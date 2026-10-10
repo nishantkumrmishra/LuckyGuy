@@ -589,6 +589,19 @@ export default function PluginTabContainer({
 
 
   // Persistent Disk Caching & Smart Content Blending
+  // Pause webview when other media plays
+  useEffect(() => {
+    const handleGlobalMedia = (e) => {
+      if (webviewRef.current) {
+        try {
+          webviewRef.current.executeJavaScript('document.querySelectorAll("video, audio").forEach(m => m.pause())');
+        } catch (err) {}
+      }
+    };
+    window.addEventListener('luckyguy-media-playback', handleGlobalMedia);
+    return () => window.removeEventListener('luckyguy-media-playback', handleGlobalMedia);
+  }, []);
+
   const cachePortalId = plugin.id || 'pornhub';
 
   useEffect(() => {
@@ -859,6 +872,9 @@ export default function PluginTabContainer({
       setInputUrl(video.url);
     }
     if (onVideoPlay) onVideoPlay();
+    window.dispatchEvent(new CustomEvent('luckyguy-media-playback', {
+      detail: { source: 'video', playerId: 'plugin-player-' + (video.id || '') }
+    }));
 
     // Dynamically resolve full metadata and direct streams from official page
     if (video.url && window.electronAPI?.extractUrl) {

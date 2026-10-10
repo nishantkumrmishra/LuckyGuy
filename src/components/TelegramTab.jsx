@@ -67,6 +67,18 @@ export default function TelegramTab({
   const [fetchError, setFetchError] = useState('');
 
   // --- Layout & Filter States ---
+  // Global media playback listener in TelegramTab
+  useEffect(() => {
+    const handleOtherMedia = (e) => {
+      const vids = document.querySelectorAll('.telegram-view video');
+      vids.forEach(v => {
+        if (!v.paused) v.pause();
+      });
+    };
+    window.addEventListener('luckyguy-media-playback', handleOtherMedia);
+    return () => window.removeEventListener('luckyguy-media-playback', handleOtherMedia);
+  }, []);
+
   const [selectedFilter, setSelectedFilter] = useState('all'); // 'all' | 'photos' | 'videos' | 'files' | 'audio'
   const [viewLayout, setViewLayout] = useState('feed'); // 'feed' (Telegram posts) | 'grid' (Media gallery)
   const [selectedIds, setSelectedIds] = useState(new Set());

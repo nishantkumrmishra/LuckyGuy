@@ -41,6 +41,29 @@ export default function CustomVideoPlayer({
   const isLocalFile = Boolean(localSrc);
 
 
+  const playerIdRef = useRef(null);
+  if (!playerIdRef.current) {
+    playerIdRef.current = 'player-' + (video?.id || Math.random().toString(36).substring(2, 9));
+  }
+  const playerId = playerIdRef.current;
+
+  // Global Audio/Video Synchronization:
+  // When another media (music track or another video in another tab) starts playing, pause this player
+  useEffect(() => {
+    const handleOtherMediaPlayback = (e) => {
+      if (e.detail?.playerId && e.detail.playerId !== playerId) {
+        if (videoRef.current && !videoRef.current.paused) {
+          videoRef.current.pause();
+          setIsPlaying(false);
+        }
+      }
+    };
+    window.addEventListener('luckyguy-media-playback', handleOtherMediaPlayback);
+    return () => {
+      window.removeEventListener('luckyguy-media-playback', handleOtherMediaPlayback);
+    };
+  }, [playerId]);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -400,6 +423,12 @@ export default function CustomVideoPlayer({
         playsInline
         preload="auto"
         onTimeUpdate={handleTimeUpdate}
+        onPlay={() => {
+          setIsPlaying(true);
+          window.dispatchEvent(new CustomEvent('luckyguy-media-playback', {
+            detail: { source: 'video', playerId }
+          }));
+        }}
         onLoadedMetadata={(e) => {
           if (e.target.duration && !isNaN(e.target.duration)) {
             setDuration(e.target.duration);
