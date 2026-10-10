@@ -410,7 +410,8 @@ class TaskDownloader extends EventEmitter {
 
   snapshot() {
     const progress = this.totalBytes > 0 ? Math.min(1.0, this.downloadedBytes / this.totalBytes) : 0;
-    return {\n      ...this.task,
+    return {
+      ...this.task,
       status: this.status,
       downloadedBytes: this.downloadedBytes,
       totalBytes: this.totalBytes,
