@@ -5,6 +5,7 @@ import {
   DuoLibrary,
   DuoVideo,
   DuoPornhub,
+  DuoYoutube,
   DuoDownload,
   DuoTrash,
   DuoSettings,
@@ -160,6 +161,9 @@ export default function Sidebar({
     const pid = (pluginId || '').toLowerCase();
     if (pid.includes('pornhub') || name.includes('pornhub')) {
       return <DuoPornhub size={18} active={isActive} />;
+    }
+    if (pid.includes('youtube') || name.includes('youtube')) {
+      return <DuoYoutube size={18} active={isActive} />;
     }
     if (name.includes('telegram') || name.includes('send') || name.includes('paper-plane') || name.includes('plane')) {
       return <Send size={17} color={color} />;
@@ -370,6 +374,7 @@ export default function Sidebar({
                   const targetCat = 'plugin-' + plugin.id;
                   const isSelected = settingsCategory === targetCat;
                   const isPornhub = (plugin.id || '').toLowerCase().includes('pornhub') || (plugin.name || '').toLowerCase().includes('pornhub');
+                  const isYouTube = (plugin.id || '').toLowerCase().includes('youtube') || (plugin.name || '').toLowerCase().includes('youtube');
                   const label = isPornhub ? "Pornhub" : (plugin.settings.title || (plugin.name + ' Setup'));
                   return (
                     <div
@@ -382,7 +387,7 @@ export default function Sidebar({
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '20px' }}>
                           <SlidersHorizontal size={16} color={isSelected ? 'var(--primary, #7c5cbf)' : 'var(--duo-stroke, currentColor)'} />
                         </div>
-                        <span style={labelStyle}>{isPornhub ? "Pornhub" : (plugin.name || "").split(/\s+/).slice(0, 2).join(" ")}</span>
+                        <span style={labelStyle}>{isPornhub ? "Pornhub" : isYouTube ? "YouTube" : (plugin.name || "").split(/\s+/).slice(0, 2).join(" ")}</span>
                       </div>
                     </div>
                   );
@@ -541,7 +546,8 @@ export default function Sidebar({
                   const isTabActive = activeTab === tabId;
                   const rawTitle = plugin.tab?.title || plugin.name || "";
                   const isPornhub = (plugin.id || '').toLowerCase().includes('pornhub') || rawTitle.toLowerCase().includes('pornhub');
-                  const tabTitle = isPornhub ? "Pornhub" : rawTitle.split(/\s+/).slice(0, 2).join(" ");
+                  const isYouTube = (plugin.id || '').toLowerCase().includes('youtube') || rawTitle.toLowerCase().includes('youtube');
+                  const tabTitle = isPornhub ? "Pornhub" : isYouTube ? "YouTube" : rawTitle.split(/\s+/).slice(0, 2).join(" ");
                   return (
                     <div
                       key={plugin.id}

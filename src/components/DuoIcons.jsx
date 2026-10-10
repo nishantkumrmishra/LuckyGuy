@@ -155,6 +155,26 @@ export const DuoPornhub = ({ size = 18, active = false, className = '' }) => (
   </svg>
 );
 
+// Duo-Tone YouTube Icon matching the App UI Layout & Design System
+export const DuoYoutube = ({ size = 18, active = false, className = '' }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
+    <rect
+      x="2.5"
+      y="4.5"
+      width="19"
+      height="15"
+      rx="4.5"
+      stroke={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
+      strokeWidth="1.8"
+      fill={active ? 'rgba(124, 92, 191, 0.12)' : 'none'}
+    />
+    <polygon
+      points="10,8 16,12 10,16"
+      fill={active ? 'var(--duo-purple, #7c5cbf)' : 'var(--duo-stroke, currentColor)'}
+    />
+  </svg>
+);
+
 // Duo-Tone Download Icon
 export const DuoDownload = ({ size = 20, active = false, className = '' }) => (
   <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">

@@ -179,16 +179,24 @@ const defaultTelegramExtension = {
 const defaultYouTubeExtension = {
   id: "luckyguy-ext-youtube",
   name: "YouTube",
-  version: "1.0.0",
-  type: "hybrid",
+  version: "1.1.0",
+  type: "portal",
   rating: "all",
-  description: "High-speed YouTube video & audio streaming engine powered by yt-dlp.",
+  description: "High-speed YouTube video & audio extractor powered by yt-dlp with format selection and MP4 direct download.",
   author: "LuckyGuy Core",
-  category: "Video & Media Downloader",
+  category: "Video & Media",
   entry: "index.js",
   mediaTypes: ["video", "audio"],
+  tab: {
+    title: "YouTube",
+    icon: "Youtube",
+    url: "https://www.youtube.com",
+    viewLayout: "grid",
+    themeColor: "#FF0000"
+  },
   capabilities: [
     "stream",
+    "crawlPage",
     "download",
     "metadata",
     "search",
@@ -229,8 +237,18 @@ export default function App() {
           list.push(defaultTelegramExtension);
         }
       }
-      if (!list.some(e => e.id === 'luckyguy-ext-youtube')) {
+      const ytIdx = list.findIndex(e => e.id === 'luckyguy-ext-youtube');
+      if (ytIdx === -1) {
         list.push(defaultYouTubeExtension);
+      } else {
+        if (!list[ytIdx].tab || !list[ytIdx].tab.url) {
+          list[ytIdx] = {
+            ...defaultYouTubeExtension,
+            ...list[ytIdx],
+            tab: defaultYouTubeExtension.tab,
+            enabled: list[ytIdx].enabled !== undefined ? list[ytIdx].enabled : true
+          };
+        }
       }
       try {
         localStorage.setItem('luckyguy-extensions', JSON.stringify(list));

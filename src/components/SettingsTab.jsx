@@ -39,6 +39,7 @@ export default function SettingsTab({
   appearance = { accentColor: '#7c5cbf', fontFamily: 'Inter', borderRadius: '8px' },
   onUpdateAppearance,
   onOpenSetupWizard,
+  installedExtensions = [],
   onUpdateExtensions,
   onNavigateTab,
 }) {
@@ -196,6 +197,13 @@ ishant\\Music');
     } catch (e) {}
     return [];
   });
+
+    // Sync customExtensions with installedExtensions prop
+  useEffect(() => {
+    if (installedExtensions && Array.isArray(installedExtensions) && installedExtensions.length > 0) {
+      setCustomExtensions(installedExtensions);
+    }
+  }, [installedExtensions]);
 
   const activePluginId = category.startsWith('plugin-') ? category.replace('plugin-', '') : null;
   const activePluginSettings = activePluginId ? customExtensions.find((e) => e.id === activePluginId) : null;

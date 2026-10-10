@@ -180,7 +180,12 @@ export default function PluginTabContainer({
     } catch (e) {}
 
     let liveItems = [];
-    if (window.electronAPI?.crawlPortal) {
+    if (isYouTube && window.electronAPI?.ytdlpSearch) {
+      try {
+        const query = (quickSearchText || '').trim() || 'trending';
+        liveItems = await window.electronAPI.ytdlpSearch(query, 25);
+      } catch (e) {}
+    } else if (window.electronAPI?.crawlPortal) {
       try {
         liveItems = await window.electronAPI.crawlPortal(activeUrl);
       } catch (e) {}
@@ -198,12 +203,15 @@ export default function PluginTabContainer({
 
   // Determine portal category and tag
   const isPornhub = plugin.id?.includes('pornhub') || (activeUrl || '').includes('pornhub');
+  const isYouTube = plugin.id?.includes('youtube') || (activeUrl || '').includes('youtube.com') || (activeUrl || '').includes('youtu.be');
   const isTelegram = plugin.id?.includes('telegram') || (activeUrl || '').includes('t.me') || (activeUrl || '').includes('telesco.pe');
   const isTelegraph = plugin.id?.includes('telegraph') || (activeUrl || '').includes('telegra.ph');
   const isArchiveMovies = plugin.id?.includes('archive') || (activeUrl || '').includes('archive.org');
   const isRadio = plugin.id?.includes('radio') || (activeUrl || '').includes('radio');
 
-  const categories = isPornhub
+  const categories = isYouTube
+    ? ['All', 'Trending Music', 'Top Charts', 'Live Streams', 'Gaming', 'News']
+    : isPornhub
     ? ['All', 'Trending HD', 'Top Rated', '4K Ultra', 'Verified Amateurs', 'VR / 60fps']
     : isTelegram
     ? ['All', 'Channel Videos', 'HD Clips', 'Wallpapers & Photos', 'Audio & Voice', 'Media Files']
@@ -298,7 +306,28 @@ export default function PluginTabContainer({
       });
     }
 
-    if (isPornhub) {
+    if (isYouTube) {
+      let query = 'trending';
+      if (cat === 'Trending Music') query = 'trending music';
+      else if (cat === 'Top Charts') query = 'top music charts 2024';
+      else if (cat === 'Live Streams') query = 'live stream music';
+      else if (cat === 'Gaming') query = 'trending gaming';
+      else if (cat === 'News') query = 'news live';
+      let targetCatUrl = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query);
+      setActiveUrl(targetCatUrl);
+      setInputUrl(targetCatUrl);
+      if (window.electronAPI?.ytdlpSearch) {
+        window.electronAPI.ytdlpSearch(query, 25).then(items => {
+          if (items && items.length > 0) {
+            setCrawledMedia(deduplicateVideos(items));
+            if (window.electronAPI?.savePortalCache) {
+              window.electronAPI.savePortalCache(cachePortalId, items);
+            }
+          }
+          setIsIndexing(false);
+        }).catch(() => setIsIndexing(false));
+      }
+    } else if (isPornhub) {
       const sampleTitles = [
         'Exclusive 4K Ultra HD Studio Session - Remastered',
         'Top Rated Scene of the Year - 1080p 60fps HD',
@@ -610,7 +639,19 @@ export default function PluginTabContainer({
         // Cache was empty: show clean skeletons while crawler fetches real website videos
         setIsIndexing(true);
 
-        if (window.electronAPI?.crawlPortal) {
+        if (isYouTube && window.electronAPI?.ytdlpSearch) {
+          try {
+            const liveItems = await window.electronAPI.ytdlpSearch('trending', 25);
+            const cleanLive = Array.isArray(liveItems) ? deduplicateVideos(liveItems.filter(isRealMediaItem)) : [];
+            if (isMounted && cleanLive.length > 0) {
+              setCrawledMedia(cleanLive);
+              if (window.electronAPI?.savePortalCache) {
+                window.electronAPI.savePortalCache(cachePortalId, cleanLive);
+              }
+              return;
+            }
+          } catch (e) {}
+        } else if (window.electronAPI?.crawlPortal) {
           try {
             const liveItems = await window.electronAPI.crawlPortal(activeUrl);
             const cleanLive = Array.isArray(liveItems) ? deduplicateVideos(liveItems.filter(isRealMediaItem)) : [];
@@ -655,7 +696,12 @@ export default function PluginTabContainer({
     setPageNumber(nextPage);
 
     let nextItems = [];
-    if (window.electronAPI?.crawlPortal) {
+    if (isYouTube && window.electronAPI?.ytdlpSearch) {
+      try {
+        const query = (quickSearchText || '').trim() || (selectedCategory !== 'All' ? selectedCategory : 'popular music');
+        nextItems = await window.electronAPI.ytdlpSearch(`${query} ${nextPage}`, 20);
+      } catch (e) {}
+    } else if (window.electronAPI?.crawlPortal) {
       try {
         const nextTargetUrl = `${activeUrl}${activeUrl.includes('?') ? '&' : '?'}page=${nextPage}`;
         nextItems = await window.electronAPI.crawlPortal(nextTargetUrl);
@@ -1210,6 +1256,8 @@ export default function PluginTabContainer({
               let targetSearchUrl;
               if (isPornhub) {
                 targetSearchUrl = 'https://www.pornhub.org/video/search?search=' + encodeURIComponent(q);
+              } else if (isYouTube) {
+                targetSearchUrl = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
               } else if (isTelegram) {
                 targetSearchUrl = 'https://t.me/s/' + encodeURIComponent(q.replace('@', ''));
               } else {
@@ -1221,7 +1269,17 @@ export default function PluginTabContainer({
               if (webviewRef.current?.loadURL) {
                 try { webviewRef.current.loadURL(targetSearchUrl); } catch(err) {}
               }
-              if (window.electronAPI?.crawlPortal) {
+              if (isYouTube && window.electronAPI?.ytdlpSearch) {
+                window.electronAPI.ytdlpSearch(q, 25).then(items => {
+                  if (items && items.length > 0) {
+                    setCrawledMedia(deduplicateVideos(items));
+                    if (window.electronAPI?.savePortalCache) {
+                      window.electronAPI.savePortalCache(cachePortalId, items);
+                    }
+                  }
+                  setIsIndexing(false);
+                }).catch(() => setIsIndexing(false));
+              } else if (window.electronAPI?.crawlPortal) {
                 window.electronAPI.crawlPortal(targetSearchUrl).then(items => {
                   if (items && items.length > 0) {
                     setCrawledMedia(deduplicateVideos(items));

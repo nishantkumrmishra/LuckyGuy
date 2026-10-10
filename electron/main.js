@@ -418,6 +418,26 @@ ipcMain.handle('crawl-portal', async (event, targetUrl) => {
   if (!targetUrl) return [];
   const crawlUrl = targetUrl.startsWith('http') ? targetUrl : 'https://' + targetUrl;
 
+  if (crawlUrl.includes('youtube.com') || crawlUrl.includes('youtu.be')) {
+    let q = 'trending';
+    try {
+      const parsed = new URL(crawlUrl);
+      if (parsed.searchParams.get('search_query')) {
+        q = parsed.searchParams.get('search_query');
+      } else if (parsed.searchParams.get('q')) {
+        q = parsed.searchParams.get('q');
+      }
+    } catch (e) {}
+    try {
+      const results = await ytdlpExtractor.search(q, 25);
+      return results || [];
+    } catch (err) {
+      console.warn('[crawl-portal] YouTube search failed:', err.message);
+      return [];
+    }
+  }
+
+
   return new Promise((resolve) => {
     let crawlWin = null;
     let resolved = false;
