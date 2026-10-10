@@ -1023,14 +1023,6 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     try { fs.mkdirSync(youtubeVideosDir, { recursive: true }); } catch (e) {}
   }
 
-  const isYouTubeVideo = Boolean(
-    (taskConfig.url && (taskConfig.url.includes('youtube.com') || taskConfig.url.includes('youtu.be'))) ||
-    (taskConfig.source && taskConfig.source.toLowerCase().includes('youtube')) ||
-    (taskConfig.platform && taskConfig.platform.toLowerCase().includes('youtube')) ||
-    (taskConfig.id && String(taskConfig.id).startsWith('yt-')) ||
-    (taskConfig.author && /youtube/i.test(taskConfig.author))
-  );
-
   if (taskConfig.customFolder && typeof taskConfig.customFolder === "string" && taskConfig.customFolder.trim()) {
     targetDir = taskConfig.customFolder.trim();
   } else if (isVideo && isAdultVideo) {
