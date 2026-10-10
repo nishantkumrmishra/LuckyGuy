@@ -1151,7 +1151,7 @@ export default function DownloadsTab({
                                 display: 'flex',
                                 alignItems: 'center',
                               }}
-                              title="Play / Open"
+                              title={item.formatType === "VIDEO" || item.format?.includes("MP4") ? "Play Video" : "Play"}
                             >
                               <Play size={14} fill="currentColor" />
                             </button>

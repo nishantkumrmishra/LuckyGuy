@@ -338,6 +338,18 @@ ipcMain.handle('open-external', (event, url) => {
   }
 });
 
+ipcMain.handle('open-file', async (event, filePath) => {
+  if (filePath && fs.existsSync(filePath)) {
+    try {
+      await shell.openPath(filePath);
+      return true;
+    } catch (e) {
+      console.warn("Could not open file:", e);
+    }
+  }
+  return false;
+});
+
 ipcMain.handle('crawl-portal', async (event, targetUrl) => {
   if (!targetUrl) return [];
   const crawlUrl = targetUrl.startsWith('http') ? targetUrl : 'https://' + targetUrl;
@@ -576,6 +588,19 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     };
   }
 
+  let streamUrl = taskConfig.url;
+  // If taskConfig.url is a Pornhub page URL, extract direct stream URL first!
+  if (pornhubExtractor.isPornhubUrl(streamUrl) && !streamUrl.includes('.mp4')) {
+    try {
+      const phVid = await pornhubExtractor.extractPornhubVideo(streamUrl);
+      if (phVid && phVid.streamUrl) {
+        streamUrl = phVid.streams?.[taskConfig.qualityLabel] || phVid.streamUrl;
+      }
+    } catch (e) {
+      console.warn('Could not resolve direct stream for download:', e.message);
+    }
+  }
+
   let enriched = null;
   try {
     enriched = await fetchEnrichedMetadata(taskConfig.title, taskConfig.artist);
@@ -588,10 +613,14 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
   const itunesArtwork = enriched?.artworkUrl || '';
   const artworkUrl = taskConfig.artworkUrl || itunesArtwork || '';
 
-  // Determine correct initial extension based on format or stream URL
+  const isVideo = taskConfig.formatType === 'VIDEO' || (streamUrl && streamUrl.includes('.mp4')) || (taskConfig.format && taskConfig.format.includes('MP4'));
+  const isImage = taskConfig.formatType === 'IMAGE' || (streamUrl && (streamUrl.includes('.jpg') || streamUrl.includes('.png')));
+
   let ext = '.m4a';
-  if (taskConfig.formatType === 'VIDEO') {
+  if (isVideo) {
     ext = '.mp4';
+  } else if (isImage) {
+    ext = '.jpg';
   } else if (taskConfig.url && (taskConfig.url.includes('.mp3') || taskConfig.url.includes('youtube.com') || taskConfig.url.includes('googlevideo.com'))) {
     ext = '.mp3';
   }
@@ -602,7 +631,6 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     : '';
 
   let targetDir = preferences.downloadFolder;
-  // Auto-organize into genre subfolder when enabled
   const shouldOrganize = preferences.autoOrganizeByGenre !== false;
   
   const userVideosDir = path.join(os.homedir(), "Videos");
@@ -610,10 +638,10 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
 
   if (taskConfig.customFolder && typeof taskConfig.customFolder === "string" && taskConfig.customFolder.trim()) {
     targetDir = taskConfig.customFolder.trim();
-  } else if (taskConfig.formatType === "VIDEO") {
+  } else if (isVideo) {
     ext = ".mp4";
     targetDir = userVideosDir;
-  } else if (taskConfig.formatType === "IMAGE") {
+  } else if (isImage) {
     ext = ".jpg";
     targetDir = userPicturesDir;
   } else if (shouldOrganize) {
@@ -636,14 +664,16 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
 
   downloadManager.addTask({
     ...taskConfig,
+    url: streamUrl,
     title: taskConfig.title,
     artist: taskConfig.artist,
     album,
     year,
     genre,
     artworkUrl,
+    formatType: isVideo ? 'VIDEO' : (isImage ? 'IMAGE' : 'AUDIO'),
     destinationPath: targetPath,
-    chunkCount: preferences.chunkCount || 8
+    chunkCount: isVideo ? 1 : (preferences.chunkCount || 8)
   });
 
   return true;
@@ -680,56 +710,8 @@ downloadManager.on('completed', async (snap) => {
     }
   }
 
-  // Universal metadata embedding (atoms for M4A, ID3 frames for MP3)
-  if (targetPath && (targetPath.endsWith('.mp3') || targetPath.endsWith('.m4a'))) {
-    try {
-      await embedId3Metadata(targetPath, {
-        title: snap.title,
-        artist: snap.artist,
-        album: snap.album,
-        year: snap.year,
-        genre: snap.genre,
-        artworkUrl: snap.artworkUrl
-      });
-    } catch (tagErr) {
-      console.warn('Failed to embed metadata tags:', tagErr.message);
-    }
-  }
-
-  // Guarantee file is moved into its genre directory if currently in root
-  if (targetPath && fs.existsSync(targetPath)) {
-    const parentDir = path.resolve(path.dirname(targetPath));
-    const rootDownloadDir = path.resolve(preferences.downloadFolder);
-    const resolvedGenre = snap.genre || 'Pop';
-    const cleanGenre = resolvedGenre.replace(/[/\\?%*:|"<>]/g, '_');
-    const expectedGenreDir = path.join(preferences.downloadFolder, cleanGenre);
-    if (!fs.existsSync(expectedGenreDir)) {
-      try { fs.mkdirSync(expectedGenreDir, { recursive: true }); } catch (e) {}
-    }
-
-    if (parentDir === rootDownloadDir) {
-      const destinationInGenre = path.join(expectedGenreDir, path.basename(targetPath));
-      try {
-        fs.renameSync(targetPath, destinationInGenre);
-        targetPath = destinationInGenre;
-      } catch (moveErr) {
-        console.warn('Could not move file to genre folder:', moveErr.message);
-      }
-    }
-  }
-
-  const activeArtwork = snap.artworkUrl;
-  if (activeArtwork && activeArtwork.startsWith('http') && targetDir) {
-    try {
-      const folderCover = path.join(targetDir, 'folder.jpg');
-      if (!fs.existsSync(folderCover)) {
-        const { fetchBuffer } = require('./id3Tagger');
-        fetchBuffer(activeArtwork).then(res => {
-          if (res && res.buffer) fs.writeFileSync(folderCover, res.buffer);
-        }).catch(() => {});
-      }
-    } catch (coverErr) {}
-  }
+  const isVideoDownload = snap.formatType === 'VIDEO' || (targetPath && /\.(mp4|mkv|webm|avi|mov)$/i.test(targetPath));
+  const isImageDownload = snap.formatType === 'IMAGE' || (targetPath && /\.(jpg|jpeg|png|webp|gif)$/i.test(targetPath));
 
   let finalSize = snap.downloadedBytes;
   try {
@@ -738,19 +720,71 @@ downloadManager.on('completed', async (snap) => {
     }
   } catch (e) {}
 
-  historyManager.recordDownload(snap.title, snap.artist, targetPath, 'COMPLETED');
+  // Only embed audio ID3 tags and register in music library if this is an audio track!
+  if (!isVideoDownload && !isImageDownload) {
+    if (targetPath && (targetPath.endsWith('.mp3') || targetPath.endsWith('.m4a'))) {
+      try {
+        await embedId3Metadata(targetPath, {
+          title: snap.title,
+          artist: snap.artist,
+          album: snap.album,
+          year: snap.year,
+          genre: snap.genre,
+          artworkUrl: snap.artworkUrl
+        });
+      } catch (tagErr) {
+        console.warn('Failed to embed metadata tags:', tagErr.message);
+      }
+    }
 
-  libraryManager.recordDownloadTransaction({
-    ...snap,
-    genre: snap.genre,
-    filePath: targetPath,
-    fileSize: finalSize,
-    status: 'COMPLETED'
-  });
+    if (targetPath && fs.existsSync(targetPath)) {
+      const parentDir = path.resolve(path.dirname(targetPath));
+      const rootDownloadDir = path.resolve(preferences.downloadFolder);
+      const resolvedGenre = snap.genre || 'Pop';
+      const cleanGenre = resolvedGenre.replace(/[/\\?%*:|"<>]/g, '_');
+      const expectedGenreDir = path.join(preferences.downloadFolder, cleanGenre);
+      if (!fs.existsSync(expectedGenreDir)) {
+        try { fs.mkdirSync(expectedGenreDir, { recursive: true }); } catch (e) {}
+      }
 
-  if (preferences.downloadFolder) {
-    libraryManager.scanDirectories([preferences.downloadFolder]);
+      if (parentDir === rootDownloadDir) {
+        const destinationInGenre = path.join(expectedGenreDir, path.basename(targetPath));
+        try {
+          fs.renameSync(targetPath, destinationInGenre);
+          targetPath = destinationInGenre;
+        } catch (moveErr) {
+          console.warn('Could not move file to genre folder:', moveErr.message);
+        }
+      }
+    }
+
+    const activeArtwork = snap.artworkUrl;
+    if (activeArtwork && activeArtwork.startsWith('http') && targetDir) {
+      try {
+        const folderCover = path.join(targetDir, 'folder.jpg');
+        if (!fs.existsSync(folderCover)) {
+          const { fetchBuffer } = require('./id3Tagger');
+          fetchBuffer(activeArtwork).then(res => {
+            if (res && res.buffer) fs.writeFileSync(folderCover, res.buffer);
+          }).catch(() => {});
+        }
+      } catch (coverErr) {}
+    }
+
+    libraryManager.recordDownloadTransaction({
+      ...snap,
+      genre: snap.genre,
+      filePath: targetPath,
+      fileSize: finalSize,
+      status: 'COMPLETED'
+    });
+
+    if (preferences.downloadFolder) {
+      libraryManager.scanDirectories([preferences.downloadFolder]);
+    }
   }
+
+  historyManager.recordDownload(snap.title, snap.artist, targetPath, 'COMPLETED');
 
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('download-progress', {
@@ -768,6 +802,12 @@ downloadManager.on('completed', async (snap) => {
 });
 
 downloadManager.on('failed', (snap) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('download-failed', snap);
+  }
+});
+
+downloadManager.on('error', (snap) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('download-failed', snap);
   }

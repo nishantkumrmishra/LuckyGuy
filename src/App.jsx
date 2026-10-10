@@ -558,26 +558,35 @@ export default function App() {
 
       const finalBytes = payload.totalBytes || payload.fileSize || 8.5 * 1024 * 1024;
       const formattedSize = (finalBytes / (1024 * 1024)).toFixed(1) + ' MB';
+      const isVideo = payload.formatType === 'VIDEO' ||
+        (payload.format && payload.format.includes('MP4')) ||
+        (payload.filePath && /\.(mp4|mkv|webm|avi|mov)$/i.test(payload.filePath));
 
       const completed = {
         id: payload.id || 'completed-' + Date.now(),
-        title: payload.title || 'Downloaded Audio',
-        artist: payload.artist || 'Unknown Artist',
+        title: payload.title || (isVideo ? 'Downloaded Video' : 'Downloaded Audio'),
+        artist: payload.artist || (isVideo ? 'Video Creator' : 'Unknown Artist'),
         album: payload.album || 'Downloaded Master',
         duration: payload.duration,
         artworkUrl: payload.artworkUrl,
         streamUrl: payload.streamUrl,
         filePath: payload.filePath,
-        format: payload.format || 'MP3 320k',
+        format: payload.format || (isVideo ? 'MP4 1080p' : 'MP3 320k'),
+        formatType: isVideo ? 'VIDEO' : (payload.formatType || 'AUDIO'),
+        mediaType: isVideo ? 'video' : (payload.mediaType || 'audio'),
         size: formattedSize,
         fileSize: finalBytes,
         downloadedAt: new Date().toLocaleDateString(),
       };
       setCompletedDownloads((prev) => [completed, ...prev]);
-      setSongs((prev) => {
-        if (prev.some((s) => s.filePath === completed.filePath || s.id === completed.id)) return prev;
-        return [completed, ...prev];
-      });
+
+      // Only add to music songs list if this is NOT a video!
+      if (!isVideo) {
+        setSongs((prev) => {
+          if (prev.some((s) => s.filePath === completed.filePath || s.id === completed.id)) return prev;
+          return [completed, ...prev];
+        });
+      }
     });
 
     if (window.electronAPI.onUpdateAvailable) {
@@ -1055,6 +1064,26 @@ export default function App() {
   // Playback logic
   const handlePlayTrack = (track, newQueue = null) => {
     if (!track) return;
+
+    const isVideo = track.formatType === 'VIDEO' || track.mediaType === 'video' ||
+      (track.format && track.format.toUpperCase().includes('MP4')) ||
+      (track.filePath && /\.(mp4|mkv|webm|avi|mov)$/i.test(track.filePath)) ||
+      (track.destinationPath && /\.(mp4|mkv|webm|avi|mov)$/i.test(track.destinationPath));
+
+    if (isVideo) {
+      // Pause music player so video audio does not conflict
+      setIsPlaying(false);
+
+      const targetPath = track.filePath || track.destinationPath;
+      if (targetPath && window.electronAPI?.openFile) {
+        window.electronAPI.openFile(targetPath);
+      } else if (targetPath && window.electronAPI?.openInFolder) {
+        window.electronAPI.openInFolder(targetPath);
+      }
+      return;
+    }
+
+    // Audio song -> standard music player playback
     setCurrentTrack(track);
     setIsPlaying(true);
     if (newQueue) {

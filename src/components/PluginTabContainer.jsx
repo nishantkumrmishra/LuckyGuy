@@ -788,8 +788,9 @@ export default function PluginTabContainer({
   const handleDownloadSingle = (item, qualityOverride) => {
     if (!onStartDownload) return;
     const isImg = item.mediaType === 'image' || (!item.streamUrl && item.imageUrl);
-    const downloadTarget = isImg ? (item.imageUrl || item.thumbnail) : (item.url || item.streamUrl);
     const chosenQuality = qualityOverride || selectedQuality || item.quality || (isImg ? 'Original' : '1080p');
+    const directStream = (item.streams && item.streams[chosenQuality]) || item.streamUrl || item.url;
+    const downloadTarget = isImg ? (item.imageUrl || item.thumbnail) : directStream;
     
     onStartDownload(downloadTarget, {
       format: isImg ? 'JPG ' + chosenQuality : 'MP4 ' + chosenQuality,
@@ -812,7 +813,8 @@ export default function PluginTabContainer({
     toDownload.forEach(m => {
       const isImg = m.mediaType === 'image' || (!m.streamUrl && m.imageUrl);
       const chosenQuality = selectedQuality || (isImg ? 'Original' : '1080p');
-      onStartDownload(isImg ? (m.imageUrl || m.thumbnail) : (m.url || m.streamUrl), {
+      const directStream = (m.streams && m.streams[chosenQuality]) || m.streamUrl || m.url;
+      onStartDownload(isImg ? (m.imageUrl || m.thumbnail) : directStream, {
         format: isImg ? 'JPG ' + chosenQuality : 'MP4 ' + chosenQuality,
         formatType: isImg ? 'IMAGE' : 'VIDEO',
         mediaType: isImg ? 'image' : 'video',

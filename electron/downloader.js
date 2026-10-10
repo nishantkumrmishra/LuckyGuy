@@ -23,11 +23,11 @@ class TaskDownloader extends EventEmitter {
   getHeaders(custom = {}) {
     const isPornhub = (this.task.url || '').includes('phncdn') || (this.task.url || '').includes('pornhub');
     const baseHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
     };
     if (isPornhub) {
       baseHeaders['Referer'] = 'https://www.pornhub.org/';
-      baseHeaders['Cookie'] = 'accessAgeDisclaimerPH=1; platform=pc; bs=1;';
+      baseHeaders['Cookie'] = 'accessAgeDisclaimerPH=1; platform=pc; bs=1; hasVisited=1; age_verified=1;';
     }
     return { ...baseHeaders, ...(this.task.headers || {}), ...custom };
   }
@@ -46,8 +46,11 @@ class TaskDownloader extends EventEmitter {
       // 1. Probe total size and range support
       const probe = await this.probeUrl(this.task.url);
       this.totalBytes = probe.contentLength || 0;
+      const isPornhub = (this.task.url || '').includes('phncdn') || (this.task.url || '').includes('pornhub');
+      const isVideo = this.task.formatType === 'VIDEO' || isPornhub;
       const supportsRange = probe.acceptRanges && this.totalBytes > 1024 * 1024;
-      const effectiveChunks = supportsRange ? Math.min(Math.max(this.task.chunkCount || 8, 1), 16) : 1;
+      // For video streams from CDNs, always use single continuous stream to avoid rate limit ECONNRESET
+      const effectiveChunks = (isVideo || !supportsRange) ? 1 : Math.min(Math.max(this.task.chunkCount || 8, 1), 16);
 
       if (!supportsRange || effectiveChunks <= 1) {
         // Single stream download
@@ -87,98 +90,111 @@ class TaskDownloader extends EventEmitter {
 
   probeUrl(targetUrl) {
     return new Promise((resolve) => {
-      const urlObj = new URL(targetUrl);
-      const client = urlObj.protocol === 'https:' ? https : http;
-      const isPornhub = targetUrl.includes('phncdn') || targetUrl.includes('pornhub');
-      const method = isPornhub ? 'GET' : 'HEAD';
-      const reqHeaders = this.getHeaders(isPornhub ? { 'Range': 'bytes=0-0' } : {});
+      try {
+        const urlObj = new URL(targetUrl);
+        const client = urlObj.protocol === 'https:' ? https : http;
+        const isPornhub = targetUrl.includes('phncdn') || targetUrl.includes('pornhub');
+        const method = isPornhub ? 'GET' : 'HEAD';
+        const reqHeaders = this.getHeaders(isPornhub ? { 'Range': 'bytes=0-0' } : {});
 
-      const req = client.request(urlObj, { method, headers: reqHeaders }, (res) => {
-        // Handle redirect
-        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          return resolve(this.probeUrl(res.headers.location));
-        }
+        const req = client.request(urlObj, { method, headers: reqHeaders }, (res) => {
+          // Handle redirect
+          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            return resolve(this.probeUrl(res.headers.location));
+          }
 
-        let len = parseInt(res.headers['content-length'] || '0', 10);
-        if (isPornhub && res.headers['content-range']) {
-          const match = res.headers['content-range'].match(/\/(\d+)/);
-          if (match) len = parseInt(match[1], 10);
-        }
-        const ranges = (res.headers['accept-ranges'] || '').toLowerCase() === 'bytes' || !!res.headers['content-range'];
-        resolve({ contentLength: len, acceptRanges: ranges });
-      });
+          let len = parseInt(res.headers['content-length'] || '0', 10);
+          if (isPornhub && res.headers['content-range']) {
+            const match = res.headers['content-range'].match(/\/(\d+)/);
+            if (match) len = parseInt(match[1], 10);
+          }
+          const ranges = (res.headers['accept-ranges'] || '').toLowerCase() === 'bytes' || !!res.headers['content-range'];
+          resolve({ contentLength: len, acceptRanges: ranges });
+        });
 
-      req.on('error', () => {
+        req.on('error', () => {
+          resolve({ contentLength: 0, acceptRanges: false });
+        });
+
+        req.end();
+      } catch (e) {
         resolve({ contentLength: 0, acceptRanges: false });
-      });
-
-      req.end();
+      }
     });
   }
 
   downloadSingle(targetUrl, destinationPath) {
     return new Promise((resolve, reject) => {
-      const urlObj = new URL(targetUrl);
-      const client = urlObj.protocol === 'https:' ? https : http;
+      try {
+        const urlObj = new URL(targetUrl);
+        const client = urlObj.protocol === 'https:' ? https : http;
 
-      let lastCalcTime = Date.now();
-      let lastBytes = 0;
+        let lastCalcTime = Date.now();
+        let lastBytes = 0;
 
-      const fileStream = fs.createWriteStream(destinationPath);
-      const req = client.get(urlObj, { headers: this.getHeaders() }, (res) => {
-        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          fileStream.close();
-          return this.downloadSingle(res.headers.location, destinationPath).then(resolve).catch(reject);
-        }
-
-        if (this.totalBytes === 0 && res.headers['content-length']) {
-          this.totalBytes = parseInt(res.headers['content-length'], 10);
-        }
-
-        res.on('data', (chunk) => {
-          if (this.isCanceled || this.isPaused) {
-            req.destroy();
+        const fileStream = fs.createWriteStream(destinationPath);
+        const req = client.get(urlObj, { headers: this.getHeaders() }, (res) => {
+          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
             fileStream.close();
-            return;
+            return this.downloadSingle(res.headers.location, destinationPath).then(resolve).catch(reject);
           }
 
-          this.downloadedBytes += chunk.length;
-          fileStream.write(chunk);
+          if (res.statusCode >= 400) {
+            fileStream.close();
+            return reject(new Error(`Server returned HTTP ${res.statusCode} ${res.statusMessage || ''}`));
+          }
 
-          const now = Date.now();
-          const elapsed = now - lastCalcTime;
-          if (elapsed >= 400) {
-            const bytesDelta = this.downloadedBytes - lastBytes;
-            this.speedBytesPerSec = Math.round((bytesDelta * 1000) / elapsed);
-            lastCalcTime = now;
-            lastBytes = this.downloadedBytes;
+          if (this.totalBytes === 0 && res.headers['content-length']) {
+            this.totalBytes = parseInt(res.headers['content-length'], 10);
+          }
 
-            if (this.totalBytes > 0) {
-              const remaining = Math.max(0, this.totalBytes - this.downloadedBytes);
-              this.etaSeconds = this.speedBytesPerSec > 0 ? Math.round(remaining / this.speedBytesPerSec) : 0;
+          res.on('data', (chunk) => {
+            if (this.isCanceled || this.isPaused) {
+              req.destroy();
+              fileStream.close();
+              return;
             }
 
-            this.emit('update', this.snapshot());
-          }
+            this.downloadedBytes += chunk.length;
+            fileStream.write(chunk);
+
+            const now = Date.now();
+            const elapsed = now - lastCalcTime;
+            if (elapsed >= 350) {
+              const bytesDelta = this.downloadedBytes - lastBytes;
+              this.speedBytesPerSec = Math.round((bytesDelta * 1000) / elapsed);
+              lastCalcTime = now;
+              lastBytes = this.downloadedBytes;
+
+              if (this.totalBytes > 0) {
+                const remaining = Math.max(0, this.totalBytes - this.downloadedBytes);
+                this.etaSeconds = this.speedBytesPerSec > 0 ? Math.round(remaining / this.speedBytesPerSec) : 0;
+              }
+
+              this.emit('update', this.snapshot());
+            }
+          });
+
+          res.on('end', () => {
+            fileStream.end();
+            resolve();
+          });
+
+          res.on('error', (e) => {
+            fileStream.close();
+            reject(e);
+          });
         });
 
-        res.on('end', () => {
-          fileStream.end();
-          resolve();
-        });
-
-        res.on('error', (e) => {
+        req.on('error', (e) => {
           fileStream.close();
           reject(e);
         });
-      });
 
-      req.on('error', (e) => {
-        fileStream.close();
-        reject(e);
-      });
-
-      this.chunkRequests.push(req);
+        this.chunkRequests.push(req);
+      } catch (err) {
+        reject(err);
+      }
     });
   }
 
@@ -199,50 +215,59 @@ class TaskDownloader extends EventEmitter {
       this.partFiles.push(partPath);
 
       chunkPromises.push(new Promise((resolve, reject) => {
-        const urlObj = new URL(targetUrl);
-        const client = urlObj.protocol === 'https:' ? https : http;
+        try {
+          const urlObj = new URL(targetUrl);
+          const client = urlObj.protocol === 'https:' ? https : http;
 
-        const partStream = fs.createWriteStream(partPath);
-        const req = client.get(urlObj, {
-          headers: this.getHeaders({
-            'Range': `bytes=${start}-${end}`
-          })
-        }, (res) => {
-          res.on('data', (chunk) => {
-            if (this.isCanceled || this.isPaused) {
-              req.destroy();
+          const partStream = fs.createWriteStream(partPath);
+          const req = client.get(urlObj, {
+            headers: this.getHeaders({
+              'Range': `bytes=${start}-${end}`
+            })
+          }, (res) => {
+            if (res.statusCode >= 400) {
               partStream.close();
-              return;
+              return reject(new Error(`Server returned HTTP ${res.statusCode}`));
             }
 
-            this.downloadedBytes += chunk.length;
-            partStream.write(chunk);
+            res.on('data', (chunk) => {
+              if (this.isCanceled || this.isPaused) {
+                req.destroy();
+                partStream.close();
+                return;
+              }
 
-            const now = Date.now();
-            const elapsed = now - lastCalcTime;
-            if (elapsed >= 350) {
-              const bytesDelta = this.downloadedBytes - lastBytes;
-              this.speedBytesPerSec = Math.round((bytesDelta * 1000) / elapsed);
-              lastCalcTime = now;
-              lastBytes = this.downloadedBytes;
+              this.downloadedBytes += chunk.length;
+              partStream.write(chunk);
 
-              const remaining = Math.max(0, this.totalBytes - this.downloadedBytes);
-              this.etaSeconds = this.speedBytesPerSec > 0 ? Math.round(remaining / this.speedBytesPerSec) : 0;
+              const now = Date.now();
+              const elapsed = now - lastCalcTime;
+              if (elapsed >= 350) {
+                const bytesDelta = this.downloadedBytes - lastBytes;
+                this.speedBytesPerSec = Math.round((bytesDelta * 1000) / elapsed);
+                lastCalcTime = now;
+                lastBytes = this.downloadedBytes;
 
-              this.emit('update', this.snapshot());
-            }
+                const remaining = Math.max(0, this.totalBytes - this.downloadedBytes);
+                this.etaSeconds = this.speedBytesPerSec > 0 ? Math.round(remaining / this.speedBytesPerSec) : 0;
+
+                this.emit('update', this.snapshot());
+              }
+            });
+
+            res.on('end', () => {
+              partStream.end();
+              resolve();
+            });
+
+            res.on('error', reject);
           });
 
-          res.on('end', () => {
-            partStream.end();
-            resolve();
-          });
-
-          res.on('error', reject);
-        });
-
-        req.on('error', reject);
-        this.chunkRequests.push(req);
+          req.on('error', reject);
+          this.chunkRequests.push(req);
+        } catch (e) {
+          reject(e);
+        }
       }));
     }
 
@@ -313,6 +338,8 @@ class DownloadManager extends EventEmitter {
     super();
     this.tasks = new Map();
     this.activeDownloaders = new Map();
+    // Catch-all error listener to prevent ERR_UNHANDLED_ERROR crashes in Node
+    this.on('error', () => {});
   }
 
   addTask(taskConfig) {
@@ -332,7 +359,6 @@ class DownloadManager extends EventEmitter {
     });
 
     downloader.on('error', (err) => {
-      this.emit('error', { id: taskConfig.id, error: err.message });
       this.emit('failed', { id: taskConfig.id, error: err.message });
     });
 
