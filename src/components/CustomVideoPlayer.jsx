@@ -1,3 +1,4 @@
+import Hls from 'hls.js';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Play,
@@ -94,9 +95,7 @@ export default function CustomVideoPlayer({
   };
 
   const ytVideoId = getYouTubeVideoId(video?.url, video?.id);
-  const [useIframeFallback, setUseIframeFallback] = useState(() => {
-    return Boolean(ytVideoId && !isLocalFile);
-  });
+  const [useIframeFallback, setUseIframeFallback] = useState(false);
   
   const [resolvedStreams, setResolvedStreams] = useState(video?.streams || {});
   const [currentStreamSrc, setCurrentStreamSrc] = useState(
@@ -429,25 +428,23 @@ export default function CustomVideoPlayer({
     >
       {useIframeFallback && ytVideoId ? (
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-          <iframe
+          <webview
             src={`https://www.youtube.com/embed/${ytVideoId}?autoplay=1&enablejsapi=1`}
-            title={titleToShow}
+            httpreferrer="https://www.youtube.com/"
             style={{
               width: '100%',
               height: '100%',
               border: 'none',
               display: 'block',
             }}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allowFullScreen
+            allowpopups="false"
           />
         </div>
       ) : (
         /* Native Video Element */
         <video
           ref={videoRef}
-          src={currentStreamSrc || undefined}
+          
           poster={video?.thumbnail}
           playsInline
           preload="auto"
