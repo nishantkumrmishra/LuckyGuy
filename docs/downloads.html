@@ -10,7 +10,7 @@
 </head>
 <body>
 
-        <!-- ===== HEADER WITH DROPDOWN MENUS & SEARCH ===== -->
+    <!-- ===== HEADER WITH DROPDOWN MENUS & SEARCH ===== -->
     <header>
         <nav>
             <div class="nav-left">
@@ -43,7 +43,7 @@
                         </div>
                     </li>
                     <li class="nav-item">
-                        <a href="downloads.html" class="nav-link"><i class="ci-Arrow_Down_Circle"></i> Releases</a>
+                        <a href="downloads.html" class="nav-link active"><i class="ci-Arrow_Down_Circle"></i> Releases</a>
                     </li>
                 </ul>
 
@@ -65,13 +65,24 @@
     <!-- ===== HERO BANNER ===== -->
     <section class="page-hero">
         <div>
-            <h1>Downloads & Releases</h1>
-            <p>Official Windows 10 & 11 Binaries • Zero Bundled Adware • 100% Free & Open Source</p>
+            <h1>Downloads & Releases (v1.1.0)</h1>
+            <p>Official Windows 10 & 11 Binaries &bull; Zero Bundled Adware &bull; 100% Free & Open Source</p>
         </div>
     </section>
 
     <!-- ===== PAGE CONTAINER ===== -->
     <div class="page-container">
+
+        <!-- LATEST RELEASE BANNER -->
+        <div style="background:#f4f4f5; border:1px solid #e4e4e7; border-radius:8px; padding:16px 22px; margin-bottom:24px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span class="badge-tag" style="background:#dcfce7; color:#15803d; border-color:#bbf7d0; font-weight:700;">Latest Release</span>
+                <strong>LuckyGuy v1.1.0 (Windows x64)</strong>
+            </div>
+            <a href="https://github.com/nishantkumrmishra/LuckyGuy/releases/tag/v1.1.0" target="_blank" style="font-size:0.88em; font-weight:600; color:#4f46e5;">
+                View Release on GitHub <i class="ci-External_Link"></i>
+            </a>
+        </div>
 
         <!-- DOWNLOAD CARDS GRID -->
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:24px; margin-bottom:30px;">
@@ -81,7 +92,7 @@
                 <p style="color:#71717a; font-size:0.92em; margin-bottom:20px;">
                     Standard Windows installer. Installs desktop shortcuts, Start Menu integration, and automatic background updater.
                 </p>
-                <a href="https://github.com/nishantkumrmishra/LuckyGuy/releases/latest" class="cta-primary" style="display:inline-block; width:100%;">
+                <a href="https://github.com/nishantkumrmishra/LuckyGuy/releases/download/v1.1.0/LuckyGuy-Setup-1.1.0.exe" class="cta-primary" style="display:inline-block; width:100%;">
                     <i class="ci-Arrow_Down_Circle"></i> Download Setup (.exe)
                 </a>
             </div>
@@ -92,10 +103,22 @@
                 <p style="color:#71717a; font-size:0.92em; margin-bottom:20px;">
                     Single standalone executable. Run directly from any USB flash drive or folder without touching Windows Registry.
                 </p>
-                <a href="https://github.com/nishantkumrmishra/LuckyGuy/releases/latest" class="cta-secondary" style="display:inline-block; width:100%;">
+                <a href="https://github.com/nishantkumrmishra/LuckyGuy/releases/download/v1.1.0/LuckyGuy-Portable-1.1.0.exe" class="cta-secondary" style="display:inline-block; width:100%;">
                     <i class="ci-Arrow_Down_Circle"></i> Download Portable (.exe)
                 </a>
             </div>
+        </div>
+
+        <!-- WHAT'S NEW IN v1.1.0 -->
+        <div class="content-card">
+            <h3><i class="ci-Lightning"></i> What's New in Version 1.1.0</h3>
+            <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:8px; font-size:0.92em; color:#3f3f46;">
+                <li><i class="ci-Check_Big" style="color:#16a34a;"></i> <strong>YouTube Media Portal Extension:</strong> Powered by yt-dlp with multi-quality streams (1080p, 720p, 360p) and synchronized DASH audio streaming.</li>
+                <li><i class="ci-Check_Big" style="color:#16a34a;"></i> <strong>Standard MP4 Encoding (Fixed 0xC00D3E84):</strong> YouTube downloads now multiplex video and audio into clean, standard MP4 files via FFmpeg, natively playable in Windows Media Player.</li>
+                <li><i class="ci-Check_Big" style="color:#16a34a;"></i> <strong>Automatic Subfolder Organization:</strong> YouTube video downloads automatically save to <code>Videos\YouTube</code> and index directly into the Videos library.</li>
+                <li><i class="ci-Check_Big" style="color:#16a34a;"></i> <strong>Persistent Companion Thumbnails:</strong> Every downloaded video automatically saves a high-res companion <code>.jpg</code> thumbnail on disk, keeping offline cards visible even if user cache is cleared.</li>
+                <li><i class="ci-Check_Big" style="color:#16a34a;"></i> <strong>Plugin SDK v2.1:</strong> Added multi-resolution stream mappings, dual-track audio sync interface, and subfolder routing in the extension developer framework.</li>
+            </ul>
         </div>
 
         <!-- SYSTEM REQUIREMENTS -->
@@ -103,8 +126,8 @@
             <h3><i class="ci-Check_Big"></i> System Requirements</h3>
             <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:8px;">
                 <li><i class="ci-Check_Big"></i> <strong>Operating System:</strong> Windows 10 (1809+) or Windows 11 (64-bit architecture).</li>
-                <li><i class="ci-Check_Big"></i> <strong>RAM:</strong> 4 GB minimum (8 GB recommended for heavy batch audio crawling).</li>
-                <li><i class="ci-Check_Big"></i> <strong>Disk Space:</strong> 150 MB for the core application (audio storage depends on library size).</li>
+                <li><i class="ci-Check_Big"></i> <strong>RAM:</strong> 4 GB minimum (8 GB recommended for heavy batch media crawling).</li>
+                <li><i class="ci-Check_Big"></i> <strong>Disk Space:</strong> 150 MB for the core application (storage depends on downloaded media).</li>
                 <li><i class="ci-Check_Big"></i> <strong>Network:</strong> Broadband internet connection for initial stream resolution and CDN fetching.</li>
             </ul>
         </div>
