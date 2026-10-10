@@ -778,30 +778,26 @@ function downloadThumbnail(thumbnailUrl, destImagePath) {
   try {
     const urlObj = new URL(thumbnailUrl);
     const client = urlObj.protocol === 'https:' ? https : http;
-    const file = fs.createWriteStream(destImagePath);
+    const referer = (thumbnailUrl.includes('phncdn') || thumbnailUrl.includes('pornhub'))
+      ? 'https://www.pornhub.org/'
+      : (thumbnailUrl.includes('ytimg') || thumbnailUrl.includes('youtube') ? 'https://www.youtube.com/' : undefined);
+    
     const req = client.get(urlObj, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-        'Referer': thumbnailUrl.includes('phncdn') || thumbnailUrl.includes('pornhub') ? 'https://www.pornhub.org/' : undefined
+        ...(referer ? { 'Referer': referer } : {})
       }
     }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        file.close();
-        try { fs.unlinkSync(destImagePath); } catch (e) {}
         return downloadThumbnail(res.headers.location, destImagePath);
       }
       if (res.statusCode === 200) {
+        const file = fs.createWriteStream(destImagePath);
         res.pipe(file);
         file.on('finish', () => file.close());
-      } else {
-        file.close();
-        try { fs.unlinkSync(destImagePath); } catch (e) {}
       }
     });
-    req.on('error', () => {
-      file.close();
-      try { fs.unlinkSync(destImagePath); } catch (e) {}
-    });
+    req.on('error', () => {});
   } catch (e) {}
 }
 
@@ -970,11 +966,27 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
   const adultPornHubDir = path.join(userVideosDir, "Adult", "PornHub");
   const userPicturesDir = path.join(os.homedir(), "Pictures");
 
+  const youtubeVideosDir = path.join(userVideosDir, "YouTube");
+  if (!fs.existsSync(youtubeVideosDir)) {
+    try { fs.mkdirSync(youtubeVideosDir, { recursive: true }); } catch (e) {}
+  }
+
+  const isYouTubeVideo = Boolean(
+    (taskConfig.url && (taskConfig.url.includes('youtube.com') || taskConfig.url.includes('youtu.be'))) ||
+    (taskConfig.source && taskConfig.source.toLowerCase().includes('youtube')) ||
+    (taskConfig.platform && taskConfig.platform.toLowerCase().includes('youtube')) ||
+    (taskConfig.id && String(taskConfig.id).startsWith('yt-')) ||
+    (taskConfig.author && /youtube/i.test(taskConfig.author))
+  );
+
   if (taskConfig.customFolder && typeof taskConfig.customFolder === "string" && taskConfig.customFolder.trim()) {
     targetDir = taskConfig.customFolder.trim();
   } else if (isVideo && isAdultVideo) {
     ext = ".mp4";
     targetDir = adultPornHubDir;
+  } else if (isVideo && isYouTubeVideo) {
+    ext = ".mp4";
+    targetDir = youtubeVideosDir;
   } else if (isVideo) {
     ext = ".mp4";
     targetDir = userVideosDir;
@@ -999,6 +1011,16 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     targetPath = path.join(targetDir, `${cleanArtist}${cleanTitle}${ext}`);
   }
 
+  // Immediately start thumbnail image download alongside video file
+  if (isVideo && targetPath) {
+    const videoBase = targetPath.replace(/\.[^/.]+$/, '');
+    const thumbPath = `${videoBase}.jpg`;
+    const incomingThumb = artworkUrl || taskConfig.artworkUrl || taskConfig.thumbnail;
+    if (incomingThumb && !fs.existsSync(thumbPath)) {
+      downloadThumbnail(incomingThumb, thumbPath);
+    }
+  }
+
   downloadManager.addTask({
     ...taskConfig,
     url: streamUrl,
@@ -1007,7 +1029,7 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     album,
     year,
     genre,
-    artworkUrl,
+    artworkUrl: artworkUrl || taskConfig.thumbnail,
     formatType: isVideo ? 'VIDEO' : (isImage ? 'IMAGE' : 'AUDIO'),
     destinationPath: targetPath,
     chunkCount: isVideo ? 1 : (preferences.chunkCount || 8)

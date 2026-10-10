@@ -831,9 +831,14 @@ class LibraryManager {
     if (!fs.existsSync(adultPornHubDir)) {
       try { fs.mkdirSync(adultPornHubDir, { recursive: true }); } catch (e) {}
     }
+    const youtubeDir = path.join(homeDir, 'Videos', 'YouTube');
+    if (!fs.existsSync(youtubeDir)) {
+      try { fs.mkdirSync(youtubeDir, { recursive: true }); } catch (e) {}
+    }
     const videoDirs = [
       adultPornHubDir,
       adultDir,
+      youtubeDir,
       path.join(homeDir, 'Videos'),
       path.join(homeDir, 'Downloads'),
       ...(Array.isArray(customDirs) ? customDirs : [customDirs])

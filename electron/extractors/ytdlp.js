@@ -56,6 +56,12 @@ class YtDlpWrapper {
           
           // Filter and extract clean formats
           const streams = {};
+          let audioStreamUrl = null;
+          if (Array.isArray(info.formats)) {
+            const audioFormats = info.formats.filter(f => f.acodec && f.acodec !== 'none' && f.url);
+            const m4aAudio = audioFormats.find(f => f.ext === 'm4a' || (f.acodec && f.acodec.includes('mp4a')));
+            audioStreamUrl = m4aAudio ? m4aAudio.url : (audioFormats[audioFormats.length - 1]?.url || null);
+          }
           if (Array.isArray(info.formats)) {
             // Find best direct mp4 video streams
             for (const f of info.formats) {
@@ -80,6 +86,7 @@ class YtDlpWrapper {
             url: info.webpage_url || targetUrl,
             streamUrl: info.url || Object.values(streams)[0] || null,
             streams,
+            audioStreamUrl,
             formatType: 'VIDEO',
             mediaType: 'video',
           });

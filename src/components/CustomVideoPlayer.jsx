@@ -28,6 +28,7 @@ export default function CustomVideoPlayer({
   const progressTrackRef = useRef(null);
   const hideControlsTimeoutRef = useRef(null);
   const lastExtractedUrlRef = useRef(null);
+  const audioRef = useRef(null);
   const hlsRef = useRef(null);
   const getFileUrl = (fp) => {
     if (!fp) return '';
@@ -97,6 +98,7 @@ export default function CustomVideoPlayer({
 
   const ytVideoId = getYouTubeVideoId(video?.url, video?.id);
     
+  const [audioStreamSrc, setAudioStreamSrc] = useState(video?.audioStreamUrl || video?.audioUrl || null);
   const [resolvedStreams, setResolvedStreams] = useState(video?.streams || {});
   const [currentStreamSrc, setCurrentStreamSrc] = useState(
     localSrc || (video?.streams && video?.streams[selectedQuality]) || video?.streamUrl || ''
@@ -169,6 +171,7 @@ export default function CustomVideoPlayer({
         
         const res = await Promise.race([extractPromise, timeoutPromise]);
         if (res && !res.error) {
+          if (res.audioStreamUrl) { setAudioStreamSrc(res.audioStreamUrl); }
           if (res.title && !/^\d+:\d+(:\d+)?$/.test(res.title)) {
             setDisplayTitle(res.title);
           }
@@ -273,6 +276,7 @@ export default function CustomVideoPlayer({
       v.load();
       v.play()
         .then(() => {
+          syncAudioPlay();
           setIsPlaying(true);
           setIsBuffering(false);
           setIsResolving(false);
@@ -283,6 +287,39 @@ export default function CustomVideoPlayer({
         });
     }
   }, [currentStreamSrc]);
+
+
+  // Sync Audio Element with Video Track
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (audioStreamSrc) {
+      if (a.src !== audioStreamSrc) {
+        a.src = audioStreamSrc;
+      }
+      a.volume = volume;
+      a.muted = isMuted;
+      a.load();
+    } else {
+      a.removeAttribute('src');
+      a.load();
+    }
+  }, [audioStreamSrc, volume, isMuted]);
+
+  const syncAudioPlay = () => {
+    if (audioRef.current && audioStreamSrc) {
+      if (videoRef.current) {
+        audioRef.current.currentTime = videoRef.current.currentTime;
+      }
+      audioRef.current.play().catch(() => {});
+    }
+  };
+
+  const syncAudioPause = () => {
+    if (audioRef.current && audioStreamSrc) {
+      audioRef.current.pause();
+    }
+  };
 
   // Auto-hide controls when mouse is inactive
   const resetHideTimer = useCallback(() => {
@@ -325,6 +362,7 @@ export default function CustomVideoPlayer({
         });
     } else {
       v.pause();
+      syncAudioPause();
       setIsPlaying(false);
       setPlaySplash('pause');
       setTimeout(() => setPlaySplash(null), 600);
@@ -340,6 +378,11 @@ export default function CustomVideoPlayer({
         setDuration(videoRef.current.duration);
       }
       if (isBuffering) setIsBuffering(false);
+      if (audioRef.current && audioStreamSrc && !audioRef.current.paused) {
+        if (Math.abs(audioRef.current.currentTime - videoRef.current.currentTime) > 0.35) {
+          audioRef.current.currentTime = videoRef.current.currentTime;
+        }
+      }
     }
   };
 
@@ -350,6 +393,9 @@ export default function CustomVideoPlayer({
     const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const newTime = pos * duration;
     videoRef.current.currentTime = newTime;
+    if (audioRef.current && audioStreamSrc) {
+      audioRef.current.currentTime = newTime;
+    }
     setCurrentTime(newTime);
   };
 
@@ -370,6 +416,10 @@ export default function CustomVideoPlayer({
       videoRef.current.volume = newVol;
       videoRef.current.muted = newVol === 0;
     }
+    if (audioRef.current) {
+      audioRef.current.volume = newVol;
+      audioRef.current.muted = newVol === 0;
+    }
   };
 
   const toggleMute = () => {
@@ -379,10 +429,17 @@ export default function CustomVideoPlayer({
         videoRef.current.muted = false;
         videoRef.current.volume = volume || 0.8;
       }
+      if (audioRef.current) {
+        audioRef.current.muted = false;
+        audioRef.current.volume = volume || 0.8;
+      }
     } else {
       setIsMuted(true);
       if (videoRef.current) {
         videoRef.current.muted = true;
+      }
+      if (audioRef.current) {
+        audioRef.current.muted = true;
       }
     }
   };
@@ -495,6 +552,7 @@ export default function CustomVideoPlayer({
           onTimeUpdate={handleTimeUpdate}
           onPlay={() => {
             setIsPlaying(true);
+            syncAudioPlay();
             window.dispatchEvent(new CustomEvent('luckyguy-media-playback', {
               detail: { source: 'video', playerId }
             }));
@@ -511,8 +569,9 @@ export default function CustomVideoPlayer({
             setIsResolving(false);
             setIsBuffering(false);
           }}
-          onWaiting={() => setIsBuffering(true)}
+          onWaiting={() => { if (audioRef.current && audioStreamSrc) audioRef.current.pause(); setIsBuffering(true); }}
           onPlaying={() => {
+            syncAudioPlay();
             setIsResolving(false);
             setIsBuffering(false);
             setIsPlaying(true);
@@ -531,6 +590,14 @@ export default function CustomVideoPlayer({
             backgroundColor: '#000000',
             cursor: 'pointer',
           }}
+        />
+
+        {/* Synchronized Audio Track for YouTube Streams */}
+        <audio
+          ref={audioRef}
+          preload="auto"
+          playsInline
+          style={{ display: 'none' }}
         />
 
       {/* Large Inviting Center Play Button (Shown when paused and ready) */}

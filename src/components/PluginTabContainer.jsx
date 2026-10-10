@@ -914,6 +914,7 @@ export default function PluginTabContainer({
                   title: (res.title && !/^\d+:\d+(:\d+)?$/.test(res.title)) ? res.title : prev.title,
                   author: res.artist || prev.author,
                   streamUrl: res.streamUrl || prev.streamUrl,
+                  audioStreamUrl: res.audioStreamUrl || prev.audioStreamUrl,
                   streams: res.streams || prev.streams,
                   thumbnail: res.artworkUrl || prev.thumbnail,
                 };
