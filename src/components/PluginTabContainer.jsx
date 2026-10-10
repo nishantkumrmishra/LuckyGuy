@@ -1566,7 +1566,7 @@ export default function PluginTabContainer({
                       type="button"
                       onClick={() => handleDownloadSingle(activePlayerVideo, selectedQuality)}
                       style={{
-                        padding: '7px 14px',
+                        padding: '7px 11px', justifyContent: 'center',
                         borderRadius: '8px',
                         border: 'none',
                         backgroundColor: 'var(--primary, #7c5cbf)',
@@ -1583,8 +1583,7 @@ export default function PluginTabContainer({
                       onMouseEnter={(e) => (e.currentTarget.style.transform = 'translateY(-1px)')}
                       onMouseLeave={(e) => (e.currentTarget.style.transform = 'none')}
                     >
-                      <DownloadCloud size={14} />
-                      <span>Download {selectedQuality || '1080p'}</span>
+                      <DownloadCloud size={15} />
                     </button>
 
                     <button

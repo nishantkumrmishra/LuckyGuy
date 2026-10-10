@@ -296,15 +296,28 @@ export default function CustomVideoPlayer({
     if (audioStreamSrc) {
       if (a.src !== audioStreamSrc) {
         a.src = audioStreamSrc;
+        a.volume = isMuted ? 0 : (volume || 0.85);
+        a.muted = isMuted;
+        a.load();
+        if (videoRef.current && !videoRef.current.paused) {
+          syncAudioPlay();
+        }
       }
-      a.volume = volume;
-      a.muted = isMuted;
-      a.load();
     } else {
-      a.removeAttribute('src');
-      a.load();
+      if (a.src) {
+        a.removeAttribute('src');
+        a.load();
+      }
     }
-  }, [audioStreamSrc, volume, isMuted]);
+  }, [audioStreamSrc]);
+
+  useEffect(() => {
+    const a = audioRef.current;
+    if (a) {
+      a.volume = isMuted ? 0 : (volume || 0.85);
+      a.muted = isMuted;
+    }
+  }, [volume, isMuted]);
 
   const syncAudioPlay = () => {
     const a = audioRef.current;
@@ -1076,7 +1089,7 @@ export default function CustomVideoPlayer({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '5px',
-                padding: '4px 10px',
+                padding: '4px 7px', justifyContent: 'center',
                 borderRadius: '5px',
                 backgroundColor: downloadQueued ? '#10b981' : 'var(--primary, #7c5cbf)',
                 border: 'none',
@@ -1089,17 +1102,7 @@ export default function CustomVideoPlayer({
               }}
               title={`Download in ${selectedQuality}`}
             >
-              {downloadQueued ? (
-                <>
-                  <Check size={12} />
-                  <span>Queued!</span>
-                </>
-              ) : (
-                <>
-                  <Download size={12} />
-                  <span>Download {selectedQuality}</span>
-                </>
-              )}
+              {downloadQueued ? <Check size={14} /> : <Download size={14} />}
             </button>
 
             {/* Fullscreen Toggle Button */}

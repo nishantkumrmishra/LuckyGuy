@@ -1575,10 +1575,11 @@ export default function App() {
   };
 
   const handleVolumeChange = (newVol) => {
-    setVolume(newVol);
-    if (isMuted && newVol > 0) setIsMuted(false);
+    const clampedVol = Math.max(0, Math.min(1, Number(newVol) || 0));
+    setVolume(clampedVol);
+    if (isMuted && clampedVol > 0) setIsMuted(false);
     if (audioRef.current) {
-      audioRef.current.volume = newVol;
+      audioRef.current.volume = clampedVol;
       audioRef.current.muted = false;
     }
   };
