@@ -36,6 +36,7 @@ export default function SettingsTab({
   onSavePreferences,
   theme = 'light',
   onToggleTheme,
+  setTheme,
   appearance = { accentColor: '#7c5cbf', fontFamily: 'Inter', borderRadius: '8px' },
   onUpdateAppearance,
   onOpenSetupWizard,
@@ -51,6 +52,47 @@ ishant\\Music');
   const [savedNotice, setSavedNotice] = useState(false);
   const [updateChecking, setUpdateChecking] = useState(false);
   const [updateResult, setUpdateResult] = useState(null);
+  const [downloadingUpdate, setDownloadingUpdate] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState(null);
+  const [updateError, setUpdateError] = useState('');
+
+  const handleSetTheme = (newMode) => {
+    if (setTheme) {
+      setTheme(newMode);
+    } else if (onToggleTheme) {
+      if (theme !== newMode) onToggleTheme();
+    }
+  };
+
+  useEffect(() => {
+    if (window.electronAPI?.onUpdateDownloadProgress) {
+      return window.electronAPI.onUpdateDownloadProgress((prog) => {
+        setUpdateProgress(prog.percent || 0);
+      });
+    }
+  }, []);
+
+  const handleInstallUpdate = async (info) => {
+    if (!info?.downloadUrl) {
+      if (info?.releaseUrl && window.electronAPI?.openExternal) {
+        window.electronAPI.openExternal(info.releaseUrl);
+      }
+      return;
+    }
+    setDownloadingUpdate(true);
+    setUpdateProgress(0);
+    setUpdateError('');
+    try {
+      const res = await window.electronAPI.downloadAndInstallUpdate(info.downloadUrl, info.assetName);
+      if (res?.error) {
+        setUpdateError(res.error);
+        setDownloadingUpdate(false);
+      }
+    } catch (e) {
+      setUpdateError(e.message);
+      setDownloadingUpdate(false);
+    }
+  };
 
   const handleCheckUpdates = async () => {
     setUpdateChecking(true);
@@ -120,8 +162,8 @@ ishant\\Music');
     setFontFamily(preset.fontFamily);
     setBorderRadius(preset.borderRadius);
     flashSaved();
-    if (preset.mode && preset.mode !== theme) {
-      onToggleTheme?.();
+    if (preset.mode) {
+      handleSetTheme(preset.mode);
     }
     if (onUpdateAppearance) onUpdateAppearance({
       accentColor: preset.accentColor,
@@ -145,7 +187,7 @@ ishant\\Music');
       if (parsed.accentColor) setAccentColor(nextAccent);
       if (parsed.fontFamily) setFontFamily(nextFont);
       if (parsed.borderRadius) setBorderRadius(nextRadius);
-      if (parsed.mode && parsed.mode !== theme) onToggleTheme?.();
+      if (parsed.mode) handleSetTheme(parsed.mode);
       if (onUpdateAppearance) {
         onUpdateAppearance({
           accentColor: nextAccent,
@@ -666,32 +708,124 @@ ishant\\Music');
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
                 LuckyGuy automatically verifies new releases against official GitHub releases.
               </p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <button
-                  type="button"
-                  onClick={handleCheckUpdates}
-                  disabled={updateChecking}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: '6px',
-                    border: '1px solid var(--border-medium)',
-                    backgroundColor: 'var(--bg-main)',
-                    color: 'var(--text-primary)',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    cursor: updateChecking ? 'wait' : 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                  }}
-                >
-                  <RefreshCw size={12} className={updateChecking ? 'spin' : ''} />
-                  <span>{updateChecking ? 'Checking...' : 'Check for Updates'}</span>
-                </button>
-                {updateResult && (
-                  <span style={{ fontSize: '11.5px', color: updateResult.available ? '#10b981' : 'var(--text-muted)' }}>
-                    {updateResult.available ? `New version v${updateResult.latestVersion} available!` : (updateResult.message || 'Up to date.')}
-                  </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={handleCheckUpdates}
+                    disabled={updateChecking || downloadingUpdate}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-medium)',
+                      backgroundColor: 'var(--bg-main)',
+                      color: 'var(--text-primary)',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      cursor: (updateChecking || downloadingUpdate) ? 'wait' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <RefreshCw size={12} className={updateChecking ? 'spin' : ''} />
+                    <span>{updateChecking ? 'Checking...' : 'Check for Updates'}</span>
+                  </button>
+                  {updateResult && !updateResult.available && (
+                    <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                      {updateResult.message || 'Up to date.'}
+                    </span>
+                  )}
+                </div>
+
+                {updateResult?.available && (
+                  <div
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                      border: '1px solid rgba(16, 185, 129, 0.25)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                      <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#10b981' }}>
+                        ✨ New Version v{updateResult.latestVersion} is Available!
+                      </span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        Current: v{updateResult.currentVersion}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleInstallUpdate(updateResult)}
+                        disabled={downloadingUpdate}
+                        style={{
+                          padding: '7px 14px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          backgroundColor: 'var(--primary, #7c5cbf)',
+                          color: '#ffffff',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: downloadingUpdate ? 'wait' : 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <DownloadCloud size={13} />
+                        <span>{downloadingUpdate ? `Downloading (${updateProgress ?? 0}%)...` : 'Download & Install Now'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (updateResult.releaseUrl && window.electronAPI?.openExternal) {
+                            window.electronAPI.openExternal(updateResult.releaseUrl);
+                          }
+                        }}
+                        style={{
+                          padding: '7px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--border-medium)',
+                          backgroundColor: 'transparent',
+                          color: 'var(--text-secondary)',
+                          fontSize: '11.5px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <ExternalLink size={12} />
+                        <span>View Release Notes</span>
+                      </button>
+                    </div>
+
+                    {downloadingUpdate && updateProgress !== null && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', color: 'var(--text-secondary)' }}>
+                          <span>Downloading setup installer...</span>
+                          <span>{updateProgress}%</span>
+                        </div>
+                        <div style={{ width: '100%', height: '5px', borderRadius: '3px', backgroundColor: 'var(--border-medium)', overflow: 'hidden' }}>
+                          <div style={{ width: `${updateProgress}%`, height: '100%', backgroundColor: 'var(--primary, #7c5cbf)', transition: 'width 0.2s ease' }} />
+                        </div>
+                      </div>
+                    )}
+
+                    {updateError && (
+                      <span style={{ fontSize: '11px', color: '#ef4444' }}>
+                        Update failed: {updateError}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -1023,7 +1157,7 @@ ishant\\Music');
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     type="button"
-                    onClick={() => { if (theme !== 'light') onToggleTheme?.(); }}
+                    onClick={() => handleSetTheme('light')}
                     style={{
                       flex: 1,
                       height: '34px',
@@ -1046,7 +1180,7 @@ ishant\\Music');
 
                   <button
                     type="button"
-                    onClick={() => { if (theme !== 'dark') onToggleTheme?.(); }}
+                    onClick={() => handleSetTheme('dark')}
                     style={{
                       flex: 1,
                       height: '34px',

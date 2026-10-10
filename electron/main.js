@@ -10,6 +10,8 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const https = require('https');
+const http = require('http');
 
 const youtubeExtractor = require('./extractors/youtube');
 const ytdlpExtractor = require('./extractors/ytdlp');
@@ -1435,6 +1437,8 @@ async function checkAppUpdates(silent = false) {
       const latestTag = release.tag_name || '';
       const latestVer = latestTag.replace(/^v/, '');
       if (latestVer && semverCompare(latestVer, currentVer) > 0) {
+        const setupAsset = (release.assets || []).find(a => a.name && a.name.includes('Setup') && a.name.endsWith('.exe')) ||
+          (release.assets || []).find(a => a.name && a.name.endsWith('.exe') && !a.name.includes('.blockmap'));
         const updateInfo = {
           available: true,
           currentVersion: currentVer,
@@ -1442,6 +1446,9 @@ async function checkAppUpdates(silent = false) {
           releaseName: release.name || latestTag,
           releaseNotes: release.body || 'A new update is available for LuckyGuy.',
           releaseUrl: release.html_url,
+          downloadUrl: setupAsset ? setupAsset.browser_download_url : release.html_url,
+          assetName: setupAsset ? setupAsset.name : null,
+          assetSize: setupAsset ? setupAsset.size : null,
           publishedAt: release.published_at,
           assets: release.assets || []
         };
@@ -1457,5 +1464,89 @@ async function checkAppUpdates(silent = false) {
     return { available: false, error: err.message };
   }
 }
+
+function downloadFileWithRedirects(targetUrl, destPath, onProgress, maxRedirects = 8) {
+  return new Promise((resolve, reject) => {
+    if (maxRedirects <= 0) return reject(new Error('Too many redirects while downloading update'));
+    try {
+      const urlObj = new URL(targetUrl);
+      const client = urlObj.protocol === 'https:' ? https : http;
+      const req = client.get(urlObj, {
+        headers: {
+          'User-Agent': 'LuckyGuy-App',
+          'Accept': '*/*'
+        }
+      }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          const redirectUrl = new URL(res.headers.location, targetUrl).toString();
+          return resolve(downloadFileWithRedirects(redirectUrl, destPath, onProgress, maxRedirects - 1));
+        }
+
+        if (res.statusCode !== 200) {
+          return reject(new Error(`Download failed with status ${res.statusCode}`));
+        }
+
+        const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
+        let downloadedBytes = 0;
+        const fileStream = fs.createWriteStream(destPath);
+
+        res.on('data', (chunk) => {
+          downloadedBytes += chunk.length;
+          if (onProgress && totalBytes > 0) {
+            const percent = Math.min(100, Math.round((downloadedBytes / totalBytes) * 100));
+            onProgress({ percent, downloadedBytes, totalBytes });
+          }
+        });
+
+        res.pipe(fileStream);
+
+        fileStream.on('finish', () => {
+          fileStream.close(() => resolve(destPath));
+        });
+
+        fileStream.on('error', (err) => {
+          try { fs.unlinkSync(destPath); } catch (e) {}
+          reject(err);
+        });
+      });
+
+      req.on('error', reject);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+ipcMain.handle('download-and-install-update', async (event, downloadUrl, assetName) => {
+  if (!downloadUrl) return { error: 'No download URL provided' };
+
+  try {
+    const filename = assetName || `LuckyGuy-Update-${Date.now()}.exe`;
+    const tempDir = app.getPath('temp');
+    const destPath = path.join(tempDir, filename);
+
+    if (fs.existsSync(destPath)) {
+      try { fs.unlinkSync(destPath); } catch (e) {}
+    }
+
+    await downloadFileWithRedirects(downloadUrl, destPath, (progress) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-download-progress', progress);
+      }
+    });
+
+    console.log('[AutoUpdater] Update downloaded to:', destPath, 'Launching installer...');
+    await shell.openPath(destPath);
+
+    setTimeout(() => {
+      app.quit();
+    }, 2000);
+
+    return { success: true, filePath: destPath };
+  } catch (err) {
+    console.warn('[AutoUpdater] Download & install failed:', err.message);
+    return { error: err.message };
+  }
+});
 
 ipcMain.handle('check-for-updates', async () => checkAppUpdates(false));

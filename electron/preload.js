@@ -1,7 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('electronAPI', {
-  minimize: () => ipcRenderer.send('window-minimize'),
+contextBridge.exposeInMainWorld('electronAPI', {\n  minimize: () => ipcRenderer.send('window-minimize'),
   minimizeWindow: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
   maximizeWindow: () => ipcRenderer.send('window-maximize'),
@@ -85,6 +84,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openDirectoryDialog: () => ipcRenderer.invoke('pick-folder'),
   getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadAndInstallUpdate: (downloadUrl, assetName) => ipcRenderer.invoke('download-and-install-update', downloadUrl, assetName),
+  onUpdateDownloadProgress: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('update-download-progress', handler);
+    return () => ipcRenderer.removeListener('update-download-progress', handler);
+  },
 
   // Portal Cache & yt-dlp Integrations
   getPortalCache: (portalId) => ipcRenderer.invoke('portal-cache-get', portalId),

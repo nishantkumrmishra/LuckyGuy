@@ -15,7 +15,7 @@ import PlaylistsTab from './components/PlaylistsTab';
 import SleepTimerModal from './components/SleepTimerModal';
 import SetupWizard from './components/SetupWizard';
 import QueueDrawer from './components/QueueDrawer';
-import { Play, Pause, SkipForward, Maximize2 } from 'lucide-react';
+import { Play, Pause, SkipForward, Maximize2, Sparkles, DownloadCloud, ExternalLink, X } from 'lucide-react';
 import { CustomIcon } from './components/DuoIcons';
 
 
@@ -567,6 +567,43 @@ export default function App() {
   const [showSleepTimerModal, setShowSleepTimerModal] = useState(false);
   const [sleepTimerRemaining, setSleepTimerRemaining] = useState(null);
   const [updateNotification, setUpdateNotification] = useState(null);
+  const [updateDownloadProgress, setUpdateDownloadProgress] = useState(null);
+  const [isUpdatingApp, setIsUpdatingApp] = useState(false);
+  const [updateAppError, setUpdateAppError] = useState('');
+
+  useEffect(() => {
+    if (window.electronAPI?.onUpdateDownloadProgress) {
+      return window.electronAPI.onUpdateDownloadProgress((prog) => {
+        setUpdateDownloadProgress(prog.percent || 0);
+      });
+    }
+  }, []);
+
+  const handleApplyUpdate = async () => {
+    if (!updateNotification) return;
+    if (!updateNotification.downloadUrl) {
+      if (updateNotification.releaseUrl && window.electronAPI?.openExternal) {
+        window.electronAPI.openExternal(updateNotification.releaseUrl);
+      }
+      return;
+    }
+    setIsUpdatingApp(true);
+    setUpdateDownloadProgress(0);
+    setUpdateAppError('');
+    try {
+      const res = await window.electronAPI.downloadAndInstallUpdate(
+        updateNotification.downloadUrl,
+        updateNotification.assetName
+      );
+      if (res?.error) {
+        setUpdateAppError(res.error);
+        setIsUpdatingApp(false);
+      }
+    } catch (err) {
+      setUpdateAppError(err.message);
+      setIsUpdatingApp(false);
+    }
+  };
 
   // Liked Tracks
   const [likedTracks, setLikedTracks] = useState(() => {
@@ -1769,6 +1806,7 @@ export default function App() {
                 preferences={preferences}
                 theme={theme}
                 setTheme={setTheme}
+                onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
                 appearance={appearance}
                 setAppearance={setAppearance}
                 onSavePreferences={(newPrefs) => {
@@ -1884,6 +1922,167 @@ export default function App() {
           onSetTimer={(seconds) => setSleepTimerRemaining(seconds)}
           currentRemaining={sleepTimerRemaining}
         />
+      )}
+
+      {/* Floating Update Available Banner / Notification */}
+      {updateNotification && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '92px',
+            right: '24px',
+            zIndex: 9999,
+            maxWidth: '380px',
+            width: 'calc(100vw - 48px)',
+            backgroundColor: 'var(--bg-card, #ffffff)',
+            border: '1px solid var(--border-medium, #e2e8f0)',
+            borderRadius: '12px',
+            padding: '16px 18px',
+            boxShadow: '0 16px 36px rgba(0, 0, 0, 0.28)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '8px',
+                  backgroundColor: 'rgba(124, 92, 191, 0.12)',
+                  color: 'var(--primary, #7c5cbf)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Sparkles size={18} />
+              </div>
+              <div>
+                <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  LuckyGuy Update Available
+                </div>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                  New version v{updateNotification.latestVersion} is ready to install!
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleDismissUpdate}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+              title="Dismiss"
+            >
+              <X size={15} />
+            </button>
+          </div>
+
+          {isUpdatingApp && updateDownloadProgress !== null ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                <span>Downloading update...</span>
+                <span>{updateDownloadProgress}%</span>
+              </div>
+              <div style={{ width: '100%', height: '6px', borderRadius: '3px', backgroundColor: 'var(--border-medium)', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    width: `${updateDownloadProgress}%`,
+                    height: '100%',
+                    backgroundColor: 'var(--primary, #7c5cbf)',
+                    transition: 'width 0.2s ease',
+                  }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={handleApplyUpdate}
+                disabled={isUpdatingApp}
+                style={{
+                  flex: 1,
+                  height: '34px',
+                  borderRadius: '6px',
+                  backgroundColor: 'var(--primary, #7c5cbf)',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: isUpdatingApp ? 'wait' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                }}
+              >
+                <DownloadCloud size={13} />
+                <span>{isUpdatingApp ? 'Downloading...' : 'Update Now'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (updateNotification.releaseUrl && window.electronAPI?.openExternal) {
+                    window.electronAPI.openExternal(updateNotification.releaseUrl);
+                  }
+                }}
+                style={{
+                  height: '34px',
+                  padding: '0 12px',
+                  borderRadius: '6px',
+                  backgroundColor: 'transparent',
+                  border: '1px solid var(--border-medium)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '11.5px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+                title="View Release Notes on GitHub"
+              >
+                <ExternalLink size={12} />
+                <span>Notes</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDismissUpdate}
+                style={{
+                  height: '34px',
+                  padding: '0 10px',
+                  borderRadius: '6px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  fontSize: '11.5px',
+                  cursor: 'pointer',
+                }}
+              >
+                Later
+              </button>
+            </div>
+          )}
+
+          {updateAppError && (
+            <div style={{ fontSize: '11px', color: '#ef4444' }}>
+              Update failed: {updateAppError}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
