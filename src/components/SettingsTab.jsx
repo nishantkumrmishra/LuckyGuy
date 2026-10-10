@@ -291,15 +291,22 @@ ishant\\Music');
     setPasteSnippet(JSON.stringify({
       id: "community-stream-hub",
       name: "Community Stream Hub",
-      version: "1.0.0",
-      description: "Custom streaming portal tab with ad-blocker and crawler integration.",
+      version: "2.1.0",
+      type: "portal",
+      rating: "all",
+      description: "Custom streaming portal tab with multi-quality video player, crawler, and ad-blocker.",
+      author: "Community Developer",
+      mediaTypes: ["video", "audio"],
       tab: {
         title: "Stream Hub",
-        icon: "Film",
+        icon: "Youtube",
         url: "https://archive.org/details/movies",
+        viewLayout: "grid",
+        themeColor: "#7c5cbf",
         badge: "HD"
       },
-      capabilities: ["stream", "crawlPage", "adblock"],
+      capabilities: ["stream", "crawlPage", "download", "videoPlayer", "metadata", "adblock"],
+      supportedUrls: ["*://archive.org/*"],
       adBlockRules: [
         "*://*.doubleclick.net/*",
         "*://*analytics*/*"
@@ -1616,12 +1623,13 @@ ishant\\Music');
               <form onSubmit={handleInstallSnippet} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <textarea
                   rows={5}
-                  placeholder={`// Paste plugin manifest JSON or script snippet here, e.g.:
+                  placeholder={`// Paste plugin manifest JSON (SDK v2.1), e.g.:
 {
   "id": "my-plugin",
-  "name": "Custom Video Streamer",
-  "tab": { "title": "Stream Hub", "url": "https://example.com" },
-  "adBlockRules": ["*://*.ads.com/*"]
+  "name": "Custom Streamer",
+  "type": "portal",
+  "tab": { "title": "Stream Hub", "url": "https://example.com", "viewLayout": "grid" },
+  "capabilities": ["stream", "download", "videoPlayer", "crawlPage"]
 }`}
                   value={pasteSnippet}
                   onChange={(e) => {

@@ -53,8 +53,8 @@
         <!-- Main Content -->
         <main class="docs-content">
             <header class="content-header">
-                <h1>Plugins & Extensions SDK</h1>
-                <p class="subtitle">Complete guide to building, installing, and managing modular audio and video extensions for LuckyGuy Desktop.</p>
+                <h1>Plugins & Extensions SDK (v2.1)</h1>
+                <p class="subtitle">Complete specification for building, installing, and distributing modular audio and video extensions for LuckyGuy Desktop.</p>
             </header>
 
             <!-- 1 Master URL to Index Everything Banner -->
@@ -80,7 +80,39 @@
             <p>Every extension runs in an isolated sandbox, communicates via strictly defined SDK interfaces, and requires zero compilation or build steps.</p>
 
             <div class="extensions-install-list">
-                <!-- 1. Universal Audio Engine -->
+                <!-- 1. YouTube Video & Audio Portal -->
+                <div class="extension-install-row">
+                    <div class="extension-install-info">
+                        <div class="extension-install-title">
+                            <strong>📺 YouTube Media Portal</strong>
+                            <span class="badge-tag">Portal Tab</span>
+                            <span class="badge-tag" style="background:#fee2e2; color:#b91c1c; border-color:#fecaca;">SDK v2.1</span>
+                        </div>
+                        <p class="extension-install-desc">High-speed YouTube video & audio extractor powered by yt-dlp with multi-resolution selector (1080p, 720p, 360p), dual-track audio sync, and MP4 direct download to Videos\YouTube.</p>
+                        <div class="extension-install-url-box">
+                            <input type="text" readonly value="https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/youtube/manifest.json" class="extension-url-input">
+                            <button class="code-box-copy" onclick="copyInputUrl(this)"><i class="ci-Copy"></i> Copy URL</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Telegram Media Downloader -->
+                <div class="extension-install-row">
+                    <div class="extension-install-info">
+                        <div class="extension-install-title">
+                            <strong>✈️ Telegram Media Downloader</strong>
+                            <span class="badge-tag">Sidebar Tab</span>
+                            <span class="badge-tag">Custom Folders</span>
+                        </div>
+                        <p class="extension-install-desc">Full channel browser, batch downloader, and multi-session media crawler for Telegram with direct destination directory configuration.</p>
+                        <div class="extension-install-url-box">
+                            <input type="text" readonly value="https://raw.githubusercontent.com/nishantkumrmishra/LuckyGuy--extensions/main/extensions/telegram/manifest.json" class="extension-url-input">
+                            <button class="code-box-copy" onclick="copyInputUrl(this)"><i class="ci-Copy"></i> Copy URL</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Universal Audio Engine -->
                 <div class="extension-install-row">
                     <div class="extension-install-info">
                         <div class="extension-install-title">
@@ -96,7 +128,7 @@
                     </div>
                 </div>
 
-                <!-- 2. Archive Movies & Cinema Portal -->
+                <!-- 4. Archive Movies & Cinema Portal -->
                 <div class="extension-install-row">
                     <div class="extension-install-info">
                         <div class="extension-install-title">
@@ -112,7 +144,7 @@
                     </div>
                 </div>
 
-                <!-- 3. Worldwide Live Radio Hub -->
+                <!-- 5. Worldwide Live Radio Hub -->
                 <div class="extension-install-row">
                     <div class="extension-install-info">
                         <div class="extension-install-title">
@@ -128,7 +160,7 @@
                     </div>
                 </div>
 
-                <!-- 4. Pornhub (18+) -->
+                <!-- 6. Pornhub (18+) -->
                 <div class="extension-install-row">
                     <div class="extension-install-info">
                         <div class="extension-install-title">
@@ -146,7 +178,7 @@
             </div>
 
             <!-- Installation steps banner -->
-            <div style="margin-top:20px; padding:14px 18px; background:#f4f4f5; border:1px solid #e4e4e7; border-radius:6px;">
+            <div style="margin-top:20px; padding:14px 18px; background:#f4f4f5; border:1px solid #e4e4e7; border-radius:6px; margin-bottom:32px;">
                 <h4 style="margin:0 0 6px 0; font-size:0.92em; font-weight:600;"><i class="ci-List_Checklist"></i> How to Install in LuckyGuy Desktop:</h4>
                 <ol style="margin:0; padding-left:20px; font-size:0.86em; color:#52525b; display:flex; flex-direction:column; gap:4px;">
                     <li>Click <strong>"Copy URL"</strong> next to any extension above.</li>
@@ -154,6 +186,123 @@
                     <li>Paste the copied URL into <strong>Extension Manifest URL</strong> and click <strong>Install Plugin</strong>.</li>
                     <li>Toggle the switch <strong>ON</strong> to enable the plugin!</li>
                 </ol>
+            </div>
+
+            <!-- SDK v2.1 Specification Section -->
+            <hr style="border:0; border-top:1px solid #e4e4e7; margin:32px 0;">
+
+            <h2><i class="ci-Code"></i> Plugin SDK v2.1 Specification</h2>
+            <p>The LuckyGuy Extension SDK allows any developer to mount web portals, crawl video collections, integrate custom players, and download media into dedicated folders without writing native C++ or Electron code.</p>
+
+            <h3 style="margin-top:24px;">1. Manifest Specification (manifest.json)</h3>
+            <p>Every plugin must include a <code>manifest.json</code> defining its identity, permissions, dynamic tab layout, and capabilities.</p>
+
+            <pre style="background:#18181b; color:#f4f4f5; padding:16px; border-radius:8px; font-size:0.86em; overflow-x:auto; text-align:left;"><code>{
+  "id": "luckyguy-ext-custom",
+  "name": "Custom Stream & Portal",
+  "version": "2.1.0",
+  "type": "portal",                 // "portal" | "audio" | "video" | "crawler"
+  "rating": "all",                  // "all" | "mature" | "18+"
+  "description": "High performance video and audio crawler.",
+  "author": "Developer Name",
+  "entry": "index.js",
+  "mediaTypes": ["video", "audio"],
+  "tab": {
+    "title": "Custom Tab",
+    "icon": "Youtube",              // Lucide icon name: Youtube, Film, Sparkles, Send, Music
+    "url": "https://example.com",
+    "viewLayout": "grid",           // "grid" | "list"
+    "themeColor": "#FF0000",
+    "badge": "HD"
+  },
+  "capabilities": [
+    "stream",                       // Resolves direct playable video/audio URLs
+    "crawlPage",                    // Scrapes video cards from web pages
+    "download",                     // Supports multi-quality offline downloads
+    "videoPlayer",                  // Renders in custom floating video player
+    "metadata",                     // Provides title, author, and duration
+    "search",                       // Integrates with global search bar
+    "adblock"                       // Strips ads using engine rules
+  ],
+  "supportedUrls": [
+    "*://*.example.com/*"
+  ],
+  "adBlockRules": [
+    "*://*.adserver.com/*",
+    "*://*tracker*/*"
+  ]
+}</code></pre>
+
+            <h3 style="margin-top:24px;">2. Lifecycle Methods (index.js)</h3>
+            <p>The entry file <code>index.js</code> exports lifecycle hooks invoked by the LuckyGuy engine.</p>
+
+            <pre style="background:#18181b; color:#f4f4f5; padding:16px; border-radius:8px; font-size:0.86em; overflow-x:auto; text-align:left;"><code>module.exports = {
+  // Check if given URL belongs to this extension
+  isSupported(url) {
+    return url && url.includes('example.com');
+  },
+
+  // Resolve media details and streams for single video/audio
+  async resolve(url, options = {}) {
+    return {
+      id: 'vid-123',
+      title: 'Sample Video Title',
+      author: 'Channel Name',
+      thumbnail: 'https://example.com/poster.jpg',
+      streamUrl: 'https://example.com/stream-1080p.mp4',
+      // Multi-quality resolution dictionary
+      streams: {
+        '1080p': 'https://example.com/stream-1080p.mp4',
+        '720p': 'https://example.com/stream-720p.mp4',
+        '360p': 'https://example.com/stream-360p.mp4'
+      },
+      // Dual-track DASH audio sync URL (optional)
+      audioStreamUrl: null,
+      format: 'MP4',
+      formatType: 'VIDEO',
+      headers: {
+        'Referer': 'https://example.com/'
+      }
+    };
+  },
+
+  // Batch crawl video cards from a page URL
+  async crawlPage(pageUrl) {
+    return [
+      {
+        id: 'item-1',
+        title: 'Video Title',
+        author: 'Creator Name',
+        thumbnail: 'https://example.com/thumb1.jpg',
+        duration: '14:20',
+        durationFormatted: '14:20',
+        size: '~150 MB',
+        url: 'https://example.com/watch?v=1',
+        mediaType: 'video',
+        quality: '1080p HD'
+      }
+    ];
+  }
+};</code></pre>
+
+            <h3 style="margin-top:24px;">3. Advanced Engine Features in SDK v2.1</h3>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-top:12px; text-align:left;">
+                <div style="background:#ffffff; border:1px solid #e4e4e7; border-radius:8px; padding:16px;">
+                    <h4 style="margin:0 0 6px 0; font-size:0.95em;"><i class="ci-Film"></i> Multi-Quality Stream Mapping</h4>
+                    <p style="margin:0; font-size:0.85em; color:#52525b;">Provide a <code>streams</code> map with resolutions like <code>1080p</code>, <code>720p</code>, <code>480p</code>. The in-app video player automatically displays a resolution picker.</p>
+                </div>
+                <div style="background:#ffffff; border:1px solid #e4e4e7; border-radius:8px; padding:16px;">
+                    <h4 style="margin:0 0 6px 0; font-size:0.95em;"><i class="ci-Volume_Up"></i> DASH Synchronized Audio Track</h4>
+                    <p style="margin:0; font-size:0.85em; color:#52525b;">If a source separates video and audio tracks (like YouTube), set <code>audioStreamUrl</code>. The player synchronizes playback and volume across both elements.</p>
+                </div>
+                <div style="background:#ffffff; border:1px solid #e4e4e7; border-radius:8px; padding:16px;">
+                    <h4 style="margin:0 0 6px 0; font-size:0.95em;"><i class="ci-Folder"></i> Persistent Companion Thumbnails</h4>
+                    <p style="margin:0; font-size:0.85em; color:#52525b;">The engine automatically writes a companion <code>&lt;title&gt;.jpg</code> alongside downloaded videos, preserving library cards offline forever even when user cache is cleared.</p>
+                </div>
+                <div style="background:#ffffff; border:1px solid #e4e4e7; border-radius:8px; padding:16px;">
+                    <h4 style="margin:0 0 6px 0; font-size:0.95em;"><i class="ci-Settings"></i> Dynamic Subfolder Routing</h4>
+                    <p style="margin:0; font-size:0.85em; color:#52525b;">Extensions can specify a <code>customFolder</code> or route into dedicated folders like <code>Videos\YouTube</code> or <code>Videos\Adult\PornHub</code>.</p>
+                </div>
             </div>
         </main>
     </div>
