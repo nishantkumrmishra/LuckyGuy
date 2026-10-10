@@ -28,6 +28,7 @@ export default function CustomVideoPlayer({
   const progressTrackRef = useRef(null);
   const hideControlsTimeoutRef = useRef(null);
   const lastExtractedUrlRef = useRef(null);
+  const isExtractingRef = useRef(false);
   const audioRef = useRef(null);
   const hlsRef = useRef(null);
   const getFileUrl = (fp) => {
@@ -119,11 +120,11 @@ export default function CustomVideoPlayer({
         setCurrentStreamSrc(chosen);
         setIsResolving(false);
       }
-    } else if (video?.streamUrl && !currentStreamSrc) {
+    } else if (video?.streamUrl && !video.streamUrl.includes('youtube.com/watch')) {
       setCurrentStreamSrc(video.streamUrl);
       setIsResolving(false);
     }
-  }, [video?.title, video?.streams, video?.streamUrl, selectedQuality, currentStreamSrc]);
+  }, [video?.title, video?.streams, video?.streamUrl, selectedQuality]);
 
   // Format seconds into MM:SS
   const formatTime = (seconds) => {
@@ -154,21 +155,32 @@ export default function CustomVideoPlayer({
       }
     }
 
-    if (video?.url && window.electronAPI?.extractUrl) {
-      // Avoid duplicate extraction if already requested for this URL
-      if (lastExtractedUrlRef.current === video.url && currentStreamSrc) {
+    if (resolvedStreams && Object.keys(resolvedStreams).length > 0) {
+      const chosen = resolvedStreams[selectedQuality] || Object.values(resolvedStreams)[0];
+      if (chosen) {
+        setCurrentStreamSrc(chosen);
         setIsResolving(false);
         return;
       }
-      lastExtractedUrlRef.current = video.url;
+    }
 
+    if (video?.url && window.electronAPI?.extractUrl) {
+      if (lastExtractedUrlRef.current === video.url) {
+        setIsResolving(false);
+        return;
+      }
+      if (isExtractingRef.current) return;
+
+      lastExtractedUrlRef.current = video.url;
+      isExtractingRef.current = true;
       setIsResolving(true);
+
       try {
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Extraction timed out')), 8000)
+          setTimeout(() => reject(new Error('Extraction timed out')), 12000)
         );
         const extractPromise = window.electronAPI.extractUrl(video.url);
-        
+
         const res = await Promise.race([extractPromise, timeoutPromise]);
         if (res && !res.error) {
           if (res.audioStreamUrl) { setAudioStreamSrc(res.audioStreamUrl); }
@@ -177,29 +189,30 @@ export default function CustomVideoPlayer({
           }
           if (res.streams && Object.keys(res.streams).length > 0) {
             setResolvedStreams(res.streams);
-            const best = res.streams[selectedQuality] || Object.values(res.streams)[0] || res.streamUrl;
+            const best = res.streams[selectedQuality] || res.streamUrl || Object.values(res.streams)[0];
             setCurrentStreamSrc(best);
           } else if (res.streamUrl) {
             setCurrentStreamSrc(res.streamUrl);
           }
-        } else if (video?.streamUrl) {
+        } else if (video?.streamUrl && !video.streamUrl.includes('youtube.com/watch')) {
           setCurrentStreamSrc(video.streamUrl);
         }
       } catch (err) {
         console.warn('Stream extraction completed with fallback:', err.message);
-        if (video?.streamUrl) {
+        if (video?.streamUrl && !video.streamUrl.includes('youtube.com/watch')) {
           setCurrentStreamSrc(video.streamUrl);
         }
       } finally {
+        isExtractingRef.current = false;
         setIsResolving(false);
       }
-    } else if (video?.streamUrl) {
+    } else if (video?.streamUrl && !video.streamUrl.includes('youtube.com/watch')) {
       setCurrentStreamSrc(video.streamUrl);
       setIsResolving(false);
     } else {
       setIsResolving(false);
     }
-  }, [video?.url, video?.streams, video?.streamUrl, selectedQuality, currentStreamSrc]);
+  }, [video?.url, video?.streams, video?.streamUrl, selectedQuality, localSrc, resolvedStreams]);
 
   useEffect(() => {
     resolveStreams();

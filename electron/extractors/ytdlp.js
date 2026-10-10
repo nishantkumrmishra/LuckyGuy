@@ -78,6 +78,14 @@ class YtDlpWrapper {
           // Filter and extract clean formats
           const streams = {};
           let audioStreamUrl = null;
+          let muxedStream = null;
+          if (Array.isArray(info.formats)) {
+            const muxedFormats = info.formats.filter(f => f.url && f.vcodec && f.vcodec !== 'none' && f.acodec && f.acodec !== 'none');
+            if (muxedFormats.length > 0) {
+              const bestMuxed = [...muxedFormats].sort((a, b) => (b.height || 0) - (a.height || 0))[0];
+              muxedStream = bestMuxed ? bestMuxed.url : null;
+            }
+          }
           if (Array.isArray(info.formats)) {
             const audioFormats = info.formats.filter(f => f.acodec && f.acodec !== 'none' && f.url);
             const m4aAudio = audioFormats.find(f => f.ext === 'm4a' || (f.acodec && f.acodec.includes('mp4a')));
