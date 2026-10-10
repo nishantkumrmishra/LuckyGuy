@@ -633,3 +633,85 @@ export const DuoPanelCollapse = ({ size = 18, collapsed = false, className = '' 
     />
   </svg>
 );
+
+
+// Duo-Tone Smart Auto Mode Icon
+export const DuoAuto = ({ size = 15, active = false, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
+    <path
+      d="M12 2L14.2 8.3L20.5 10.5L14.2 12.7L12 19L9.8 12.7L3.5 10.5L9.8 8.3L12 2Z"
+      stroke={active ? "var(--duo-purple, #7c5cbf)" : "var(--duo-stroke, currentColor)"}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill={active ? "rgba(124, 92, 191, 0.22)" : "none"}
+    />
+    <path
+      d="M19 16L19.8 18.2L22 19L19.8 19.8L19 22L18.2 19.8L16 19L18.2 18.2L19 16Z"
+      stroke="var(--duo-purple, #7c5cbf)"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      fill="var(--duo-purple, #7c5cbf)"
+    />
+    <circle cx="5" cy="5" r="1.5" fill="var(--duo-purple, #7c5cbf)" />
+  </svg>
+);
+
+// Duo-Tone Download Action Arrow for buttons
+export const DuoDownloadAction = ({ size = 14, className = "", color = "currentColor" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none">
+    <path
+      d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M7 10l5 5 5-5"
+      stroke={color}
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <line
+      x1="12"
+      y1="15"
+      x2="12"
+      y2="3"
+      stroke={color}
+      strokeWidth="2.2"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+// Duo-Tone Download Centerpiece for Empty State
+export const DuoDownloadEmpty = ({ size = 44, className = "" }) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 48 48" fill="none">
+    <rect
+      x="6"
+      y="32"
+      width="36"
+      height="11"
+      rx="5.5"
+      stroke="var(--duo-stroke, currentColor)"
+      strokeWidth="2.2"
+      fill="rgba(124, 92, 191, 0.12)"
+    />
+    <path
+      d="M24 7v19m0 0l-6.5-6.5m6.5 6.5l6.5-6.5"
+      stroke="var(--duo-purple, #7c5cbf)"
+      strokeWidth="2.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <circle cx="13" cy="37.5" r="2" fill="var(--duo-purple, #7c5cbf)" />
+    <circle cx="35" cy="37.5" r="2" fill="var(--duo-purple, #7c5cbf)" />
+    <path
+      d="M38 10l1.2 2.5L42 13.7l-2.8 1.2L38 17.5l-1.2-2.6L34 13.7l2.8-1.2L38 10z"
+      fill="var(--duo-purple, #7c5cbf)"
+    />
+  </svg>
+);

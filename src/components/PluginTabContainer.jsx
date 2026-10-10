@@ -1296,8 +1296,9 @@ export default function PluginTabContainer({
               }
             }}
             style={{
-              flex: 1,
-              maxWidth: '340px',
+              marginLeft: 'auto',
+              width: '320px',
+              maxWidth: '380px',
               display: 'flex',
               alignItems: 'center',
             }}
@@ -1939,6 +1940,50 @@ export default function PluginTabContainer({
                   <div className="skeleton-shimmer-box" style={{ height: '10px', width: '40%', borderRadius: '4px', marginTop: '6px' }} />
                 </div>
               ))}
+            </div>
+          ) : crawledMedia.length === 0 ? (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '60px 20px',
+                textAlign: 'center',
+                borderRadius: '12px',
+                border: '1px dashed var(--border-medium, #e2e8f0)',
+                backgroundColor: 'var(--bg-card, #ffffff)',
+                marginTop: '10px',
+              }}
+            >
+              <Film size={36} color="var(--primary, #7c5cbf)" style={{ opacity: 0.6, marginBottom: '12px' }} />
+              <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                No Media Streams Loaded
+              </div>
+              <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', maxWidth: '380px', marginBottom: '18px' }}>
+                Search for videos using the search bar on the top right, or click below to reload the feed.
+              </div>
+              <button
+                type="button"
+                onClick={handleWebReload}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 18px',
+                  borderRadius: '8px',
+                  backgroundColor: 'var(--primary, #7c5cbf)',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(124, 92, 191, 0.25)',
+                }}
+              >
+                <RefreshCw size={13} />
+                <span>Reload Feed</span>
+              </button>
             </div>
           ) : (
             /* Clean Uncluttered Media Cards Grid */

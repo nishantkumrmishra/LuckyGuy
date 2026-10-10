@@ -1,3 +1,4 @@
+import { DuoAuto, DuoDownloadAction, DuoDownloadEmpty } from './DuoIcons';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Download,
@@ -419,7 +420,7 @@ export default function DownloadsTab({
                 }}
                 title="Smart Auto-Detect based on link"
               >
-                <Sparkles size={12} color="var(--primary, #7c5cbf)" />
+                <DuoAuto size={13} active={mediaDownloadMode === "auto"} />
                 <span>Auto</span>
               </button>
             </div>
@@ -585,7 +586,7 @@ export default function DownloadsTab({
               transition: 'all 0.2s ease',
             }}
           >
-            <Download size={14} />
+            <DuoDownloadAction size={14} color={hasInput ? "#ffffff" : "var(--text-muted)"} />
             <span>Download</span>
           </button>
         </div>
@@ -819,7 +820,7 @@ export default function DownloadsTab({
             gap: '8px',
           }}
         >
-          <ArrowDownToLine size={32} color="var(--primary, #7c5cbf)" style={{ opacity: 0.6 }} />
+          <DuoDownloadEmpty size={44} />
           <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
             {filterTab === 'downloading' ? 'No active downloads' : 'No downloads recorded'}
           </div>
