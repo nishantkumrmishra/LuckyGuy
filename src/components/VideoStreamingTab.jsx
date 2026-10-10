@@ -26,7 +26,9 @@ import {
   ListPlus,
   Plus,
   Globe,
-  ChevronRight
+  ChevronRight,
+  Send,
+  Copy
 } from 'lucide-react';
 import { DuoVideo, DuoPornhub, DuoYoutube } from './DuoIcons';
 

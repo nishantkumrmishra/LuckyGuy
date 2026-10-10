@@ -8,6 +8,7 @@ import {
   Layers,
   Search,
   Download,
+  DownloadCloud,
   Play,
   X,
   Check,
