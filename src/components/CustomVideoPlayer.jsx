@@ -85,6 +85,18 @@ export default function CustomVideoPlayer({
   );
   const [isBuffering, setIsBuffering] = useState(false);
   const [hasError, setHasError] = useState(false);
+
+  const getYouTubeVideoId = (url, id) => {
+    if (id && String(id).startsWith("yt-")) return String(id).replace("yt-", "");
+    if (!url) return null;
+    const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/i);
+    return m ? m[1] : null;
+  };
+
+  const ytVideoId = getYouTubeVideoId(video?.url, video?.id);
+  const [useIframeFallback, setUseIframeFallback] = useState(() => {
+    return Boolean(ytVideoId && !isLocalFile);
+  });
   
   const [resolvedStreams, setResolvedStreams] = useState(video?.streams || {});
   const [currentStreamSrc, setCurrentStreamSrc] = useState(
@@ -402,7 +414,7 @@ export default function CustomVideoPlayer({
       ref={containerRef}
       onMouseMove={resetHideTimer}
       onMouseLeave={() => isPlaying && setShowControls(false)}
-      onClick={togglePlay}
+      onClick={useIframeFallback ? undefined : togglePlay}
       style={{
         position: 'relative',
         width: '100%',
@@ -415,53 +427,75 @@ export default function CustomVideoPlayer({
         userSelect: 'none',
       }}
     >
-      {/* Native Video Element */}
-      <video
-        ref={videoRef}
-        src={currentStreamSrc || undefined}
-        poster={video?.thumbnail}
-        playsInline
-        preload="auto"
-        onTimeUpdate={handleTimeUpdate}
-        onPlay={() => {
-          setIsPlaying(true);
-          window.dispatchEvent(new CustomEvent('luckyguy-media-playback', {
-            detail: { source: 'video', playerId }
-          }));
-        }}
-        onLoadedMetadata={(e) => {
-          if (e.target.duration && !isNaN(e.target.duration)) {
-            setDuration(e.target.duration);
-          }
-          setIsResolving(false);
-          setIsBuffering(false);
-          setHasError(false);
-        }}
-        onCanPlay={() => {
-          setIsResolving(false);
-          setIsBuffering(false);
-        }}
-        onWaiting={() => setIsBuffering(true)}
-        onPlaying={() => {
-          setIsResolving(false);
-          setIsBuffering(false);
-          setIsPlaying(true);
-          setHasError(false);
-        }}
-        onError={() => {
-          setIsResolving(false);
-          setIsBuffering(false);
-          setHasError(true);
-        }}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'contain',
-          display: 'block',
-          backgroundColor: '#000000',
-          cursor: 'pointer',
-        }}
-      />
+      {useIframeFallback && ytVideoId ? (
+        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${ytVideoId}?autoplay=1&enablejsapi=1`}
+            title={titleToShow}
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 'none',
+              display: 'block',
+            }}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        </div>
+      ) : (
+        /* Native Video Element */
+        <video
+          ref={videoRef}
+          src={currentStreamSrc || undefined}
+          poster={video?.thumbnail}
+          playsInline
+          preload="auto"
+          onTimeUpdate={handleTimeUpdate}
+          onPlay={() => {
+            setIsPlaying(true);
+            window.dispatchEvent(new CustomEvent('luckyguy-media-playback', {
+              detail: { source: 'video', playerId }
+            }));
+          }}
+          onLoadedMetadata={(e) => {
+            if (e.target.duration && !isNaN(e.target.duration)) {
+              setDuration(e.target.duration);
+            }
+            setIsResolving(false);
+            setIsBuffering(false);
+            setHasError(false);
+          }}
+          onCanPlay={() => {
+            setIsResolving(false);
+            setIsBuffering(false);
+          }}
+          onWaiting={() => setIsBuffering(true)}
+          onPlaying={() => {
+            setIsResolving(false);
+            setIsBuffering(false);
+            setIsPlaying(true);
+            setHasError(false);
+          }}
+          onError={() => {
+            setIsResolving(false);
+            setIsBuffering(false);
+            if (ytVideoId) {
+              setUseIframeFallback(true);
+              setHasError(false);
+            } else {
+              setHasError(true);
+            }
+          }}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            display: 'block',
+            backgroundColor: '#000000',
+            cursor: 'pointer',
+          }}
+        />
+      )}
 
       {/* Large Inviting Center Play Button (Shown when paused and ready) */}
       {!isPlaying && !isResolving && !hasError && (
@@ -561,26 +595,53 @@ export default function CustomVideoPlayer({
         >
           <AlertCircle size={36} color="#ef4444" />
           <div style={{ fontSize: '13px', fontWeight: 600 }}>Stream buffering or connection interrupted</div>
-          <button
-            type="button"
-            onClick={resolveStreams}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 18px',
-              borderRadius: '6px',
-              border: 'none',
-              backgroundColor: 'var(--primary, #7c5cbf)',
-              color: '#ffffff',
-              fontSize: '12px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            <RotateCcw size={14} />
-            <span>Reload Stream</span>
-          </button>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              type="button"
+              onClick={resolveStreams}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 18px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: 'var(--primary, #7c5cbf)',
+                color: '#ffffff',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <RotateCcw size={14} />
+              <span>Reload Stream</span>
+            </button>
+            {ytVideoId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setUseIframeFallback(true);
+                  setHasError(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 18px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#ef4444',
+                  color: '#ffffff',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <Play size={14} fill="#fff" />
+                <span>Play via YouTube Player</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -645,23 +706,48 @@ export default function CustomVideoPlayer({
         </span>
 
         {/* Video Quality Indicator Badge */}
-        <span
-          style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.2)',
-            backdropFilter: 'blur(8px)',
-            color: '#ffffff',
-            fontSize: '11px',
-            fontWeight: 700,
-            padding: '2px 8px',
-            borderRadius: '4px',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-          }}
-        >
-          {selectedQuality}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {ytVideoId && !isLocalFile && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setUseIframeFallback(!useIframeFallback);
+                setHasError(false);
+              }}
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.18)',
+                backdropFilter: 'blur(8px)',
+                color: '#ffffff',
+                fontSize: '11px',
+                fontWeight: 600,
+                padding: '3px 9px',
+                borderRadius: '4px',
+                border: '1px solid rgba(255, 255, 255, 0.25)',
+                cursor: 'pointer',
+              }}
+            >
+              {useIframeFallback ? 'YouTube Player' : 'Direct Stream'}
+            </button>
+          )}
+          <span
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              backdropFilter: 'blur(8px)',
+              color: '#ffffff',
+              fontSize: '11px',
+              fontWeight: 700,
+              padding: '2px 8px',
+              borderRadius: '4px',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+            }}
+          >
+            {useIframeFallback ? 'HD' : selectedQuality}
+          </span>
+        </div>
       </div>
 
-      {/* Bottom Controls Bar Overlay */}
+      {!useIframeFallback && (
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -970,6 +1056,7 @@ export default function CustomVideoPlayer({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

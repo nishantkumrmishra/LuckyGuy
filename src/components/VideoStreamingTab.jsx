@@ -28,7 +28,60 @@ import {
   Globe,
   ChevronRight
 } from 'lucide-react';
-import { DuoVideo } from './DuoIcons';
+import { DuoVideo, DuoPornhub, DuoYoutube } from './DuoIcons';
+
+
+const VideoSourceBadge = ({ source, isCompact = false }) => {
+  const iconSize = isCompact ? 13 : 15;
+  let icon = null;
+  let label = source?.name || 'Video';
+
+  if (source?.id === 'pornhub') {
+    icon = <DuoPornhub size={iconSize} active={true} />;
+    label = 'Pornhub';
+  } else if (source?.id === 'youtube') {
+    icon = <DuoYoutube size={iconSize} active={true} />;
+    label = 'YouTube';
+  } else if (source?.id === 'telegram') {
+    icon = <Send size={iconSize - 2} color="#0ea5e9" />;
+    label = 'Telegram';
+  } else if (source?.id === 'online') {
+    icon = <Globe size={iconSize - 2} color="var(--primary, #7c5cbf)" />;
+    label = 'Stream';
+  } else {
+    icon = <Film size={iconSize - 2} color="#10b981" />;
+    label = 'Video';
+  }
+
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        padding: isCompact ? '2px 6px' : '3px 8px',
+        borderRadius: '5px',
+        backgroundColor: 'rgba(20, 20, 26, 0.82)',
+        backdropFilter: 'blur(8px)',
+        border: '1px solid rgba(255, 255, 255, 0.14)',
+        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.4)',
+        zIndex: 2,
+      }}
+    >
+      {icon}
+      <span
+        style={{
+          fontSize: isCompact ? '9.5px' : '10.5px',
+          fontWeight: 700,
+          color: '#ffffff',
+          letterSpacing: '0.2px',
+        }}
+      >
+        {label}
+      </span>
+    </div>
+  );
+};
 
 export default function VideoStreamingTab({
   videos = [],
@@ -54,9 +107,9 @@ export default function VideoStreamingTab({
   // View Mode: 'grid' (Default Large), 'grid-compact' (Compact / Small Size), 'list' (Table List View)
   const [viewMode, setViewMode] = useState(() => {
     try {
-      return localStorage.getItem('luckyguy-video-view-mode') || 'grid';
+      return localStorage.getItem('luckyguy-video-view-mode') || 'grid-compact';
     } catch {
-      return 'grid';
+      return 'grid-compact';
     }
   });
 
@@ -74,6 +127,34 @@ export default function VideoStreamingTab({
   const [playlistModalVideo, setPlaylistModalVideo] = useState(null);
   const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
   const [playlistNotice, setPlaylistNotice] = useState('');
+  const [contextMenu, setContextMenu] = useState(null); // { x, y, video }
+  const [isPlaylistSubmenuOpen, setIsPlaylistSubmenuOpen] = useState(false);
+
+  const handleOpenContextMenu = (e, video) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const menuWidth = 230;
+    const menuHeight = 240;
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
+    setContextMenu({ x, y, video });
+    setIsPlaylistSubmenuOpen(false);
+  };
+
+  useEffect(() => {
+    const handleClose = () => {
+      if (contextMenu) setContextMenu(null);
+    };
+    const handleKey = (e) => {
+      if (e.key === 'Escape') setContextMenu(null);
+    };
+    window.addEventListener('click', handleClose);
+    window.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('click', handleClose);
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [contextMenu]);
 
   // Auto-scan / refresh video list on component mount
   useEffect(() => {
@@ -1321,84 +1402,6 @@ export default function VideoStreamingTab({
                             <span>{formatFileSize(video.fileSize)}</span>
                           </div>
 
-                          {/* Quick Card Action Toolbar on Hover */}
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'flex-end',
-                              gap: '6px',
-                              paddingTop: '6px',
-                              borderTop: '1px solid var(--border-light, rgba(0,0,0,0.04))',
-                              marginTop: '4px',
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => setPlaylistModalVideo(video)}
-                              style={{
-                                padding: '4px 8px',
-                                borderRadius: '4px',
-                                border: '1px solid var(--border-medium)',
-                                backgroundColor: 'transparent',
-                                color: 'var(--text-secondary)',
-                                fontSize: '11px',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '3px',
-                              }}
-                              title="Add to Playlist"
-                            >
-                              <ListPlus size={12} color="var(--primary, #7c5cbf)" />
-                              <span>Playlist</span>
-                            </button>
-
-                            {video.filePath && (
-                              <button
-                                type="button"
-                                onClick={() => onOpenFolder && onOpenFolder(video.filePath)}
-                                style={{
-                                  padding: '4px 6px',
-                                  borderRadius: '4px',
-                                  border: '1px solid var(--border-medium)',
-                                  backgroundColor: 'transparent',
-                                  color: 'var(--text-secondary)',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                }}
-                                title="Show in Windows Explorer"
-                              >
-                                <FolderOpen size={12} />
-                              </button>
-                            )}
-
-                            {onDeleteVideo && video.filePath && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (window.confirm(`Delete "${video.title}" from library?`)) {
-                                    onDeleteVideo(video.filePath);
-                                  }
-                                }}
-                                style={{
-                                  padding: '4px 6px',
-                                  borderRadius: '4px',
-                                  border: 'none',
-                                  backgroundColor: 'transparent',
-                                  color: '#ef4444',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                }}
-                                title="Delete video"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            )}
-                          </div>
                         </div>
                       </div>
                     );
@@ -1407,6 +1410,360 @@ export default function VideoStreamingTab({
               )}
             </div>
           )}
+
+
+      {/* RIGHT-CLICK CONTEXT MENU WITH PLAYLIST SELECTION */}
+      {contextMenu && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            top: contextMenu.y,
+            left: contextMenu.x,
+            width: '220px',
+            backgroundColor: 'var(--bg-card, #ffffff)',
+            border: '1px solid var(--border-medium, #e5e7eb)',
+            borderRadius: '10px',
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(0, 0, 0, 0.08)',
+            padding: '6px',
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2px',
+            backdropFilter: 'blur(12px)',
+          }}
+        >
+          {/* Header Title */}
+          <div
+            style={{
+              padding: '6px 10px 8px 10px',
+              fontSize: '11px',
+              fontWeight: 600,
+              color: 'var(--text-muted, #9ca3af)',
+              borderBottom: '1px solid var(--border-light, #f3f4f6)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+            title={contextMenu.video.title}
+          >
+            {contextMenu.video.title}
+          </div>
+
+          {/* Play Video */}
+          <button
+            type="button"
+            onClick={() => {
+              onPlayVideo(contextMenu.video);
+              setContextMenu(null);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '7px 10px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: 'transparent',
+              color: 'var(--text-primary)',
+              fontSize: '12.5px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              textAlign: 'left',
+              width: '100%',
+              transition: 'background-color 0.12s ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-hover, rgba(124, 92, 191, 0.08))')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            <Play size={14} color="var(--primary, #7c5cbf)" fill="var(--primary, #7c5cbf)" />
+            <span>Play Video</span>
+          </button>
+
+          {/* Add to Playlist ▶ (with Submenu) */}
+          <div
+            style={{ position: 'relative' }}
+            onMouseEnter={() => setIsPlaylistSubmenuOpen(true)}
+            onMouseLeave={() => setIsPlaylistSubmenuOpen(false)}
+          >
+            <button
+              type="button"
+              onClick={() => setIsPlaylistSubmenuOpen(!isPlaylistSubmenuOpen)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '7px 10px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: isPlaylistSubmenuOpen ? 'var(--bg-hover, rgba(124, 92, 191, 0.08))' : 'transparent',
+                color: 'var(--text-primary)',
+                fontSize: '12.5px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                width: '100%',
+                transition: 'background-color 0.12s ease',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ListPlus size={14} color="var(--primary, #7c5cbf)" />
+                <span>Add to Playlist</span>
+              </div>
+              <ChevronRight size={13} color="var(--text-secondary)" />
+            </button>
+
+            {/* Playlist Submenu Flyout */}
+            {isPlaylistSubmenuOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: contextMenu.x + 220 + 200 > window.innerWidth ? '-205px' : '210px',
+                  width: '200px',
+                  maxHeight: '260px',
+                  overflowY: 'auto',
+                  backgroundColor: 'var(--bg-card, #ffffff)',
+                  border: '1px solid var(--border-medium, #e5e7eb)',
+                  borderRadius: '10px',
+                  boxShadow: '0 12px 32px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(0, 0, 0, 0.08)',
+                  padding: '6px',
+                  zIndex: 10000,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '2px',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '4px 8px',
+                    fontSize: '10.5px',
+                    fontWeight: 700,
+                    color: 'var(--text-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.4px',
+                  }}
+                >
+                  Select Playlist
+                </div>
+
+                {playlists.length === 0 ? (
+                  <div style={{ padding: '8px', fontSize: '11.5px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                    No playlists found
+                  </div>
+                ) : (
+                  playlists.map((pl) => (
+                    <button
+                      key={pl.id}
+                      type="button"
+                      onClick={() => {
+                        if (onAddToPlaylist) {
+                          onAddToPlaylist(pl.id, {
+                            id: contextMenu.video.id,
+                            filePath: contextMenu.video.filePath,
+                            url: contextMenu.video.url || contextMenu.video.streamUrl,
+                            title: contextMenu.video.title,
+                            author: contextMenu.video.author || contextMenu.video.artist,
+                            artist: contextMenu.video.author || contextMenu.video.artist,
+                            thumbnail: contextMenu.video.thumbnail || contextMenu.video.artworkUrl,
+                            formatType: 'VIDEO',
+                            mediaType: 'video',
+                          });
+                          setPlaylistNotice(`Added to "${pl.name}"`);
+                          setTimeout(() => setPlaylistNotice(''), 3000);
+                        }
+                        setContextMenu(null);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '6px 8px',
+                        borderRadius: '5px',
+                        border: 'none',
+                        backgroundColor: 'transparent',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        width: '100%',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-hover, rgba(124, 92, 191, 0.08))')}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    >
+                      <Folder size={13} color="var(--primary, #7c5cbf)" />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {pl.name}
+                      </span>
+                    </button>
+                  ))
+                )}
+
+                <div style={{ height: '1px', backgroundColor: 'var(--border-light, #f3f4f6)', margin: '4px 0' }} />
+
+                {/* + New Playlist Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPlaylistModalVideo(contextMenu.video);
+                    setContextMenu(null);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 8px',
+                    borderRadius: '5px',
+                    border: 'none',
+                    backgroundColor: 'rgba(124, 92, 191, 0.08)',
+                    color: 'var(--primary, #7c5cbf)',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    width: '100%',
+                  }}
+                >
+                  <FolderPlus size={13} />
+                  <span>+ Create Playlist</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Show in File Explorer */}
+          {contextMenu.video.filePath && (
+            <button
+              type="button"
+              onClick={() => {
+                onOpenFolder && onOpenFolder(contextMenu.video.filePath);
+                setContextMenu(null);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '7px 10px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                color: 'var(--text-primary)',
+                fontSize: '12.5px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                textAlign: 'left',
+                width: '100%',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-hover, rgba(124, 92, 191, 0.08))')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              <FolderOpen size={14} color="var(--text-secondary)" />
+              <span>Show in Folder</span>
+            </button>
+          )}
+
+          {/* Copy Link */}
+          {(contextMenu.video.url || contextMenu.video.streamUrl) && (
+            <button
+              type="button"
+              onClick={() => {
+                const urlToCopy = contextMenu.video.url || contextMenu.video.streamUrl;
+                if (navigator.clipboard) {
+                  navigator.clipboard.writeText(urlToCopy);
+                  setPlaylistNotice('Link copied to clipboard');
+                  setTimeout(() => setPlaylistNotice(''), 2500);
+                }
+                setContextMenu(null);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '7px 10px',
+                borderRadius: '6px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                color: 'var(--text-primary)',
+                fontSize: '12.5px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                textAlign: 'left',
+                width: '100%',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-hover, rgba(124, 92, 191, 0.08))')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+            >
+              <Copy size={14} color="var(--text-secondary)" />
+              <span>Copy Link</span>
+            </button>
+          )}
+
+          {/* Delete from Library */}
+          {onDeleteVideo && contextMenu.video.filePath && (
+            <>
+              <div style={{ height: '1px', backgroundColor: 'var(--border-light, #f3f4f6)', margin: '4px 0' }} />
+              <button
+                type="button"
+                onClick={() => {
+                  const vid = contextMenu.video;
+                  setContextMenu(null);
+                  if (window.confirm(`Delete "${vid.title}" from library?`)) {
+                    onDeleteVideo(vid.filePath);
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '7px 10px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: '#ef4444',
+                  fontSize: '12.5px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  width: '100%',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                <Trash2 size={14} color="#ef4444" />
+                <span>Delete Video</span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* FLOATING TOAST NOTIFICATION */}
+      {playlistNotice && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'rgba(24, 24, 30, 0.92)',
+            color: '#ffffff',
+            backdropFilter: 'blur(10px)',
+            padding: '8px 18px',
+            borderRadius: '20px',
+            fontSize: '12.5px',
+            fontWeight: 600,
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+            zIndex: 10001,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+          }}
+        >
+          <CheckCircle2 size={16} color="#10b981" />
+          <span>{playlistNotice}</span>
+        </div>
+      )}
 
           {/* ADD TO PLAYLIST MODAL */}
           {playlistModalVideo && (

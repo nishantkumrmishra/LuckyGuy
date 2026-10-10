@@ -13,6 +13,7 @@ import {
   Check,
   Heart,
   FolderOpen,
+  FolderPlus,
   Image,
   Upload
 } from 'lucide-react';
@@ -45,10 +46,6 @@ export default function PlaylistsTab({
   const [addSongSearch, setAddSongSearch] = useState('');
   const [isEditingCover, setIsEditingCover] = useState(false);
   const [coverInputUrl, setCoverInputUrl] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-
-  const MUSIC_GENRES = ['Indie', 'Rock', 'Pop', 'K-Pop', 'Hip Hop', 'EDM', 'Acoustic', 'Lo-Fi', 'Metal', 'Jazz'];
-
   const currentPlaylist = playlists.find(
     (p) => p.id === selectedPlaylistId || p.name === selectedPlaylistId
   );
@@ -1071,73 +1068,48 @@ export default function PlaylistsTab({
         <div
           style={{
             marginBottom: '20px',
-            padding: '16px 20px',
+            padding: '14px 18px',
             backgroundColor: 'var(--bg-card)',
             borderRadius: '12px',
             border: '1px solid var(--border-medium)',
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            maxWidth: '480px',
+            maxWidth: '440px',
+            boxShadow: 'var(--shadow-sm)',
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input
-                type="text"
-                placeholder="Playlist name (creates folder in Music\\Playlists)..."
-                value={newPlaylistName}
-                onChange={(e) => setNewPlaylistName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateNew()}
-                autoFocus
-                style={{
-                  flex: 1,
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-medium)',
-                  backgroundColor: 'var(--bg-main)',
-                  color: 'var(--text-primary)',
-                  outline: 'none',
-                  fontSize: '13px',
-                }}
-              />
-            </div>
-            {/* Music Genre Categories */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 500 }}>Category:</span>
-              {MUSIC_GENRES.map((genre) => (
-                <button
-                  key={genre}
-                  type="button"
-                  onClick={() => setSelectedCategory(selectedCategory === genre ? '' : genre)}
-                  style={{
-                    padding: '3px 9px',
-                    borderRadius: '12px',
-                    fontSize: '11px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    border: '1px solid ' + (selectedCategory === genre ? 'var(--primary)' : 'var(--border-medium)'),
-                    backgroundColor: selectedCategory === genre ? 'var(--primary)' : 'var(--bg-main)',
-                    color: selectedCategory === genre ? '#ffffff' : 'var(--text-secondary)',
-                    transition: 'all 0.12s ease',
-                  }}
-                >
-                  {genre}
-                </button>
-              ))}
-            </div>
-          </div>
+          <FolderPlus size={18} color="var(--primary)" style={{ flexShrink: 0 }} />
+          <input
+            type="text"
+            placeholder="Folder or playlist name..."
+            value={newPlaylistName}
+            onChange={(e) => setNewPlaylistName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleCreateNew()}
+            autoFocus
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-medium)',
+              backgroundColor: 'var(--bg-main)',
+              color: 'var(--text-primary)',
+              outline: 'none',
+              fontSize: '13px',
+            }}
+          />
           <button
             onClick={handleCreateNew}
             style={{
               backgroundColor: 'var(--primary)',
               color: 'white',
               border: 'none',
-              padding: '8px 14px',
+              padding: '8px 16px',
               borderRadius: '8px',
               fontSize: '13px',
-              fontWeight: 500,
+              fontWeight: 600,
               cursor: 'pointer',
+              flexShrink: 0,
             }}
           >
             Create
@@ -1150,6 +1122,9 @@ export default function PlaylistsTab({
               color: 'var(--text-secondary)',
               cursor: 'pointer',
               padding: '6px',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
             }}
           >
             <X size={16} />
@@ -1188,7 +1163,7 @@ export default function PlaylistsTab({
               No Playlists Found
             </div>
             <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-              Create a playlist or add folders inside your <b>Music\Playlists</b> directory.
+              Create a playlist folder to organize music and streaming videos in your <b>Music\Playlists</b> directory.
             </div>
             <button
               onClick={() => setIsCreatingNew(true)}
