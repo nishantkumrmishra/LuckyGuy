@@ -19,6 +19,29 @@ import { Play, Pause, SkipForward, Maximize2 } from 'lucide-react';
 import { CustomIcon } from './components/DuoIcons';
 
 
+
+const simplifyVideoTitle = (rawTitle, maxLength = 55) => {
+  if (!rawTitle) return 'Video';
+  let clean = rawTitle
+    .replace(/[\/\\?%*:|"<>~#&]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (clean.length > maxLength) {
+    const truncated = clean.substring(0, maxLength);
+    const lastSpace = truncated.lastIndexOf(' ');
+    clean = (lastSpace > 25 ? truncated.substring(0, lastSpace) : truncated).trim();
+  }
+  return clean || 'Video';
+};
+
+const formatAudioSrc = (filePath) => {
+  if (!filePath) return '';
+  if (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('file://')) return filePath;
+  const normalized = filePath.split('\\').join('/');
+  const segments = normalized.split('/').map((seg, i) => (i === 0 && seg.includes(':')) ? seg : encodeURIComponent(seg));
+  return 'file:///' + segments.join('/');
+};
+
 // Helper: Universal track deduplication (by path, id, and normalized title+artist)
 const deduplicateTracks = (trackList) => {
   if (!Array.isArray(trackList)) return [];
@@ -388,6 +411,10 @@ export default function App() {
     }
   }, [appearance]);
 
+  // Audio Element Ref & Playback Speed
+  const audioRef = useRef(null);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
+
   // Player & Queue State
   const [currentTrack, setCurrentTrack] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -641,14 +668,24 @@ export default function App() {
     const isImage = options.formatType === "IMAGE" || options.mediaType === "image" || (options.format && options.format.includes("JPG"));
     const isFile = options.formatType === "FILE" || options.mediaType === "file";
 
+    const isAdult = options.isAdult === true ||
+      options.category === 'adult' ||
+      (options.author && /pornhub/i.test(options.author)) ||
+      (options.pluginId && /pornhub/i.test(options.pluginId)) ||
+      (trimmed && (trimmed.includes('phncdn') || trimmed.includes('pornhub')));
+
     if (isVideo || isImage || isFile) {
       const taskId = options.id || ("dl-" + Date.now());
-      const cleanTitle = (options.title || "media").replace(/[\/\\?%*:|"<>]/g, "_");
+      const cleanTitle = isVideo ? simplifyVideoTitle(options.title) : (options.title || "media").replace(/[\/\\?%*:|"<>]/g, "_");
       const ext = isVideo ? ".mp4" : (isImage ? ".jpg" : ".bin");
       const quality = options.quality || options.qualityLabel || (isVideo ? "1080p HD" : "Original");
 
-      // Custom folder (e.g. for Telegram) or user Videos/Pictures folder
-      let targetFolder = isVideo ? "C:\\Users\\nishant\\Videos" : (isImage ? "C:\\Users\\nishant\\Pictures" : "C:\\Users\\nishant\\Downloads");
+      // Custom folder or Adult/PornHub folder or Videos/Pictures folder
+      let targetFolder = (isVideo && isAdult)
+        ? "C:\\Users\\nishant\\Videos\\Adult\\PornHub"
+        : isVideo
+        ? "C:\\Users\\nishant\\Videos"
+        : (isImage ? "C:\\Users\\nishant\\Pictures" : "C:\\Users\\nishant\\Downloads");
       if (options.customFolder && typeof options.customFolder === "string" && options.customFolder.trim()) {
         targetFolder = options.customFolder.trim();
       }
@@ -681,12 +718,13 @@ export default function App() {
             title: newTask.title,
             artist: newTask.artist,
             album: newTask.album,
-            artworkUrl: newTask.artworkUrl,
             duration: newTask.duration,
             destinationPath,
             customFolder: options.customFolder || null,
             formatType: isVideo ? "VIDEO" : (isImage ? "IMAGE" : "FILE"),
             qualityLabel: quality,
+            isAdult,
+            artworkUrl: options.thumbnail || newTask.artworkUrl || '',
           });
         } catch (e) {
           console.error("Plugin media download error:", e);
@@ -1120,7 +1158,25 @@ export default function App() {
     }
   };
 
-  const handlePlayTrack = (track, newQueue = null) => {
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+      if (audioRef.current.duration && !isNaN(audioRef.current.duration)) {
+        setDuration(audioRef.current.duration);
+      }
+    }
+  };
+
+  const handleEnded = () => {
+    if (repeatMode === 'one' && audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(console.warn);
+    } else {
+      handleNext();
+    }
+  };
+
+  const handlePlayTrack = async (track, newQueue = null) => {
     if (!track) return;
 
     const isVideo = track.formatType === 'VIDEO' || track.mediaType === 'video' ||
@@ -1129,27 +1185,66 @@ export default function App() {
       (track.destinationPath && /\.(mp4|mkv|webm|avi|mov)$/i.test(track.destinationPath));
 
     if (isVideo) {
-      // Pause music player so video audio does not conflict
+      if (audioRef.current) audioRef.current.pause();
       setIsPlaying(false);
       handlePlayVideo(track);
       return;
     }
 
     // Audio song -> standard music player playback
-    setCurrentTrack(track);
-    setIsPlaying(true);
-    if (newQueue) {
-      setPlayQueue(newQueue);
-      setQueueIndex(newQueue.findIndex((t) => t.id === track.id || t.filePath === track.filePath));
+    let resolvedPath = track.filePath || track.destinationPath;
+    if (window.electronAPI?.resolveAudioPath && (resolvedPath || track.title)) {
+      try {
+        const actual = await window.electronAPI.resolveAudioPath(resolvedPath, track.title, track.artist);
+        if (actual) resolvedPath = actual;
+      } catch (e) {}
+    }
+
+    const activeTrack = { ...track, filePath: resolvedPath || track.filePath };
+    setCurrentTrack(activeTrack);
+
+    const queueList = newQueue || (songs.length > 0 ? songs : [activeTrack]);
+    setPlayQueue(queueList);
+    const idx = queueList.findIndex((t) => (t.id && t.id === track.id) || (t.filePath && t.filePath === activeTrack.filePath));
+    setQueueIndex(idx !== -1 ? idx : 0);
+
+    const audioSrc = activeTrack.streamUrl || formatAudioSrc(resolvedPath);
+    if (audioRef.current && audioSrc) {
+      audioRef.current.src = audioSrc;
+      audioRef.current.playbackRate = playbackSpeed || 1.0;
+      audioRef.current.volume = isMuted ? 0 : (volume ?? 0.8);
+      audioRef.current
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch((err) => {
+          console.warn('Audio playback error:', err);
+          setIsPlaying(false);
+        });
+    } else {
+      setIsPlaying(true);
+      setDuration(activeTrack.duration || 215);
     }
   };
 
   const handlePause = () => {
     setIsPlaying(false);
+    if (audioRef.current) audioRef.current.pause();
   };
 
   const handleResume = () => {
-    setIsPlaying(true);
+    if (audioRef.current && audioRef.current.src) {
+      audioRef.current
+        .play()
+        .then(() => setIsPlaying(true))
+        .catch(console.warn);
+    } else if (currentTrack) {
+      handlePlayTrack(currentTrack);
+    }
+  };
+
+  const handleTogglePlay = () => {
+    if (isPlaying) handlePause();
+    else handleResume();
   };
 
   const handleNext = () => {
@@ -1159,9 +1254,7 @@ export default function App() {
       if (repeatMode === 'all') nextIdx = 0;
       else return;
     }
-    setQueueIndex(nextIdx);
-    setCurrentTrack(playQueue[nextIdx]);
-    setIsPlaying(true);
+    handlePlayTrack(playQueue[nextIdx], playQueue);
   };
 
   const handlePrevious = () => {
@@ -1171,13 +1264,31 @@ export default function App() {
       if (repeatMode === 'all') prevIdx = playQueue.length - 1;
       else return;
     }
-    setQueueIndex(prevIdx);
-    setCurrentTrack(playQueue[prevIdx]);
-    setIsPlaying(true);
+    handlePlayTrack(playQueue[prevIdx], playQueue);
   };
 
   const handleSeek = (time) => {
     setCurrentTime(time);
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
+    }
+  };
+
+  const handleVolumeChange = (newVol) => {
+    setVolume(newVol);
+    if (isMuted && newVol > 0) setIsMuted(false);
+    if (audioRef.current) {
+      audioRef.current.volume = newVol;
+      audioRef.current.muted = false;
+    }
+  };
+
+  const handleToggleMute = () => {
+    setIsMuted((prev) => {
+      const next = !prev;
+      if (audioRef.current) audioRef.current.muted = next;
+      return next;
+    });
   };
 
   const handleToggleLike = (track) => {
@@ -1487,33 +1598,62 @@ export default function App() {
           </div>
 
           {/* Persistent Player Bar at Bottom (Never on video/plugin/telegram tabs, only when track is active) */}
+          {/* Hidden Native Audio Element for zero-delay hardware-accelerated playback */}
+          <audio
+            ref={audioRef}
+            onTimeUpdate={handleTimeUpdate}
+            onLoadedMetadata={(e) => {
+              if (e.target.duration && !isNaN(e.target.duration)) {
+                setDuration(e.target.duration);
+              }
+            }}
+            onDurationChange={(e) => {
+              if (e.target.duration && !isNaN(e.target.duration)) {
+                setDuration(e.target.duration);
+              }
+            }}
+            onEnded={handleEnded}
+            onError={(e) => {
+              console.warn('Audio element error:', e);
+              setIsPlaying(false);
+            }}
+          />
+
+          {/* Persistent Player Bar at Bottom (Never on video/plugin/telegram tabs, only when track is active) */}
           {!activeTab.startsWith('plugin-') && activeTab !== 'telegram' && activeTab !== 'videos' && activeTab !== 'adult' && currentTrack && (
             <PlayerBar
-            currentTrack={currentTrack}
-            isPlaying={isPlaying}
-            onPlay={handleResume}
-            onPause={handlePause}
-            onNext={handleNext}
-            onPrevious={handlePrevious}
-            onSeek={handleSeek}
-            currentTime={currentTime}
-            duration={duration}
-            volume={volume}
-            setVolume={setVolume}
-            isMuted={isMuted}
-            setIsMuted={setIsMuted}
-            isShuffle={isShuffle}
-            setIsShuffle={setIsShuffle}
-            repeatMode={repeatMode}
-            setRepeatMode={setRepeatMode}
-            isLiked={likedTracks.some(
-              (t) => currentTrack && (t.id === currentTrack.id || t.filePath === currentTrack.filePath)
-            )}
-            onToggleLike={() => currentTrack && handleToggleLike(currentTrack)}
-            onOpenQueue={() => setShowQueueDrawer((prev) => !prev)}
-            onOpenSleepTimer={() => setShowSleepTimerModal(true)}
-            sleepTimerRemaining={sleepTimerRemaining}
-          />
+              currentTrack={currentTrack}
+              isPlaying={isPlaying}
+              onTogglePlay={handleTogglePlay}
+              onNext={handleNext}
+              onPrevious={handlePrevious}
+              onSeek={handleSeek}
+              currentTime={currentTime}
+              duration={duration}
+              volume={volume}
+              onVolumeChange={handleVolumeChange}
+              isMuted={isMuted}
+              onToggleMute={handleToggleMute}
+              isShuffle={isShuffle}
+              onToggleShuffle={() => setIsShuffle((prev) => !prev)}
+              repeatMode={repeatMode}
+              onToggleRepeat={() => {
+                setRepeatMode((prev) => (prev === 'off' ? 'all' : prev === 'all' ? 'one' : 'off'));
+              }}
+              playbackSpeed={playbackSpeed}
+              onChangePlaybackSpeed={(speed) => {
+                setPlaybackSpeed(speed);
+                if (audioRef.current) audioRef.current.playbackRate = speed;
+              }}
+              isLiked={likedTracks.some(
+                (t) => currentTrack && (t.id === currentTrack.id || t.filePath === currentTrack.filePath)
+              )}
+              onToggleLike={() => currentTrack && handleToggleLike(currentTrack)}
+              onToggleQueue={() => setShowQueueDrawer((prev) => !prev)}
+              isQueueOpen={showQueueDrawer}
+              onOpenSleepTimer={() => setShowSleepTimerModal(true)}
+              sleepTimerRemaining={sleepTimerRemaining}
+            />
           )}
         </main>
       </div>

@@ -826,7 +826,14 @@ class LibraryManager {
   getAdultVideos(customDirs = []) {
     const validVideoExts = new Set(['.mp4', '.mkv', '.webm', '.mov', '.avi']);
     const homeDir = os.homedir();
+    const adultPornHubDir = path.join(homeDir, 'Videos', 'Adult', 'PornHub');
+    const adultDir = path.join(homeDir, 'Videos', 'Adult');
+    if (!fs.existsSync(adultPornHubDir)) {
+      try { fs.mkdirSync(adultPornHubDir, { recursive: true }); } catch (e) {}
+    }
     const videoDirs = [
+      adultPornHubDir,
+      adultDir,
       path.join(homeDir, 'Videos'),
       path.join(homeDir, 'Downloads'),
       ...(Array.isArray(customDirs) ? customDirs : [customDirs])
@@ -850,13 +857,25 @@ class LibraryManager {
           const normPath = path.resolve(item.filePath).toLowerCase();
           try {
             const stat = fs.statSync(item.filePath);
+            let artworkUrl = item.artworkUrl || '';
+            if (!artworkUrl) {
+              const dir = path.dirname(item.filePath);
+              const baseName = path.basename(item.filePath, ext);
+              for (const imgExt of ['.jpg', '.jpeg', '.png', '.webp']) {
+                const companion = path.join(dir, baseName + imgExt);
+                if (fs.existsSync(companion)) {
+                  artworkUrl = this.filePathToFileUrl(companion);
+                  break;
+                }
+              }
+            }
             videoMap.set(normPath, {
               id: item.id || Buffer.from(item.filePath).toString('base64').replace(/=/g, ''),
               title: item.title || path.basename(item.filePath, ext),
-              artist: item.artist || item.uploader || 'Video',
+              artist: item.artist || item.uploader || (item.filePath.includes('PornHub') ? 'Pornhub' : 'Video'),
               album: item.platform || 'Videos',
               quality: item.quality || '1080p',
-              artworkUrl: item.artworkUrl || '',
+              artworkUrl,
               filePath: item.filePath,
               streamUrl: this.filePathToFileUrl(item.filePath),
               fileSize: stat.size,
@@ -885,13 +904,21 @@ class LibraryManager {
                 try {
                   const stat = fs.statSync(fullPath);
                   const title = path.basename(entry.name, ext);
+                  let artworkUrl = '';
+                  for (const imgExt of ['.jpg', '.jpeg', '.png', '.webp']) {
+                    const companion = path.join(dir, title + imgExt);
+                    if (fs.existsSync(companion)) {
+                      artworkUrl = this.filePathToFileUrl(companion);
+                      break;
+                    }
+                  }
                   videoMap.set(normPath, {
                     id: Buffer.from(fullPath).toString('base64').replace(/=/g, ''),
                     title,
-                    artist: 'Video',
+                    artist: dir.includes('PornHub') ? 'Pornhub' : 'Video',
                     album: 'Videos',
                     quality: 'HD',
-                    artworkUrl: '',
+                    artworkUrl,
                     filePath: fullPath,
                     streamUrl: this.filePathToFileUrl(fullPath),
                     fileSize: stat.size,

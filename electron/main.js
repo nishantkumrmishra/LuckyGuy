@@ -73,6 +73,8 @@ if (libraryManager.songs.length === 0) {
   libraryManager.scanDirectories(defaultMusicDirs);
 }
 
+try { recoverOrphanedVideoParts(); } catch(e) {}
+
 
 app.on("web-contents-created", (event, contents) => {
   contents.on("did-fail-load", (e, errorCode) => {
@@ -578,6 +580,108 @@ ipcMain.handle('resolve-track-stream', async (event, title, artist) => {
   return null;
 });
 
+
+function simplifyMediaTitle(rawTitle, maxLength = 55) {
+  if (!rawTitle) return 'Video';
+  let clean = rawTitle
+    .replace(/[\/\\?%*:|"<>~#&]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (clean.length > maxLength) {
+    const truncated = clean.substring(0, maxLength);
+    const lastSpace = truncated.lastIndexOf(' ');
+    clean = (lastSpace > 25 ? truncated.substring(0, lastSpace) : truncated).trim();
+  }
+  return clean || 'Video';
+}
+
+function downloadThumbnail(thumbnailUrl, destImagePath) {
+  if (!thumbnailUrl || typeof thumbnailUrl !== 'string' || !thumbnailUrl.startsWith('http')) return;
+  try {
+    const urlObj = new URL(thumbnailUrl);
+    const client = urlObj.protocol === 'https:' ? https : http;
+    const file = fs.createWriteStream(destImagePath);
+    const req = client.get(urlObj, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+        'Referer': thumbnailUrl.includes('phncdn') || thumbnailUrl.includes('pornhub') ? 'https://www.pornhub.org/' : undefined
+      }
+    }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        file.close();
+        try { fs.unlinkSync(destImagePath); } catch (e) {}
+        return downloadThumbnail(res.headers.location, destImagePath);
+      }
+      if (res.statusCode === 200) {
+        res.pipe(file);
+        file.on('finish', () => file.close());
+      } else {
+        file.close();
+        try { fs.unlinkSync(destImagePath); } catch (e) {}
+      }
+    });
+    req.on('error', () => {
+      file.close();
+      try { fs.unlinkSync(destImagePath); } catch (e) {}
+    });
+  } catch (e) {}
+}
+
+function recoverOrphanedVideoParts() {
+  try {
+    const userVideos = path.join(os.homedir(), 'Videos');
+    const adultPornHubDir = path.join(userVideos, 'Adult', 'PornHub');
+    if (!fs.existsSync(adultPornHubDir)) {
+      try { fs.mkdirSync(adultPornHubDir, { recursive: true }); } catch (e) {}
+    }
+    const checkDirs = [userVideos, adultPornHubDir];
+    for (const dir of checkDirs) {
+      if (!fs.existsSync(dir)) continue;
+      const files = fs.readdirSync(dir);
+      const part0Files = files.filter(f => f.endsWith('.part0'));
+      for (const p0 of part0Files) {
+        const baseName = p0.replace(/\.part0$/, '');
+        const parts = [];
+        let i = 0;
+        while (fs.existsSync(path.join(dir, `${baseName}.part${i}`))) {
+          parts.push(path.join(dir, `${baseName}.part${i}`));
+          i++;
+        }
+        if (parts.length > 0) {
+          const rawTitle = baseName.replace(/\.mp4$/i, '');
+          const cleanTitle = simplifyMediaTitle(rawTitle);
+          const finalDest = path.join(adultPornHubDir, `${cleanTitle}.mp4`);
+          console.log(`[AutoRecovery] Merging ${parts.length} part files into ${finalDest}...`);
+          const outStream = fs.createWriteStream(finalDest);
+          let pIdx = 0;
+          const pipeNext = () => {
+            if (pIdx >= parts.length) {
+              outStream.end();
+              for (const p of parts) {
+                try { fs.unlinkSync(p); } catch (e) {}
+              }
+              const zeroByteOrphan = path.join(dir, baseName);
+              try {
+                if (fs.existsSync(zeroByteOrphan) && fs.statSync(zeroByteOrphan).size === 0) {
+                  fs.unlinkSync(zeroByteOrphan);
+                }
+              } catch (e) {}
+              console.log(`[AutoRecovery] Successfully recovered: ${finalDest}`);
+              return;
+            }
+            const reader = fs.createReadStream(parts[pIdx++]);
+            reader.on('error', (err) => console.warn('[AutoRecovery] Read error:', err.message));
+            reader.pipe(outStream, { end: false });
+            reader.on('end', pipeNext);
+          };
+          outStream.on('error', (err) => console.warn('[AutoRecovery] Write error:', err.message));
+          pipeNext();
+        }
+      }
+    }
+  } catch (e) {}
+}
+
 // Download Manager IPC
 ipcMain.handle('download-start', async (event, taskConfig) => {
   if (historyManager.isDownloaded(taskConfig.title, taskConfig.artist, taskConfig.destinationPath, preferences.downloadFolder)) {
@@ -625,8 +729,18 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     ext = '.mp3';
   }
 
-  const cleanTitle = (taskConfig.title || 'download').replace(/[\/\\?%*:|"<>]/g, '_');
-  const cleanArtist = (taskConfig.artist && taskConfig.artist !== 'Unknown Artist' && taskConfig.artist !== 'Various Artists')
+  const isAdultVideo = (taskConfig.isAdult === true ||
+    taskConfig.category === 'adult' ||
+    (taskConfig.artist && /pornhub/i.test(taskConfig.artist)) ||
+    (taskConfig.author && /pornhub/i.test(taskConfig.author)) ||
+    (taskConfig.pluginId && /pornhub/i.test(taskConfig.pluginId)) ||
+    (taskConfig.url && (taskConfig.url.includes('phncdn') || taskConfig.url.includes('pornhub'))));
+
+  const cleanTitle = isVideo
+    ? simplifyMediaTitle(taskConfig.title)
+    : (taskConfig.title || 'download').replace(/[\/\\?%*:|"<>]/g, '_');
+
+  const cleanArtist = (!isVideo && taskConfig.artist && taskConfig.artist !== 'Unknown Artist' && taskConfig.artist !== 'Various Artists')
     ? taskConfig.artist.replace(/[\/\\?%*:|"<>]/g, '_') + ' - '
     : '';
 
@@ -634,10 +748,14 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
   const shouldOrganize = preferences.autoOrganizeByGenre !== false;
   
   const userVideosDir = path.join(os.homedir(), "Videos");
+  const adultPornHubDir = path.join(userVideosDir, "Adult", "PornHub");
   const userPicturesDir = path.join(os.homedir(), "Pictures");
 
   if (taskConfig.customFolder && typeof taskConfig.customFolder === "string" && taskConfig.customFolder.trim()) {
     targetDir = taskConfig.customFolder.trim();
+  } else if (isVideo && isAdultVideo) {
+    ext = ".mp4";
+    targetDir = adultPornHubDir;
   } else if (isVideo) {
     ext = ".mp4";
     targetDir = userVideosDir;
@@ -711,6 +829,21 @@ downloadManager.on('completed', async (snap) => {
   }
 
   const isVideoDownload = snap.formatType === 'VIDEO' || (targetPath && /\.(mp4|mkv|webm|avi|mov)$/i.test(targetPath));
+  if (isVideoDownload && targetPath) {
+    const videoBase = targetPath.replace(/\.[^/.]+$/, '');
+    const thumbPath = `${videoBase}.jpg`;
+    if (snap.artworkUrl && !fs.existsSync(thumbPath)) {
+      downloadThumbnail(snap.artworkUrl, thumbPath);
+    }
+    libraryManager.recordDownloadTransaction({
+      ...snap,
+      filePath: targetPath,
+      fileSize: snap.downloadedBytes,
+      artworkUrl: snap.artworkUrl,
+      formatType: 'VIDEO',
+      status: 'COMPLETED'
+    });
+  }
   const isImageDownload = snap.formatType === 'IMAGE' || (targetPath && /\.(jpg|jpeg|png|webp|gif)$/i.test(targetPath));
 
   let finalSize = snap.downloadedBytes;
@@ -919,7 +1052,12 @@ ipcMain.handle('library-update-song', async (event, songId, updates) => libraryM
 ipcMain.handle('library-find-duplicates', async () => libraryManager.findDuplicates());
 ipcMain.handle('library-organize-fix', async (event, musicDir) => libraryManager.organizeAndFixLibrary(musicDir));
 ipcMain.handle('library-get-videos', async (event, customDirs) => {
+  try { recoverOrphanedVideoParts(); } catch(e) {}
   const dirs = [
+    path.join(os.homedir(), 'Videos', 'Adult', 'PornHub'),
+    path.join(os.homedir(), 'Videos', 'Adult'),
+    path.join(os.homedir(), 'Videos'),
+    path.join(os.homedir(), 'Downloads'),
     preferences?.downloadFolder,
     ...(Array.isArray(customDirs) ? customDirs : [customDirs])
   ].filter(Boolean);
@@ -927,7 +1065,12 @@ ipcMain.handle('library-get-videos', async (event, customDirs) => {
 });
 ipcMain.handle('library-delete-video', async (event, filePath) => libraryManager.deleteVideo(filePath));
 ipcMain.handle('library-get-adult-videos', async (event, customDirs) => {
+  try { recoverOrphanedVideoParts(); } catch(e) {}
   const dirs = [
+    path.join(os.homedir(), 'Videos', 'Adult', 'PornHub'),
+    path.join(os.homedir(), 'Videos', 'Adult'),
+    path.join(os.homedir(), 'Videos'),
+    path.join(os.homedir(), 'Downloads'),
     preferences?.downloadFolder,
     ...(Array.isArray(customDirs) ? customDirs : [customDirs])
   ].filter(Boolean);

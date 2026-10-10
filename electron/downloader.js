@@ -21,7 +21,10 @@ class TaskDownloader extends EventEmitter {
   }
 
   getHeaders(custom = {}) {
-    const isPornhub = (this.task.url || '').includes('phncdn') || (this.task.url || '').includes('pornhub');
+    const isPornhub = (this.task.url || '').includes('phncdn') ||
+      (this.task.url || '').includes('pornhub') ||
+      (this.task.artist || '').toLowerCase().includes('pornhub') ||
+      (this.task.author || '').toLowerCase().includes('pornhub');
     const baseHeaders = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
     };
@@ -46,14 +49,19 @@ class TaskDownloader extends EventEmitter {
       // 1. Probe total size and range support
       const probe = await this.probeUrl(this.task.url);
       this.totalBytes = probe.contentLength || 0;
-      const isPornhub = (this.task.url || '').includes('phncdn') || (this.task.url || '').includes('pornhub');
-      const isVideo = this.task.formatType === 'VIDEO' || isPornhub;
+      const isPornhub = (this.task.url || '').includes('phncdn') ||
+        (this.task.url || '').includes('pornhub') ||
+        (this.task.artist || '').toLowerCase().includes('pornhub') ||
+        (this.task.author || '').toLowerCase().includes('pornhub');
+      const isVideo = this.task.formatType === 'VIDEO' || isPornhub ||
+        /\.(mp4|mkv|webm|avi|mov)$/i.test(this.task.destinationPath || '');
       const supportsRange = probe.acceptRanges && this.totalBytes > 1024 * 1024;
-      // For video streams from CDNs, always use single continuous stream to avoid rate limit ECONNRESET
+
+      // Videos MUST always use single continuous stream (1 chunk) to prevent fragmented .part files
       const effectiveChunks = (isVideo || !supportsRange) ? 1 : Math.min(Math.max(this.task.chunkCount || 8, 1), 16);
 
       if (!supportsRange || effectiveChunks <= 1) {
-        // Single stream download with automatic range resume on drop
+        // Single stream download directly to destinationPath with auto-resume on drop
         await this.downloadSingle(this.task.url, this.task.destinationPath);
       } else {
         // Parallel multi-chunk download
@@ -106,7 +114,6 @@ class TaskDownloader extends EventEmitter {
       try {
         const urlObj = new URL(targetUrl);
         const client = urlObj.protocol === 'https:' ? https : http;
-        const isPornhub = targetUrl.includes('phncdn') || targetUrl.includes('pornhub');
         const method = 'GET';
         const reqHeaders = this.getHeaders({ 'Range': 'bytes=0-0' });
 
@@ -314,13 +321,27 @@ class TaskDownloader extends EventEmitter {
 
             res.on('end', () => {
               partStream.end();
+            });
+
+            partStream.on('finish', () => {
               resolve();
             });
 
-            res.on('error', reject);
+            partStream.on('error', (err) => {
+              partStream.close();
+              reject(err);
+            });
+
+            res.on('error', (err) => {
+              partStream.close();
+              reject(err);
+            });
           });
 
-          req.on('error', reject);
+          req.on('error', (err) => {
+            partStream.close();
+            reject(err);
+          });
           this.chunkRequests.push(req);
         } catch (e) {
           reject(e);
@@ -332,7 +353,7 @@ class TaskDownloader extends EventEmitter {
 
     if (this.isCanceled || this.isPaused) return;
 
-    // Merge part files into final file
+    // Merge part files sequentially into final file using streams with proper backpressure
     this.status = 'MERGING';
     this.emit('update', this.snapshot());
 
@@ -340,14 +361,27 @@ class TaskDownloader extends EventEmitter {
       const outStream = fs.createWriteStream(destinationPath);
       outStream.on('error', reject);
       outStream.on('finish', resolve);
-      for (const part of this.partFiles) {
-        if (fs.existsSync(part)) {
-          const buffer = fs.readFileSync(part);
-          outStream.write(buffer);
-          try { fs.unlinkSync(part); } catch (e) {}
+
+      let pIdx = 0;
+      const pipeNext = () => {
+        if (pIdx >= this.partFiles.length) {
+          outStream.end();
+          return;
         }
-      }
-      outStream.end();
+        const part = this.partFiles[pIdx++];
+        if (!fs.existsSync(part)) {
+          pipeNext();
+          return;
+        }
+        const inStream = fs.createReadStream(part);
+        inStream.on('error', reject);
+        inStream.pipe(outStream, { end: false });
+        inStream.on('end', () => {
+          try { fs.unlinkSync(part); } catch (e) {}
+          pipeNext();
+        });
+      };
+      pipeNext();
     });
   }
 
@@ -376,8 +410,7 @@ class TaskDownloader extends EventEmitter {
 
   snapshot() {
     const progress = this.totalBytes > 0 ? Math.min(1.0, this.downloadedBytes / this.totalBytes) : 0;
-    return {
-      ...this.task,
+    return {\n      ...this.task,
       status: this.status,
       downloadedBytes: this.downloadedBytes,
       totalBytes: this.totalBytes,
@@ -449,13 +482,15 @@ class DownloadManager extends EventEmitter {
 
   pauseAll() {
     for (const d of this.activeDownloaders.values()) {
-      if (d && !d.isPaused && !d.isCanceled) d.pause();
+      d.pause();
     }
   }
 
   resumeAll() {
-    for (const [id, task] of this.tasks.entries()) {
-      if (task.status === 'PAUSED') this.resumeTask(id);
+    for (const [id, snap] of this.tasks.entries()) {
+      if (snap.status === 'PAUSED') {
+        this.resumeTask(id);
+      }
     }
   }
 
@@ -464,7 +499,4 @@ class DownloadManager extends EventEmitter {
   }
 }
 
-module.exports = {
-  DownloadManager,
-  TaskDownloader
-};
+module.exports = { DownloadManager, TaskDownloader };

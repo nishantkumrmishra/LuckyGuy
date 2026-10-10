@@ -786,6 +786,10 @@ export default function PluginTabContainer({
     }
   };
 
+  const isAdultPlugin = (plugin?.id || '').toLowerCase().includes('pornhub') ||
+    (plugin?.category || '').toLowerCase() === 'adult' ||
+    (plugin?.name || '').toLowerCase().includes('pornhub');
+
   const handleDownloadSingle = (item, qualityOverride) => {
     if (!onStartDownload) return;
     const isImg = item.mediaType === 'image' || (!item.streamUrl && item.imageUrl);
@@ -802,6 +806,8 @@ export default function PluginTabContainer({
       title: item.title,
       author: item.author || plugin.name,
       thumbnail: item.thumbnail || item.imageUrl || '',
+      isAdult: isAdultPlugin,
+      category: isAdultPlugin ? 'adult' : (plugin?.category || 'media'),
       customFolder: customDownloadFolder || (plugin.id?.includes('telegram') ? preferences?.telegramDownloadFolder : null)
     });
     setDownloadSuccessMsg(`Queued "${item.title}" (${chosenQuality}) for download!`);
@@ -824,6 +830,8 @@ export default function PluginTabContainer({
         title: m.title,
         author: m.author || plugin.name,
         thumbnail: m.thumbnail || m.imageUrl || '',
+        isAdult: isAdultPlugin,
+        category: isAdultPlugin ? 'adult' : (plugin?.category || 'media'),
         customFolder: customDownloadFolder || null
       });
     });
