@@ -35,7 +35,10 @@ import {
   Image as ImageIcon,
   ZoomIn,
   Settings,
-  FolderOpen
+  FolderOpen,
+  Home,
+  ListPlus,
+  Bookmark
 } from 'lucide-react';
 
 export default function PluginTabContainer({
@@ -116,6 +119,10 @@ export default function PluginTabContainer({
   });
   const [activeLightboxImage, setActiveLightboxImage] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const [playlistModalVideo, setPlaylistModalVideo] = useState(null);
+  const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
+  const [toastMsg, setToastMsg] = useState('');
+  const isSavedInVideos = (v) => Array.isArray(savedOnlineVideos) && savedOnlineVideos.some(sv => (sv.id && sv.id === v?.id) || (sv.url && sv.url === v?.url));
   const [ageVerificationBypassed, setAgeVerificationBypassed] = useState(true);
   const [selectedQuality, setSelectedQuality] = useState('1080p');
   const [customDownloadFolder, setCustomDownloadFolder] = useState(() => {
@@ -1000,25 +1007,89 @@ export default function PluginTabContainer({
         }
       `}</style>
 
-      {/* Sleek Top Navigation Toolbar inside Tab (Hidden when playing video) */}
-      {!activePlayerVideo && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            padding: '10px 20px',
-            backgroundColor: 'var(--bg-card, #ffffff)',
-            borderBottom: '1px solid var(--border-medium, #e2e8f0)',
-            gap: '8px',
-            flexShrink: 0,
-          }}
-        >
-          {/* Back, Forward, Reload buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <button
-              type="button"
-              onClick={handleWebBack}
-              title="Go Back"
+      {/* Sleek Top Navigation Toolbar inside Tab (Always visible on grid & video watch views) */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '10px 20px',
+          backgroundColor: 'var(--bg-card, #ffffff)',
+          borderBottom: '1px solid var(--border-medium, #e2e8f0)',
+          gap: '8px',
+          flexShrink: 0,
+          zIndex: 40,
+        }}
+      >
+        {/* Back, Forward, Home, Reload buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button
+            type="button"
+            onClick={handleWebBack}
+            title={activePlayerVideo ? "Back to Videos Grid" : "Go Back"}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
+              borderRadius: '6px',
+              border: '1px solid var(--border-medium, #e2e8f0)',
+              backgroundColor: 'var(--bg-main, #f8fafc)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+            }}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={handleWebForward}
+            title="Go Forward"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
+              borderRadius: '6px',
+              border: '1px solid var(--border-medium, #e2e8f0)',
+              backgroundColor: 'var(--bg-main, #f8fafc)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+            }}
+          >
+            <ChevronRight size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (activePlayerVideo) {
+                setActivePlayerVideo(null);
+                setInputUrl(activeUrl);
+              } else if (onNavigateHome) {
+                onNavigateHome();
+              }
+            }}
+            title={activePlayerVideo ? "Back to Videos Grid" : "Go to Home"}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
+              borderRadius: '6px',
+              border: '1px solid var(--border-medium, #e2e8f0)',
+              backgroundColor: 'var(--bg-main, #f8fafc)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+            }}
+          >
+            <Home size={15} />
+          </button>
+          <button
+            type="button"
+            onClick={handleWebReload}
+            title="Reload"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -1217,8 +1288,7 @@ export default function PluginTabContainer({
             </div>
           </form>
 
-                  </div>
-      )}
+      </div>
 
       {/* Floating Batch Selection Bar */}
       {selectedIds.size > 0 && (
@@ -1314,6 +1384,48 @@ export default function PluginTabContainer({
           >
             {/* Left Area (72% - 75% width): Custom Video Player + Details + More Related Videos */}
             <div style={{ flex: '0 0 73%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Breadcrumb Navigation directly above Player */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <button
+                  type="button"
+                  onClick={() => { setActivePlayerVideo(null); setInputUrl(activeUrl); }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '7px',
+                    border: '1px solid var(--border-medium)',
+                    backgroundColor: 'var(--bg-card)',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <ChevronLeft size={15} />
+                  <span>Back to Videos Grid</span>
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '3px 9px',
+                      borderRadius: '12px',
+                      backgroundColor: 'rgba(124, 92, 191, 0.12)',
+                      color: 'var(--primary, #7c5cbf)',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <Globe size={11} />
+                    <span>Online Stream &bull; No Download Required</span>
+                  </span>
+                </div>
+              </div>
+
               {/* Custom Native Video Player with In-Player Quality & Download */}
               <CustomVideoPlayer
                 video={activePlayerVideo}
@@ -1369,6 +1481,62 @@ export default function PluginTabContainer({
                         Verified Stream Channel &bull; {activePlayerVideo.views || 'HQ Stream'}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Online Actions: Save to Videos & Add to Playlist */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onSaveToVideos) {
+                          onSaveToVideos(activePlayerVideo);
+                          const isNowSaved = !isSavedInVideos(activePlayerVideo);
+                          setToastMsg(isNowSaved ? 'Saved to Videos Library (Streaming Mode)!' : 'Removed from Videos Library');
+                          setTimeout(() => setToastMsg(''), 3000);
+                        }
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '7px 14px',
+                        borderRadius: '7px',
+                        border: isSavedInVideos(activePlayerVideo) ? '1px solid var(--primary, #7c5cbf)' : '1px solid var(--border-medium)',
+                        backgroundColor: isSavedInVideos(activePlayerVideo) ? 'rgba(124, 92, 191, 0.12)' : 'var(--bg-card)',
+                        color: isSavedInVideos(activePlayerVideo) ? 'var(--primary, #7c5cbf)' : 'var(--text-primary)',
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      title="Save this online video into your Videos tab to stream anytime without downloading"
+                    >
+                      {isSavedInVideos(activePlayerVideo) ? <Check size={14} /> : <Film size={14} />}
+                      <span>{isSavedInVideos(activePlayerVideo) ? 'Saved in Videos' : 'Save to Videos'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPlaylistModalVideo(activePlayerVideo)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '7px 14px',
+                        borderRadius: '7px',
+                        border: '1px solid var(--border-medium)',
+                        backgroundColor: 'var(--bg-card)',
+                        color: 'var(--text-primary)',
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      title="Add to a playlist to play over the internet anytime"
+                    >
+                      <ListPlus size={14} />
+                      <span>Add to Playlist</span>
+                    </button>
                   </div>
                 </div>
               </div>

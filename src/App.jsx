@@ -289,6 +289,60 @@ export default function App() {
   const [activeDownloads, setActiveDownloads] = useState([]);
   const [videos, setVideos] = useState([]);
   const [activeVideo, setActiveVideo] = useState(null);
+  const [savedOnlineVideos, setSavedOnlineVideos] = useState(() => {
+    try {
+      const saved = localStorage.getItem('localguy-saved-online-videos');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleSaveToVideos = useCallback((video) => {
+    if (!video) return;
+    setSavedOnlineVideos((prev) => {
+      const exists = prev.some((v) => (v.id && v.id === video.id) || (v.url && v.url === video.url));
+      let updated;
+      if (exists) {
+        updated = prev.filter((v) => (v.id ? v.id !== video.id : true) && (v.url ? v.url !== video.url : true));
+      } else {
+        const item = {
+          id: video.id || 'online-' + Date.now(),
+          title: video.title || 'Online Video',
+          author: video.author || 'Web Stream',
+          thumbnail: video.thumbnail || video.imageUrl || '',
+          url: video.url || '',
+          streamUrl: video.streamUrl || video.url || '',
+          duration: video.duration || 'Stream',
+          durationFormatted: video.duration || 'Online',
+          isOnline: true,
+          mediaType: 'video',
+          formatType: 'VIDEO',
+          quality: video.quality || '1080p Stream',
+          savedAt: Date.now(),
+        };
+        updated = [item, ...prev];
+      }
+      try {
+        localStorage.setItem('localguy-saved-online-videos', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  }, []);
+
+  const handleRemoveOnlineVideo = useCallback((videoId) => {
+    setSavedOnlineVideos((prev) => {
+      const updated = prev.filter((v) => v.id !== videoId && v.url !== videoId);
+      try {
+        localStorage.setItem('localguy-saved-online-videos', JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  }, []);
+
+  const allVideos = useMemo(() => {
+    return [...savedOnlineVideos, ...videos];
+  }, [savedOnlineVideos, videos]);
   const [libraryMode, setLibraryMode] = useState('music'); // 'music' | 'videos'
   const [completedDownloads, setCompletedDownloads] = useState(() => {
     try {
@@ -1203,6 +1257,10 @@ export default function App() {
     if (activeVideo?.id === video.id) {
       setActiveVideo(null);
     }
+    if (video.isOnline) {
+      handleRemoveOnlineVideo(video.id);
+      return;
+    }
     setVideos((prev) => prev.filter((v) => v.id !== video.id && v.filePath !== video.filePath));
     if (video.filePath) {
       if (window.electronAPI?.deleteVideo) {
@@ -1234,7 +1292,7 @@ export default function App() {
   const handlePlayTrack = async (track, newQueue = null) => {
     if (!track) return;
 
-    const isVideo = track.formatType === 'VIDEO' || track.mediaType === 'video' ||
+    const isVideo = track.formatType === 'VIDEO' || track.mediaType === 'video' || track.isOnline || Boolean(track.url && /view_video|pornhub|youtube|video/i.test(track.url)) ||
       (track.format && track.format.toUpperCase().includes('MP4')) ||
       (track.filePath && /\.(mp4|mkv|webm|avi|mov)$/i.test(track.filePath)) ||
       (track.destinationPath && /\.(mp4|mkv|webm|avi|mov)$/i.test(track.destinationPath));
@@ -1495,7 +1553,7 @@ export default function App() {
 
             {activeTab === 'videos' && (
               <VideoStreamingTab
-                videos={videos}
+                videos={allVideos}
                 activeVideo={activeVideo}
                 onPlayVideo={handlePlayVideo}
                 onClosePlayer={() => setActiveVideo(null)}
@@ -1509,7 +1567,7 @@ export default function App() {
             {activeTab === 'library' && (
               <LibraryTab
                 songs={songs}
-                videos={videos}
+                videos={allVideos}
                 activeVideo={activeVideo}
                 onPlayVideo={handlePlayVideo}
                 onClosePlayer={() => setActiveVideo(null)}
@@ -1632,6 +1690,12 @@ export default function App() {
                       onStartDownload={handleStartDownload}
                       preferences={preferences}
                       onOpenFolder={handleOpenFolder}
+                      playlists={playlists}
+                      onAddToPlaylist={handleAddTrackToPlaylist}
+                      onCreatePlaylist={handleCreatePlaylist}
+                      savedOnlineVideos={savedOnlineVideos}
+                      onSaveToVideos={handleSaveToVideos}
+                      onNavigateHome={() => setActiveTab('home')}
                     />
                   )}
                 </div>

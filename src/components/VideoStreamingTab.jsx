@@ -33,6 +33,7 @@ export default function VideoStreamingTab({
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('recent'); // 'recent' | 'title' | 'size'
+  const [mediaFilter, setMediaFilter] = useState('all'); // 'all' | 'downloaded' | 'online'
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -233,6 +234,62 @@ export default function VideoStreamingTab({
           </div>
 
           {/* Search & Sort Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', backgroundColor: 'var(--bg-card)', padding: '3px', borderRadius: '8px', border: '1px solid var(--border-medium)', gap: '4px' }}>
+              <button
+                type="button"
+                onClick={() => setMediaFilter('all')}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: mediaFilter === 'all' ? 'var(--primary, #7c5cbf)' : 'transparent',
+                  color: mediaFilter === 'all' ? '#ffffff' : 'var(--text-secondary)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                All Videos ({videos.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setMediaFilter('online')}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: mediaFilter === 'online' ? 'var(--primary, #7c5cbf)' : 'transparent',
+                  color: mediaFilter === 'online' ? '#ffffff' : 'var(--text-secondary)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                Online Stream ({videos.filter(v => v.isOnline).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setMediaFilter('downloaded')}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: mediaFilter === 'downloaded' ? 'var(--primary, #7c5cbf)' : 'transparent',
+                  color: mediaFilter === 'downloaded' ? '#ffffff' : 'var(--text-secondary)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                Downloaded ({videos.filter(v => !v.isOnline).length})
+              </button>
+            </div>
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <div
               style={{
@@ -370,6 +427,30 @@ export default function VideoStreamingTab({
                         }}
                       >
                         <Film size={32} />
+                      </div>
+                    )}
+
+                    {video.isOnline && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '6px',
+                          left: '6px',
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: 'rgba(124, 92, 191, 0.92)',
+                          color: '#fff',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          zIndex: 2,
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+                        }}
+                      >
+                        <Globe size={11} />
+                        <span>ONLINE STREAM</span>
                       </div>
                     )}
 
