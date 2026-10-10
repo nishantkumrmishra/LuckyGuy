@@ -180,15 +180,14 @@ export default function PluginTabContainer({
       } catch (e) {}
     }
 
-    const fresh = (liveItems && liveItems.length > 0)
-      ? deduplicateVideos(liveItems)
-      : deduplicateVideos(generateIndexedVideos(selectedCategory, 1));
-
-    setCrawledMedia(fresh);
-    setIsIndexing(false);
-    if (window.electronAPI?.savePortalCache) {
-      window.electronAPI.savePortalCache(cachePortalId, fresh);
+    const cleanLive = Array.isArray(liveItems) ? deduplicateVideos(liveItems.filter(isRealMediaItem)) : [];
+    if (cleanLive.length > 0) {
+      setCrawledMedia(cleanLive);
+      if (window.electronAPI?.savePortalCache) {
+        window.electronAPI.savePortalCache(cachePortalId, cleanLive);
+      }
     }
+    setIsIndexing(false);
   };
 
   // Determine portal category and tag
@@ -207,6 +206,19 @@ export default function PluginTabContainer({
     : ['All', 'Top Stations', 'Chillout & Ambient', 'Jazz & Blues', 'Electronic Dance', 'Rock Classics'];
 
   // Curated photography and cinema thumbnails
+    const defaultFallbackThumb = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180' fill='%2318181b'%3E%3Crect width='320' height='180'/%3E%3Cpolygon points='135,65 135,115 185,90' fill='%2352525b'/%3E%3C/svg%3E";
+
+  const isRealMediaItem = useCallback((item) => {
+    if (!item || !item.url) return false;
+    const id = String(item.id || '');
+    const thumb = String(item.thumbnail || '');
+    const title = String(item.title || '');
+    if (id.startsWith('ph-vid-') || id.startsWith('tg-art-')) return false;
+    if (thumb.includes('images.unsplash.com')) return false;
+    if (title.includes('Exclusive 4K Ultra HD Studio Session') || title.includes('Top Rated Scene of the Year')) return false;
+    return true;
+  }, []);
+
   const matureThumbnails = [
     'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=640&auto=format&fit=crop&q=80',
     'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=640&auto=format&fit=crop&q=80',
@@ -559,41 +571,61 @@ export default function PluginTabContainer({
 
         if (!isMounted) return;
 
-        if (Array.isArray(cached) && cached.length > 0) {
-          const freshSeed = generateIndexedVideos(selectedCategory, 1);
-          const blended = deduplicateVideos([...freshSeed.slice(0, 8), ...cached]);
-          setCrawledMedia(blended);
+        // Clean any cached items so that mock items with random artwork are permanently purged
+        const cleanCached = Array.isArray(cached) ? deduplicateVideos(cached.filter(isRealMediaItem)) : [];
+
+        if (cleanCached.length > 0) {
+          // If clean real cached videos exist, load them immediately with ZERO delay
+          setCrawledMedia(cleanCached);
           setIsIndexing(false);
-          if (window.electronAPI?.savePortalCache) {
-            window.electronAPI.savePortalCache(cachePortalId, blended);
+
+          // Update cache on disk if any polluted items were pruned
+          if (cached.length !== cleanCached.length && window.electronAPI?.savePortalCache) {
+            window.electronAPI.savePortalCache(cachePortalId, cleanCached);
+          }
+
+          // Fetch fresh live videos in the background and update seamlessly
+          if (window.electronAPI?.crawlPortal) {
+            try {
+              const liveItems = await window.electronAPI.crawlPortal(activeUrl);
+              const cleanLive = Array.isArray(liveItems) ? deduplicateVideos(liveItems.filter(isRealMediaItem)) : [];
+              if (isMounted && cleanLive.length > 0) {
+                const merged = deduplicateVideos([...cleanLive, ...cleanCached]);
+                setCrawledMedia(merged);
+                if (window.electronAPI?.savePortalCache) {
+                  window.electronAPI.savePortalCache(cachePortalId, merged);
+                }
+              }
+            } catch (e) {}
           }
           return;
         }
 
-        // Instant seed load - eliminate infinite skeleton shimmer immediately
-        const initialSeed = deduplicateVideos(generateIndexedVideos(selectedCategory, 1));
-        setCrawledMedia(initialSeed);
-        setIsIndexing(false);
+        // Cache was empty: show clean skeletons while crawler fetches real website videos
+        setIsIndexing(true);
 
-        // Background live crawl without blocking UI
         if (window.electronAPI?.crawlPortal) {
           try {
             const liveItems = await window.electronAPI.crawlPortal(activeUrl);
-            if (isMounted && Array.isArray(liveItems) && liveItems.length > 0) {
-              const updated = deduplicateVideos([...liveItems, ...initialSeed]);
-              setCrawledMedia(updated);
+            const cleanLive = Array.isArray(liveItems) ? deduplicateVideos(liveItems.filter(isRealMediaItem)) : [];
+            if (isMounted && cleanLive.length > 0) {
+              setCrawledMedia(cleanLive);
               setBlockedAdsCount(prev => prev + 14);
               if (window.electronAPI?.savePortalCache) {
-                window.electronAPI.savePortalCache(cachePortalId, updated);
+                window.electronAPI.savePortalCache(cachePortalId, cleanLive);
               }
+              return;
             }
           } catch (e) {}
         }
+
+        // Fallback for non-video / Telegraph plugins if crawler is not applicable
+        if (isMounted && isTelegraph) {
+          const artItems = deduplicateVideos(generateIndexedVideos(selectedCategory, 1));
+          setCrawledMedia(artItems);
+        }
       } catch (err) {
         console.warn('Error loading media portal items:', err);
-        if (isMounted) {
-          setCrawledMedia(deduplicateVideos(generateIndexedVideos(selectedCategory, 1)));
-        }
       } finally {
         if (isMounted) {
           setIsIndexing(false);
@@ -606,7 +638,7 @@ export default function PluginTabContainer({
     return () => {
       isMounted = false;
     };
-  }, [plugin.id, selectedCategory, deduplicateVideos]);
+  }, [plugin.id, selectedCategory, deduplicateVideos, cachePortalId, activeUrl, isRealMediaItem, isTelegraph]);
 
   // Infinite Scroll Trigger
   const handleLoadMore = useCallback(async () => {
@@ -624,19 +656,22 @@ export default function PluginTabContainer({
       } catch (e) {}
     }
 
-    if (!nextItems || nextItems.length === 0) {
-      nextItems = generateIndexedVideos(selectedCategory, nextPage);
-    }
+    const cleanNext = Array.isArray(nextItems) ? deduplicateVideos(nextItems.filter(isRealMediaItem)) : [];
 
-    setCrawledMedia(prev => {
-      const updated = deduplicateVideos([...prev, ...nextItems]);
-      if (window.electronAPI?.savePortalCache) {
-        window.electronAPI.savePortalCache(cachePortalId, updated);
-      }
-      return updated;
-    });
+    if (cleanNext.length > 0) {
+      setCrawledMedia(prev => {
+        const updated = deduplicateVideos([...prev.filter(isRealMediaItem), ...cleanNext]);
+        if (window.electronAPI?.savePortalCache) {
+          window.electronAPI.savePortalCache(cachePortalId, updated);
+        }
+        return updated;
+      });
+    } else if (isTelegraph) {
+      const artNext = generateIndexedVideos(selectedCategory, nextPage);
+      setCrawledMedia(prev => deduplicateVideos([...prev, ...artNext]));
+    }
     setIsLoadingMore(false);
-  }, [isLoadingMore, isIndexing, pageNumber, activeUrl, selectedCategory, deduplicateVideos, cachePortalId]);
+  }, [isLoadingMore, isIndexing, pageNumber, activeUrl, deduplicateVideos, cachePortalId, isRealMediaItem, isTelegraph, selectedCategory]);
 
   // Observer for Infinite Scroll sentinel
   useEffect(() => {
@@ -1393,7 +1428,7 @@ export default function PluginTabContainer({
                           src={video.thumbnail}
                           alt={video.title}
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={(e) => { e.target.src = video.thumbnailFallback || matureThumbnails[0]; }}
+                          onError={(e) => { e.target.src = defaultFallbackThumb; }}
                         />
                         <span
                           style={{
@@ -1473,7 +1508,7 @@ export default function PluginTabContainer({
                         src={rec.thumbnail}
                         alt={rec.title}
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={(e) => { e.target.src = rec.thumbnailFallback || matureThumbnails[0]; }}
+                        onError={(e) => { e.target.src = defaultFallbackThumb; }}
                       />
                       <span
                         style={{
@@ -1726,7 +1761,7 @@ export default function PluginTabContainer({
                       <img
                         src={item.thumbnail}
                         alt={item.title}
-                        onError={(e) => { if (item.thumbnailFallback && e.target.src !== item.thumbnailFallback) { e.target.src = item.thumbnailFallback; } }}
+                        onError={(e) => { e.target.src = defaultFallbackThumb; }}
                         style={{
                           width: '100%',
                           height: '100%',

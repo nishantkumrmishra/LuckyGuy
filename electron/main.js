@@ -604,6 +604,16 @@ ipcMain.handle('portal-cache-get', async (event, portalId) => {
     const cacheFile = path.join(portalCacheDir, `${cleanId}.json`);
     if (fs.existsSync(cacheFile)) {
       const data = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+      if (Array.isArray(data)) {
+        return data.filter(it => {
+          if (!it || !it.url) return false;
+          const id = String(it.id || '');
+          const thumb = String(it.thumbnail || '');
+          if (id.startsWith('ph-vid-') || id.startsWith('tg-art-')) return false;
+          if (thumb.includes('images.unsplash.com')) return false;
+          return true;
+        });
+      }
       return data;
     }
   } catch (err) {
@@ -619,7 +629,15 @@ ipcMain.handle('portal-cache-save', async (event, portalId, items) => {
     if (!fs.existsSync(portalCacheDir)) {
       fs.mkdirSync(portalCacheDir, { recursive: true });
     }
-    fs.writeFileSync(cacheFile, JSON.stringify(items || [], null, 2), 'utf8');
+    const cleanItems = Array.isArray(items) ? items.filter(it => {
+      if (!it || !it.url) return false;
+      const id = String(it.id || '');
+      const thumb = String(it.thumbnail || '');
+      if (id.startsWith('ph-vid-') || id.startsWith('tg-art-')) return false;
+      if (thumb.includes('images.unsplash.com')) return false;
+      return true;
+    }) : [];
+    fs.writeFileSync(cacheFile, JSON.stringify(cleanItems, null, 2), 'utf8');
     return true;
   } catch (err) {
     console.warn('[PortalCache] Write error:', err.message);
