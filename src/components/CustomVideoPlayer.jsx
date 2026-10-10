@@ -58,14 +58,14 @@ export default function CustomVideoPlayer({
   
   // Separation of initial URL resolution and in-playback buffering
   const [isResolving, setIsResolving] = useState(
-    !video?.streamUrl && (!video?.streams || Object.keys(video.streams).length === 0)
+    !localSrc && !video?.streamUrl && (!video?.streams || Object.keys(video.streams).length === 0)
   );
   const [isBuffering, setIsBuffering] = useState(false);
   const [hasError, setHasError] = useState(false);
   
   const [resolvedStreams, setResolvedStreams] = useState(video?.streams || {});
   const [currentStreamSrc, setCurrentStreamSrc] = useState(
-    (video?.streams && video?.streams[selectedQuality]) || video?.streamUrl || ''
+    localSrc || (video?.streams && video?.streams[selectedQuality]) || video?.streamUrl || ''
   );
   const [displayTitle, setDisplayTitle] = useState(
     video?.title && !/^\d+:\d+(:\d+)?$/.test(video.title) ? video.title : ''
@@ -100,6 +100,13 @@ export default function CustomVideoPlayer({
   // Resolve direct streams if needed
   const resolveStreams = useCallback(async () => {
     setHasError(false);
+
+    if (localSrc || (video?.streamUrl && video.streamUrl.startsWith('file:'))) {
+      const chosen = localSrc || video.streamUrl;
+      setCurrentStreamSrc(chosen);
+      setIsResolving(false);
+      return;
+    }
 
     if (video?.streams && Object.keys(video.streams).length > 0) {
       setResolvedStreams(video.streams);

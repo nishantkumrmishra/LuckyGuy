@@ -447,6 +447,9 @@ export default function App() {
     try {
       localStorage.setItem('localguy-active-tab', activeTab);
     } catch (e) {}
+    if (activeTab === 'videos' || activeTab === 'library') {
+      refreshVideos();
+    }
   }, [activeTab]);
 
   useEffect(() => {
@@ -635,6 +638,8 @@ export default function App() {
           if (prev.some((s) => s.filePath === completed.filePath || s.id === completed.id)) return prev;
           return [completed, ...prev];
         });
+      } else {
+        refreshVideos();
       }
     });
 
@@ -1334,12 +1339,29 @@ export default function App() {
         const isEditable = e.target.isContentEditable;
         if (tag === 'input' || tag === 'textarea' || isEditable) return;
         e.preventDefault();
-        setIsPlaying((prev) => !prev);
+
+        // 1. If video player is active, toggle video element directly
+        if (activeVideo) {
+          const videoEl = document.querySelector('video');
+          if (videoEl) {
+            if (videoEl.paused) {
+              videoEl.play().catch(console.warn);
+            } else {
+              videoEl.pause();
+            }
+            return;
+          }
+        }
+
+        // 2. If music player has a track, toggle audio playback
+        if (currentTrack || (audioRef.current && audioRef.current.src)) {
+          handleTogglePlay();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [activeVideo, currentTrack, isPlaying, handleTogglePlay]);
 
   // Update notification dismissal
   const handleDismissUpdate = () => {

@@ -37,6 +37,13 @@ ishant\\Videos',
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Auto-scan / refresh video list on component mount
+  useEffect(() => {
+    if (onRefreshVideos) {
+      onRefreshVideos();
+    }
+  }, []);
+
   // Total downloaded size calculation
   const totalSizeBytes = useMemo(() => {
     return videos.reduce((acc, v) => acc + (v.fileSize || 0), 0);
