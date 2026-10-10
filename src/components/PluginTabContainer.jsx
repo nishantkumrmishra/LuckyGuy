@@ -48,7 +48,13 @@ export default function PluginTabContainer({
   onOpenFolder,
   onOpenSettings,
   onVideoPlay,
-  onNavRegister
+  onNavRegister,
+  savedOnlineVideos = [],
+  onSaveToVideos,
+  playlists = [],
+  onAddToPlaylist,
+  onCreatePlaylist,
+  onNavigateHome
 }) {
   // Helper: Domain Aliases Unblocking (learned from Pornhub / regional blocking)
   const resolveDomainAlias = useCallback((url) => {
@@ -122,7 +128,26 @@ export default function PluginTabContainer({
   const [playlistModalVideo, setPlaylistModalVideo] = useState(null);
   const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
   const [toastMsg, setToastMsg] = useState('');
-  const isSavedInVideos = (v) => Array.isArray(savedOnlineVideos) && savedOnlineVideos.some(sv => (sv.id && sv.id === v?.id) || (sv.url && sv.url === v?.url));
+  const [localSavedVideos, setLocalSavedVideos] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('localguy-saved-online-videos') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  const activeSavedVideos = (Array.isArray(savedOnlineVideos) && savedOnlineVideos.length > 0)
+    ? savedOnlineVideos
+    : localSavedVideos;
+
+  const isSavedInVideos = (v) => {
+    if (!v) return false;
+    return Array.isArray(activeSavedVideos) && activeSavedVideos.some(sv => 
+      (sv?.id && sv.id === v?.id) || 
+      (sv?.url && sv.url === v?.url) ||
+      (sv?.embedUrl && sv.embedUrl === v?.embedUrl)
+    );
+  };
   const [ageVerificationBypassed, setAgeVerificationBypassed] = useState(true);
   const [selectedQuality, setSelectedQuality] = useState('1080p');
   const [customDownloadFolder, setCustomDownloadFolder] = useState(() => {
@@ -1152,61 +1177,23 @@ export default function PluginTabContainer({
           <button
             type="button"
             onClick={handleWebReload}
-            title="Reload"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '32px',
-                height: '32px',
-                borderRadius: '6px',
-                border: '1px solid var(--border-medium, #e2e8f0)',
-                backgroundColor: 'var(--bg-main, #f8fafc)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-              }}
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={handleWebForward}
-              title="Go Forward"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '32px',
-                height: '32px',
-                borderRadius: '6px',
-                border: '1px solid var(--border-medium, #e2e8f0)',
-                backgroundColor: 'var(--bg-main, #f8fafc)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-              }}
-            >
-              <ChevronRight size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={handleWebReload}
-              title="Refresh"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '32px',
-                height: '32px',
-                borderRadius: '6px',
-                border: '1px solid var(--border-medium, #e2e8f0)',
-                backgroundColor: 'var(--bg-main, #f8fafc)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-              }}
-            >
-              <RefreshCw size={13} />
-            </button>
-          </div>
+            title="Refresh"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
+              borderRadius: '6px',
+              border: '1px solid var(--border-medium, #e2e8f0)',
+              backgroundColor: 'var(--bg-main, #f8fafc)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+            }}
+          >
+            <RefreshCw size={13} />
+          </button>
+        </div>
 
           {/* URL Address Bar */}
           <form
@@ -1565,10 +1552,23 @@ export default function PluginTabContainer({
                       onClick={() => {
                         if (onSaveToVideos) {
                           onSaveToVideos(activePlayerVideo);
-                          const isNowSaved = !isSavedInVideos(activePlayerVideo);
-                          setToastMsg(isNowSaved ? 'Saved to Videos Library (Streaming Mode)!' : 'Removed from Videos Library');
-                          setTimeout(() => setToastMsg(''), 3000);
                         }
+                        setLocalSavedVideos(prev => {
+                          const exists = prev.some(sv => (sv?.id && sv.id === activePlayerVideo?.id) || (sv?.url && sv.url === activePlayerVideo?.url));
+                          let updated;
+                          if (exists) {
+                            updated = prev.filter(sv => (sv?.id !== activePlayerVideo?.id) && (sv?.url !== activePlayerVideo?.url));
+                          } else {
+                            updated = [activePlayerVideo, ...prev];
+                          }
+                          try {
+                            localStorage.setItem('localguy-saved-online-videos', JSON.stringify(updated));
+                          } catch (e) {}
+                          return updated;
+                        });
+                        const isNowSaved = !isSavedInVideos(activePlayerVideo);
+                        setToastMsg(isNowSaved ? 'Saved to Videos Library (Streaming Mode)!' : 'Removed from Videos Library');
+                        setTimeout(() => setToastMsg(''), 3000);
                       }}
                       style={{
                         display: 'flex',
@@ -2099,6 +2099,204 @@ export default function PluginTabContainer({
                 <span>Loading more media streams...</span>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Add To Playlist Modal */}
+      {playlistModalVideo && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => setPlaylistModalVideo(null)}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--bg-card, #ffffff)',
+              borderRadius: '12px',
+              border: '1px solid var(--border-medium, #e2e8f0)',
+              width: '420px',
+              maxWidth: '90vw',
+              padding: '20px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ListPlus size={18} color="var(--primary, #7c5cbf)" />
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Add Video to Playlist</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPlaylistModalVideo(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '4px',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <strong>Video:</strong> {playlistModalVideo.title}
+            </div>
+
+            {/* List of existing playlists */}
+            <div style={{ maxHeight: '200px', overflowY: 'auto', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {playlists && playlists.length > 0 ? (
+                playlists.map((pl) => (
+                  <button
+                    key={pl.id}
+                    type="button"
+                    onClick={() => {
+                      if (onAddToPlaylist) {
+                        onAddToPlaylist(pl.id, {
+                          id: playlistModalVideo.id || playlistModalVideo.url,
+                          title: playlistModalVideo.title,
+                          author: playlistModalVideo.author || `${plugin.name} Video`,
+                          artist: playlistModalVideo.author || `${plugin.name} Video`,
+                          thumbnail: playlistModalVideo.thumbnail,
+                          url: playlistModalVideo.url,
+                          embedUrl: playlistModalVideo.embedUrl,
+                          streamUrl: playlistModalVideo.streamUrl,
+                          source: playlistModalVideo.source || plugin.name,
+                          isOnline: true,
+                          mediaType: 'video'
+                        });
+                        setToastMsg(`Added to "${pl.name}"!`);
+                        setTimeout(() => setToastMsg(''), 3000);
+                        setPlaylistModalVideo(null);
+                      }
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-medium, #e2e8f0)',
+                      backgroundColor: 'var(--bg-main, #f8fafc)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                    }}
+                  >
+                    <span>{pl.name}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{pl.tracks?.length || 0} tracks</span>
+                  </button>
+                ))
+              ) : (
+                <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                  No playlists created yet. Create one below!
+                </div>
+              )}
+            </div>
+
+            {/* Create new playlist inline */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                placeholder="New playlist name..."
+                value={newPlaylistTitle}
+                onChange={(e) => setNewPlaylistTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newPlaylistTitle.trim()) {
+                    if (onCreatePlaylist) {
+                      const newPl = onCreatePlaylist(newPlaylistTitle.trim());
+                      if (newPl && onAddToPlaylist) {
+                        onAddToPlaylist(newPl.id, {
+                          id: playlistModalVideo.id || playlistModalVideo.url,
+                          title: playlistModalVideo.title,
+                          author: playlistModalVideo.author || `${plugin.name} Video`,
+                          artist: playlistModalVideo.author || `${plugin.name} Video`,
+                          thumbnail: playlistModalVideo.thumbnail,
+                          url: playlistModalVideo.url,
+                          embedUrl: playlistModalVideo.embedUrl,
+                          streamUrl: playlistModalVideo.streamUrl,
+                          source: playlistModalVideo.source || plugin.name,
+                          isOnline: true,
+                          mediaType: 'video'
+                        });
+                      }
+                    }
+                    setToastMsg(`Playlist created and video added!`);
+                    setTimeout(() => setToastMsg(''), 3000);
+                    setNewPlaylistTitle('');
+                    setPlaylistModalVideo(null);
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-medium, #e2e8f0)',
+                  backgroundColor: 'var(--bg-main, #f8fafc)',
+                  color: 'var(--text-primary)',
+                  fontSize: '12px',
+                  outline: 'none',
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (!newPlaylistTitle.trim()) return;
+                  if (onCreatePlaylist) {
+                    const newPl = onCreatePlaylist(newPlaylistTitle.trim());
+                    if (newPl && onAddToPlaylist) {
+                      onAddToPlaylist(newPl.id, {
+                        id: playlistModalVideo.id || playlistModalVideo.url,
+                        title: playlistModalVideo.title,
+                        author: playlistModalVideo.author || `${plugin.name} Video`,
+                        artist: playlistModalVideo.author || `${plugin.name} Video`,
+                        thumbnail: playlistModalVideo.thumbnail,
+                        url: playlistModalVideo.url,
+                        embedUrl: playlistModalVideo.embedUrl,
+                        streamUrl: playlistModalVideo.streamUrl,
+                        source: playlistModalVideo.source || plugin.name,
+                        isOnline: true,
+                        mediaType: 'video'
+                      });
+                    }
+                  }
+                  setToastMsg(`Playlist created and video added!`);
+                  setTimeout(() => setToastMsg(''), 3000);
+                  setNewPlaylistTitle('');
+                  setPlaylistModalVideo(null);
+                }}
+                style={{
+                  padding: '8px 14px',
+                  backgroundColor: 'var(--primary, #7c5cbf)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                Create
+              </button>
+            </div>
           </div>
         </div>
       )}

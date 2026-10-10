@@ -18,7 +18,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
-  Key
+  Key,
+  Sparkles
 } from 'lucide-react';
 
 export default function DownloadsTab({
