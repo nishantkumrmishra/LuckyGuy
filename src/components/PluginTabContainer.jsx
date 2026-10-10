@@ -72,7 +72,8 @@ export default function PluginTabContainer({
     let url = plugin.tab?.url || plugin.tab?.defaultUrl || '';
     return resolveDomainAlias(url);
   });
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'web'
+  // ViewMode permanently set to grid as requested
+  const viewMode = 'grid';
   const [isAdBlockEnabled, setIsAdBlockEnabled] = useState(() => {
     try {
       const saved = localStorage.getItem(`luckyguy-adblock-${plugin.id}`);
@@ -900,8 +901,9 @@ export default function PluginTabContainer({
         }
       `}</style>
 
-      {/* Sleek Top Navigation Toolbar inside Tab (Back, Forward, Refresh, URL, View Toggle) */}
-      <div
+      {/* Sleek Top Navigation Toolbar inside Tab (Hidden when playing video) */}
+      {!activePlayerVideo && (
+        <div
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -1029,60 +1031,8 @@ export default function PluginTabContainer({
             </div>
           </form>
 
-          {/* View Mode Toggle: Grid | Web */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              backgroundColor: 'var(--bg-main, #f8fafc)',
-              borderRadius: '6px',
-              border: '1px solid var(--border-medium, #e2e8f0)',
-              padding: '2px',
-              marginLeft: 'auto',
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => { setActivePlayerVideo(null); setViewMode('grid'); extractVideosFromWebview(); }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '4px 10px',
-                borderRadius: '4px',
-                border: 'none',
-                backgroundColor: viewMode === 'grid' ? 'var(--primary, #7c5cbf)' : 'transparent',
-                color: viewMode === 'grid' ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '11px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              <LayoutGrid size={12} />
-              <span>Media Grid</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => { setActivePlayerVideo(null); setViewMode('web'); }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                padding: '4px 10px',
-                borderRadius: '4px',
-                border: 'none',
-                backgroundColor: viewMode === 'web' ? 'var(--primary, #7c5cbf)' : 'transparent',
-                color: viewMode === 'web' ? '#ffffff' : 'var(--text-secondary)',
-                fontSize: '11px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              <Globe size={12} />
-              <span>Web Frame</span>
-            </button>
-          </div>
-        </div>
+                  </div>
+      )}
 
       {/* Floating Batch Selection Bar */}
       {selectedIds.size > 0 && (
@@ -1186,7 +1136,7 @@ export default function PluginTabContainer({
             style={{
               flex: 1,
               display: 'flex',
-              padding: '20px 24px',
+              padding: '12px 24px',
               gap: '24px',
               maxWidth: '1800px',
               margin: '0 auto',
@@ -1544,38 +1494,22 @@ export default function PluginTabContainer({
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 3. DIRECT WEB FRAME (when ViewMode is 'web') */}
-      {/* ========================================================================= */}
-      {!activePlayerVideo && viewMode === 'web' && (
-        <div style={{ flex: 1, height: '100%', minHeight: '520px', display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
-          <div style={{ flex: 1, height: '100%', minHeight: '480px', position: 'relative', backgroundColor: '#ffffff' }}>
-            {activeUrl ? (
-              typeof window !== 'undefined' && window.electronAPI ? (
-                <webview
-                  ref={webviewRef}
-                  src={activeUrl}
-                  style={{ width: '100%', height: '100%', minHeight: '480px', border: 'none', backgroundColor: '#ffffff' }}
-                  allowpopups="true"
-                />
-              ) : (
-                <iframe
-                  ref={iframeRef}
-                  src={activeUrl}
-                  title={plugin.name}
-                  allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-                  style={{ width: '100%', height: '100%', minHeight: '480px', border: 'none', backgroundColor: '#ffffff' }}
-                />
-              )
-            ) : null}
-          </div>
-        </div>
-      )}
+      {/* Headless Background Webview for media extraction only (No visible webframe) */}
+      <div style={{ display: 'none' }}>
+        {activeUrl && typeof window !== 'undefined' && window.electronAPI && (
+          <webview
+            ref={webviewRef}
+            src={activeUrl}
+            style={{ width: 0, height: 0 }}
+            allowpopups="true"
+          />
+        )}
+      </div>
 
       {/* ========================================================================= */}
       {/* 4. CLEAN MEDIA GRID (Videos and Images, Infinite scroll, No bulky buttons) */}
       {/* ========================================================================= */}
-      {!activePlayerVideo && viewMode === 'grid' && (
+      {!activePlayerVideo && (
         <div style={{ flex: 1, padding: '20px 24px' }}>
           {/* YouTube Shimmer Skeleton (when indexing initial feed) */}
           {isIndexing ? (
