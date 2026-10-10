@@ -53,7 +53,7 @@ class TaskDownloader extends EventEmitter {
       const effectiveChunks = (isVideo || !supportsRange) ? 1 : Math.min(Math.max(this.task.chunkCount || 8, 1), 16);
 
       if (!supportsRange || effectiveChunks <= 1) {
-        // Single stream download
+        // Single stream download with automatic range resume on drop
         await this.downloadSingle(this.task.url, this.task.destinationPath);
       } else {
         // Parallel multi-chunk download
@@ -63,6 +63,7 @@ class TaskDownloader extends EventEmitter {
       if (this.isCanceled) {
         this.status = 'CANCELED';
         this.cleanPartFiles();
+        try { if (fs.existsSync(this.task.destinationPath)) fs.unlinkSync(this.task.destinationPath); } catch (e) {}
         this.emit('update', this.snapshot());
         return;
       }
@@ -71,6 +72,11 @@ class TaskDownloader extends EventEmitter {
         this.status = 'PAUSED';
         this.emit('update', this.snapshot());
         return;
+      }
+
+      // Verify that full content was actually received
+      if (this.totalBytes > 0 && this.downloadedBytes < this.totalBytes) {
+        throw new Error(`Incomplete download: received ${this.downloadedBytes} of ${this.totalBytes} bytes`);
       }
 
       this.status = 'COMPLETED';
@@ -82,6 +88,13 @@ class TaskDownloader extends EventEmitter {
       if (!this.isCanceled && !this.isPaused) {
         this.status = 'ERROR';
         this.errorMessage = err.message;
+        // Clean up empty 0-byte file if it failed before starting
+        try {
+          if (fs.existsSync(this.task.destinationPath)) {
+            const stat = fs.statSync(this.task.destinationPath);
+            if (stat.size === 0) fs.unlinkSync(this.task.destinationPath);
+          }
+        } catch (e) {}
         this.emit('update', this.snapshot());
         this.emit('error', err);
       }
@@ -94,21 +107,25 @@ class TaskDownloader extends EventEmitter {
         const urlObj = new URL(targetUrl);
         const client = urlObj.protocol === 'https:' ? https : http;
         const isPornhub = targetUrl.includes('phncdn') || targetUrl.includes('pornhub');
-        const method = isPornhub ? 'GET' : 'HEAD';
-        const reqHeaders = this.getHeaders(isPornhub ? { 'Range': 'bytes=0-0' } : {});
+        const method = 'GET';
+        const reqHeaders = this.getHeaders({ 'Range': 'bytes=0-0' });
 
         const req = client.request(urlObj, { method, headers: reqHeaders }, (res) => {
           // Handle redirect
           if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            req.destroy();
             return resolve(this.probeUrl(res.headers.location));
           }
 
-          let len = parseInt(res.headers['content-length'] || '0', 10);
-          if (isPornhub && res.headers['content-range']) {
+          let len = 0;
+          if (res.headers['content-range']) {
             const match = res.headers['content-range'].match(/\/(\d+)/);
             if (match) len = parseInt(match[1], 10);
+          } else if (res.headers['content-length']) {
+            len = parseInt(res.headers['content-length'], 10);
           }
           const ranges = (res.headers['accept-ranges'] || '').toLowerCase() === 'bytes' || !!res.headers['content-range'];
+          req.destroy();
           resolve({ contentLength: len, acceptRanges: ranges });
         });
 
@@ -123,20 +140,25 @@ class TaskDownloader extends EventEmitter {
     });
   }
 
-  downloadSingle(targetUrl, destinationPath) {
+  downloadSingle(targetUrl, destinationPath, resumeFrom = 0, retriesLeft = 8) {
     return new Promise((resolve, reject) => {
       try {
         const urlObj = new URL(targetUrl);
         const client = urlObj.protocol === 'https:' ? https : http;
 
         let lastCalcTime = Date.now();
-        let lastBytes = 0;
+        let lastBytes = resumeFrom;
 
-        const fileStream = fs.createWriteStream(destinationPath);
-        const req = client.get(urlObj, { headers: this.getHeaders() }, (res) => {
+        const fileStream = fs.createWriteStream(destinationPath, {
+          flags: resumeFrom > 0 ? 'a' : 'w'
+        });
+
+        const headers = this.getHeaders(resumeFrom > 0 ? { 'Range': `bytes=${resumeFrom}-` } : {});
+
+        const req = client.get(urlObj, { headers }, (res) => {
           if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
             fileStream.close();
-            return this.downloadSingle(res.headers.location, destinationPath).then(resolve).catch(reject);
+            return this.downloadSingle(res.headers.location, destinationPath, resumeFrom, retriesLeft).then(resolve).catch(reject);
           }
 
           if (res.statusCode >= 400) {
@@ -144,8 +166,13 @@ class TaskDownloader extends EventEmitter {
             return reject(new Error(`Server returned HTTP ${res.statusCode} ${res.statusMessage || ''}`));
           }
 
-          if (this.totalBytes === 0 && res.headers['content-length']) {
-            this.totalBytes = parseInt(res.headers['content-length'], 10);
+          if (this.totalBytes === 0) {
+            if (res.headers['content-range']) {
+              const match = res.headers['content-range'].match(/\/(\d+)/);
+              if (match) this.totalBytes = parseInt(match[1], 10);
+            } else if (res.headers['content-length']) {
+              this.totalBytes = resumeFrom + parseInt(res.headers['content-length'], 10);
+            }
           }
 
           res.on('data', (chunk) => {
@@ -177,18 +204,48 @@ class TaskDownloader extends EventEmitter {
 
           res.on('end', () => {
             fileStream.end();
-            resolve();
+            fileStream.on('finish', () => {
+              if (this.isCanceled || this.isPaused) return resolve();
+
+              // If stream ended prematurely before all bytes were received, resume automatically!
+              if (this.totalBytes > 0 && this.downloadedBytes < this.totalBytes && retriesLeft > 0) {
+                console.warn(`[Downloader] Stream ended prematurely at ${this.downloadedBytes}/${this.totalBytes}. Resuming from byte ${this.downloadedBytes}...`);
+                this.downloadSingle(targetUrl, destinationPath, this.downloadedBytes, retriesLeft - 1)
+                  .then(resolve)
+                  .catch(reject);
+              } else {
+                resolve();
+              }
+            });
           });
 
           res.on('error', (e) => {
             fileStream.close();
-            reject(e);
+            if (this.totalBytes > 0 && this.downloadedBytes < this.totalBytes && retriesLeft > 0 && !this.isCanceled && !this.isPaused) {
+              console.warn(`[Downloader] Socket error (${e.message}) at ${this.downloadedBytes}/${this.totalBytes}. Resuming in 1s...`);
+              setTimeout(() => {
+                this.downloadSingle(targetUrl, destinationPath, this.downloadedBytes, retriesLeft - 1)
+                  .then(resolve)
+                  .catch(reject);
+              }, 1000);
+            } else {
+              reject(e);
+            }
           });
         });
 
         req.on('error', (e) => {
           fileStream.close();
-          reject(e);
+          if (this.totalBytes > 0 && this.downloadedBytes < this.totalBytes && retriesLeft > 0 && !this.isCanceled && !this.isPaused) {
+            console.warn(`[Downloader] Request error (${e.message}) at ${this.downloadedBytes}/${this.totalBytes}. Resuming in 1s...`);
+            setTimeout(() => {
+              this.downloadSingle(targetUrl, destinationPath, this.downloadedBytes, retriesLeft - 1)
+                .then(resolve)
+                .catch(reject);
+            }, 1000);
+          } else {
+            reject(e);
+          }
         });
 
         this.chunkRequests.push(req);
