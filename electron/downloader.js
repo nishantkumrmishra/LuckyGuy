@@ -3,6 +3,7 @@ const path = require('path');
 const http = require('http');
 const https = require('https');
 const { EventEmitter } = require('events');
+const ytdlpExtractor = require('./extractors/ytdlp');
 
 class TaskDownloader extends EventEmitter {
   constructor(task) {
@@ -18,6 +19,30 @@ class TaskDownloader extends EventEmitter {
     this.isCanceled = false;
     this.chunkRequests = [];
     this.partFiles = [];
+    this.activeProcess = null;
+  }
+
+  isYouTubeTask() {
+    const url = this.task.url || '';
+    const orig = this.task.originalUrl || '';
+    const author = (this.task.author || '').toLowerCase();
+    const source = (this.task.source || '').toLowerCase();
+    const platform = (this.task.platform || '').toLowerCase();
+    const pluginId = (this.task.pluginId || '').toLowerCase();
+    const id = String(this.task.id || '');
+
+    return (
+      url.includes('youtube.com') ||
+      url.includes('youtu.be') ||
+      url.includes('googlevideo.com') ||
+      orig.includes('youtube.com') ||
+      orig.includes('youtu.be') ||
+      author.includes('youtube') ||
+      source.includes('youtube') ||
+      platform.includes('youtube') ||
+      pluginId.includes('youtube') ||
+      id.startsWith('yt-')
+    );
   }
 
   getHeaders(custom = {}) {
@@ -35,6 +60,71 @@ class TaskDownloader extends EventEmitter {
     return { ...baseHeaders, ...(this.task.headers || {}), ...custom };
   }
 
+  async downloadYouTube() {
+    let ytUrl = this.task.originalUrl || this.task.url;
+    if (!ytUrl || ytUrl.includes('googlevideo.com')) {
+      if (this.task.id && this.task.id.startsWith('yt-')) {
+        ytUrl = `https://www.youtube.com/watch?v=${this.task.id.replace(/^yt-/, '')}`;
+      } else if (this.task.url && (this.task.url.includes('youtube.com') || this.task.url.includes('youtu.be'))) {
+        ytUrl = this.task.url;
+      }
+    }
+
+    try {
+      await ytdlpExtractor.download(
+        ytUrl,
+        this.task.destinationPath,
+        (progress) => {
+          if (this.isCanceled || this.isPaused) return;
+          this.downloadedBytes = progress.downloadedBytes || this.downloadedBytes;
+          if (progress.totalBytes > 0) this.totalBytes = progress.totalBytes;
+          this.speedBytesPerSec = progress.speedBytesPerSec || this.speedBytesPerSec;
+          this.etaSeconds = progress.etaSeconds || this.etaSeconds;
+          this.emit('update', this.snapshot());
+        },
+        {
+          formatType: this.task.formatType,
+          mediaType: this.task.mediaType,
+          registerProcess: (proc) => {
+            this.activeProcess = proc;
+          }
+        }
+      );
+
+      if (this.isCanceled) {
+        this.status = 'CANCELED';
+        try { if (fs.existsSync(this.task.destinationPath)) fs.unlinkSync(this.task.destinationPath); } catch (e) {}
+        this.emit('update', this.snapshot());
+        return;
+      }
+
+      if (this.isPaused) {
+        this.status = 'PAUSED';
+        this.emit('update', this.snapshot());
+        return;
+      }
+
+      this.status = 'COMPLETED';
+      this.speedBytesPerSec = 0;
+      this.etaSeconds = 0;
+      this.emit('update', this.snapshot());
+      this.emit('completed', this.snapshot());
+    } catch (err) {
+      if (!this.isCanceled && !this.isPaused) {
+        this.status = 'ERROR';
+        this.errorMessage = err.message;
+        try {
+          if (fs.existsSync(this.task.destinationPath)) {
+            const stat = fs.statSync(this.task.destinationPath);
+            if (stat.size === 0) fs.unlinkSync(this.task.destinationPath);
+          }
+        } catch (e) {}
+        this.emit('update', this.snapshot());
+        this.emit('error', err);
+      }
+    }
+  }
+
   async start() {
     this.status = 'DOWNLOADING';
     this.emit('update', this.snapshot());
@@ -44,6 +134,11 @@ class TaskDownloader extends EventEmitter {
       const targetDir = path.dirname(this.task.destinationPath);
       if (!fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir, { recursive: true });
+      }
+
+      if (this.isYouTubeTask()) {
+        await this.downloadYouTube();
+        return;
       }
 
       // 1. Probe total size and range support
@@ -377,127 +472,4 @@ class TaskDownloader extends EventEmitter {
         inStream.on('error', reject);
         inStream.pipe(outStream, { end: false });
         inStream.on('end', () => {
-          try { fs.unlinkSync(part); } catch (e) {}
-          pipeNext();
-        });
-      };
-      pipeNext();
-    });
-  }
-
-  cleanPartFiles() {
-    for (const part of this.partFiles) {
-      try {
-        if (fs.existsSync(part)) fs.unlinkSync(part);
-      } catch (e) {}
-    }
-  }
-
-  pause() {
-    this.isPaused = true;
-    this.chunkRequests.forEach(req => req && req.destroy && req.destroy());
-    this.status = 'PAUSED';
-    this.emit('update', this.snapshot());
-  }
-
-  cancel() {
-    this.isCanceled = true;
-    this.chunkRequests.forEach(req => req && req.destroy && req.destroy());
-    this.cleanPartFiles();
-    this.status = 'CANCELED';
-    this.emit('update', this.snapshot());
-  }
-
-  snapshot() {
-    const progress = this.totalBytes > 0 ? Math.min(1.0, this.downloadedBytes / this.totalBytes) : 0;
-    return {
-      ...this.task,
-      status: this.status,
-      downloadedBytes: this.downloadedBytes,
-      totalBytes: this.totalBytes,
-      speedBytesPerSec: this.speedBytesPerSec,
-      etaSeconds: this.etaSeconds,
-      progress,
-      activeChunks: this.activeChunks,
-      errorMessage: this.errorMessage || null
-    };
-  }
-}
-
-class DownloadManager extends EventEmitter {
-  constructor() {
-    super();
-    this.tasks = new Map();
-    this.activeDownloaders = new Map();
-    // Catch-all error listener to prevent ERR_UNHANDLED_ERROR crashes in Node
-    this.on('error', () => {});
-  }
-
-  addTask(taskConfig) {
-    const downloader = new TaskDownloader(taskConfig);
-    this.tasks.set(taskConfig.id, downloader.snapshot());
-    this.activeDownloaders.set(taskConfig.id, downloader);
-
-    downloader.on('update', (snap) => {
-      this.tasks.set(taskConfig.id, snap);
-      this.emit('update', snap);
-    });
-
-    downloader.on('completed', (snap) => {
-      this.tasks.delete(taskConfig.id);
-      this.activeDownloaders.delete(taskConfig.id);
-      this.emit('completed', snap);
-    });
-
-    downloader.on('error', (err) => {
-      this.emit('failed', { id: taskConfig.id, error: err.message });
-    });
-
-    downloader.start();
-    return downloader;
-  }
-
-  pauseTask(id) {
-    const d = this.activeDownloaders.get(id);
-    if (d) d.pause();
-  }
-
-  resumeTask(id) {
-    const prev = this.tasks.get(id);
-    if (prev) {
-      prev.status = 'QUEUED';
-      this.addTask(prev);
-    }
-  }
-
-  cancelTask(id) {
-    const d = this.activeDownloaders.get(id);
-    if (d) d.cancel();
-  }
-
-  removeTask(id) {
-    this.cancelTask(id);
-    this.tasks.delete(id);
-    this.activeDownloaders.delete(id);
-  }
-
-  pauseAll() {
-    for (const d of this.activeDownloaders.values()) {
-      d.pause();
-    }
-  }
-
-  resumeAll() {
-    for (const [id, snap] of this.tasks.entries()) {
-      if (snap.status === 'PAUSED') {
-        this.resumeTask(id);
-      }
-    }
-  }
-
-  getAllTasks() {
-    return Array.from(this.tasks.values());
-  }
-}
-
-module.exports = { DownloadManager, TaskDownloader };
+          try { fs.unlinkSync(part); } catch (e) {}\n          pipeNext();\n        });\n      };\n      pipeNext();\n    });\n  }\n\n  cleanPartFiles() {\n    for (const part of this.partFiles) {\n      try {\n        if (fs.existsSync(part)) fs.unlinkSync(part);\n      } catch (e) {}\n    }\n  }\n\n  pause() {\n    this.isPaused = true;\n    if (this.activeProcess) {\n      try { this.activeProcess.kill('SIGTERM'); } catch (e) {}\n    }\n    this.chunkRequests.forEach(req => req && req.destroy && req.destroy());\n    this.status = 'PAUSED';\n    this.emit('update', this.snapshot());\n  }\n\n  cancel() {\n    this.isCanceled = true;\n    if (this.activeProcess) {\n      try { this.activeProcess.kill('SIGTERM'); } catch (e) {}\n    }\n    this.chunkRequests.forEach(req => req && req.destroy && req.destroy());\n    this.cleanPartFiles();\n    this.status = 'CANCELED';\n    this.emit('update', this.snapshot());\n  }\n\n  snapshot() {\n    const progress = this.totalBytes > 0 ? Math.min(1.0, this.downloadedBytes / this.totalBytes) : 0;\n    return {\n      ...this.task,\n      status: this.status,\n      downloadedBytes: this.downloadedBytes,\n      totalBytes: this.totalBytes,\n      speedBytesPerSec: this.speedBytesPerSec,\n      etaSeconds: this.etaSeconds,\n      progress,\n      activeChunks: this.activeChunks,\n      errorMessage: this.errorMessage || null\n    };\n  }\n}\n\nclass DownloadManager extends EventEmitter {\n  constructor() {\n    super();\n    this.tasks = new Map();\n    this.activeDownloaders = new Map();\n    // Catch-all error listener to prevent ERR_UNHANDLED_ERROR crashes in Node\n    this.on('error', () => {});\n  }\n\n  addTask(taskConfig) {\n    const downloader = new TaskDownloader(taskConfig);\n    this.tasks.set(taskConfig.id, downloader.snapshot());\n    this.activeDownloaders.set(taskConfig.id, downloader);\n\n    downloader.on('update', (snap) => {\n      this.tasks.set(taskConfig.id, snap);\n      this.emit('update', snap);\n    });\n\n    downloader.on('completed', (snap) => {\n      this.tasks.delete(taskConfig.id);\n      this.activeDownloaders.delete(taskConfig.id);\n      this.emit('completed', snap);\n    });\n\n    downloader.on('error', (err) => {\n      console.error(`Task ${taskConfig.id} download error:`, err.message);\n    });\n\n    downloader.start();\n    return downloader;\n  }\n\n  pauseTask(taskId) {\n    const downloader = this.activeDownloaders.get(taskId);\n    if (downloader) downloader.pause();\n  }\n\n  resumeTask(taskId) {\n    const downloader = this.activeDownloaders.get(taskId);\n    if (downloader) {\n      downloader.isPaused = false;\n      downloader.start();\n    }\n  }\n\n  cancelTask(taskId) {\n    const downloader = this.activeDownloaders.get(taskId);\n    if (downloader) {\n      downloader.cancel();\n      this.tasks.delete(taskId);\n      this.activeDownloaders.delete(taskId);\n    }\n  }\n\n  getStatus(taskId) {\n    return this.tasks.get(taskId) || null;\n  }\n\n  getAllTasks() {\n    return Array.from(this.tasks.values());\n  }\n}\n\nmodule.exports = { DownloadManager, TaskDownloader };\n

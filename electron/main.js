@@ -774,13 +774,21 @@ function simplifyMediaTitle(rawTitle, maxLength = 55) {
 }
 
 function downloadThumbnail(thumbnailUrl, destImagePath) {
-  if (!thumbnailUrl || typeof thumbnailUrl !== 'string' || !thumbnailUrl.startsWith('http')) return;
+  if (!thumbnailUrl || typeof thumbnailUrl !== 'string' || !thumbnailUrl.startsWith('http') || !destImagePath) return;
+
+  // Normalize YouTube thumbnail URLs to guaranteed JPEG
+  let cleanUrl = thumbnailUrl;
+  if (cleanUrl.includes('ytimg.com') || cleanUrl.includes('youtube.com')) {
+    cleanUrl = cleanUrl.replace(/\/vi_webp\//, '/vi/').replace(/\.webp$/, '.jpg');
+  }
+
+  const tempPath = `${destImagePath}.tmp`;
   try {
-    const urlObj = new URL(thumbnailUrl);
+    const urlObj = new URL(cleanUrl);
     const client = urlObj.protocol === 'https:' ? https : http;
-    const referer = (thumbnailUrl.includes('phncdn') || thumbnailUrl.includes('pornhub'))
+    const referer = (cleanUrl.includes('phncdn') || cleanUrl.includes('pornhub'))
       ? 'https://www.pornhub.org/'
-      : (thumbnailUrl.includes('ytimg') || thumbnailUrl.includes('youtube') ? 'https://www.youtube.com/' : undefined);
+      : (cleanUrl.includes('ytimg') || cleanUrl.includes('youtube') ? 'https://www.youtube.com/' : undefined);
     
     const req = client.get(urlObj, {
       headers: {
@@ -791,13 +799,56 @@ function downloadThumbnail(thumbnailUrl, destImagePath) {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         return downloadThumbnail(res.headers.location, destImagePath);
       }
-      if (res.statusCode === 200) {
-        const file = fs.createWriteStream(destImagePath);
-        res.pipe(file);
-        file.on('finish', () => file.close());
+      if (res.statusCode === 404 && cleanUrl.includes('maxresdefault.jpg')) {
+        return downloadThumbnail(cleanUrl.replace('maxresdefault.jpg', 'hqdefault.jpg'), destImagePath);
       }
+      if (res.statusCode !== 200) {
+        return;
+      }
+
+      const file = fs.createWriteStream(tempPath);
+      res.pipe(file);
+      file.on('finish', () => {
+        file.close(() => {
+          try {
+            if (fs.existsSync(tempPath)) {
+              const stat = fs.statSync(tempPath);
+              if (stat.size > 0) {
+                // Check if file is webp or png and needs ffmpeg conversion to jpg
+                const buffer = Buffer.alloc(12);
+                const fd = fs.openSync(tempPath, 'r');
+                fs.readSync(fd, buffer, 0, 12, 0);
+                fs.closeSync(fd);
+
+                const isWebp = buffer.toString('utf8', 0, 4) === 'RIFF' && buffer.toString('utf8', 8, 12) === 'WEBP';
+                const isPng = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+
+                const ffmpegDir = ytdlpExtractor.resolveFfmpeg();
+                if ((isWebp || isPng) && ffmpegDir) {
+                  const ffmpegExe = path.join(ffmpegDir, 'ffmpeg.exe');
+                  execFile(ffmpegExe, ['-y', '-i', tempPath, destImagePath], () => {
+                    try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch (e) {}
+                  });
+                } else {
+                  if (fs.existsSync(destImagePath)) {
+                    try { fs.unlinkSync(destImagePath); } catch (e) {}
+                  }
+                  fs.renameSync(tempPath, destImagePath);
+                }
+              } else {
+                try { fs.unlinkSync(tempPath); } catch (e) {}
+              }
+            }
+          } catch (e) {}
+        });
+      });
+      file.on('error', () => {
+        try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch (e) {}
+      });
     });
-    req.on('error', () => {});
+    req.on('error', () => {
+      try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch (e) {}
+    });
   } catch (e) {}
 }
 
@@ -867,6 +918,15 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
   }
 
   let streamUrl = taskConfig.url;
+  const isYouTubeVideo = Boolean(
+    (taskConfig.url && (taskConfig.url.includes('youtube.com') || taskConfig.url.includes('youtu.be') || taskConfig.url.includes('googlevideo.com'))) ||
+    (taskConfig.originalUrl && (taskConfig.originalUrl.includes('youtube.com') || taskConfig.originalUrl.includes('youtu.be'))) ||
+    (taskConfig.source && taskConfig.source.toLowerCase().includes('youtube')) ||
+    (taskConfig.platform && taskConfig.platform.toLowerCase().includes('youtube')) ||
+    (taskConfig.pluginId && taskConfig.pluginId.toLowerCase().includes('youtube')) ||
+    (taskConfig.id && String(taskConfig.id).startsWith('yt-')) ||
+    (taskConfig.author && /youtube/i.test(taskConfig.author))
+  );
   // If taskConfig.url is a Pornhub page URL, extract direct stream URL first!
   if (pornhubExtractor.isPornhubUrl(streamUrl) && !streamUrl.includes('.mp4')) {
     try {
@@ -877,21 +937,13 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     } catch (e) {
       console.warn('Could not resolve direct stream for download:', e.message);
     }
-  } else if ((streamUrl.includes('youtube.com') || streamUrl.includes('youtu.be')) && !streamUrl.includes('googlevideo.com')) {
+  } else if (!isYouTubeVideo && (streamUrl.includes('youtube.com') || streamUrl.includes('youtu.be')) && !streamUrl.includes('googlevideo.com')) {
     try {
       const ytVid = await ytdlpExtractor.extractInfo(streamUrl);
-      if (ytVid) {
-        if ((taskConfig.formatType === 'AUDIO' || taskConfig.mediaType === 'audio') && ytVid.audioStreamUrl) {
-          streamUrl = ytVid.audioStreamUrl;
-        } else if (ytVid.streams?.[taskConfig.qualityLabel]) {
-          streamUrl = ytVid.streams[taskConfig.qualityLabel];
-        } else {
-          streamUrl = ytVid.streamUrl || Object.values(ytVid.streams || {})[0] || streamUrl;
-        }
+      if (ytVid && (taskConfig.formatType === 'AUDIO' || taskConfig.mediaType === 'audio') && ytVid.audioStreamUrl) {
+        streamUrl = ytVid.audioStreamUrl;
       }
-    } catch (e) {
-      console.warn('Could not resolve YouTube stream via yt-dlp:', e.message);
-    }
+    } catch (e) {}
   }
 
   let enriched = null;
@@ -1006,7 +1058,12 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
 
   let targetPath;
   if (taskConfig.destinationPath) {
-    targetPath = taskConfig.destinationPath;
+    if (isVideo && isYouTubeVideo && !taskConfig.customFolder) {
+      const fileName = path.basename(taskConfig.destinationPath);
+      targetPath = path.join(youtubeVideosDir, fileName);
+    } else {
+      targetPath = taskConfig.destinationPath;
+    }
   } else {
     targetPath = path.join(targetDir, `${cleanArtist}${cleanTitle}${ext}`);
   }
@@ -1016,7 +1073,7 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     const videoBase = targetPath.replace(/\.[^/.]+$/, '');
     const thumbPath = `${videoBase}.jpg`;
     const incomingThumb = artworkUrl || taskConfig.artworkUrl || taskConfig.thumbnail;
-    if (incomingThumb && !fs.existsSync(thumbPath)) {
+    if (incomingThumb && (!fs.existsSync(thumbPath) || fs.statSync(thumbPath).size === 0)) {
       downloadThumbnail(incomingThumb, thumbPath);
     }
   }
@@ -1031,6 +1088,7 @@ ipcMain.handle('download-start', async (event, taskConfig) => {
     genre,
     artworkUrl: artworkUrl || taskConfig.thumbnail,
     formatType: isVideo ? 'VIDEO' : (isImage ? 'IMAGE' : 'AUDIO'),
+    originalUrl: taskConfig.originalUrl || taskConfig.url,
     destinationPath: targetPath,
     chunkCount: isVideo ? 1 : (preferences.chunkCount || 8)
   });
@@ -1074,7 +1132,7 @@ downloadManager.on('completed', async (snap) => {
   if (isVideoDownload && targetPath) {
     const videoBase = targetPath.replace(/\.[^/.]+$/, '');
     const thumbPath = `${videoBase}.jpg`;
-    if (snap.artworkUrl && !fs.existsSync(thumbPath)) {
+    if (snap.artworkUrl && (!fs.existsSync(thumbPath) || fs.statSync(thumbPath).size === 0)) {
       downloadThumbnail(snap.artworkUrl, thumbPath);
     }
     libraryManager.recordDownloadTransaction({

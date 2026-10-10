@@ -985,7 +985,8 @@ export default function PluginTabContainer({
     const isImg = item.mediaType === 'image' || (!item.streamUrl && item.imageUrl);
     const chosenQuality = qualityOverride || selectedQuality || item.quality || (isImg ? 'Original' : '1080p');
     const directStream = (item.streams && item.streams[chosenQuality]) || item.streamUrl || item.url;
-    const downloadTarget = isImg ? (item.imageUrl || item.thumbnail) : directStream;
+    const ytWebUrl = item.url || (item.id ? `https://www.youtube.com/watch?v=${String(item.id).replace(/^yt-/, '')}` : null);
+    const downloadTarget = isYouTubePlugin ? (ytWebUrl || directStream) : (isImg ? (item.imageUrl || item.thumbnail) : directStream);
     
     onStartDownload(downloadTarget, {
       format: isImg ? 'JPG ' + chosenQuality : 'MP4 ' + chosenQuality,
@@ -997,6 +998,10 @@ export default function PluginTabContainer({
       author: item.author || plugin.name,
       thumbnail: item.thumbnail || item.imageUrl || '',
       isAdult: isAdultPlugin,
+      isYouTube: isYouTubePlugin,
+      pluginId: plugin?.id,
+      source: plugin?.id || (isYouTubePlugin ? 'youtube' : undefined),
+      originalUrl: ytWebUrl,
       category: isAdultPlugin ? 'adult' : (plugin?.category || 'media'),
       customFolder: customDownloadFolder || (plugin.id?.includes('telegram') ? preferences?.telegramDownloadFolder : null)
     });
@@ -1010,7 +1015,9 @@ export default function PluginTabContainer({
       const isImg = m.mediaType === 'image' || (!m.streamUrl && m.imageUrl);
       const chosenQuality = selectedQuality || (isImg ? 'Original' : '1080p');
       const directStream = (m.streams && m.streams[chosenQuality]) || m.streamUrl || m.url;
-      onStartDownload(isImg ? (m.imageUrl || m.thumbnail) : directStream, {
+      const ytWebUrl = m.url || (m.id ? `https://www.youtube.com/watch?v=${String(m.id).replace(/^yt-/, '')}` : null);
+      const downloadTarget = isYouTubePlugin ? (ytWebUrl || directStream) : (isImg ? (m.imageUrl || m.thumbnail) : directStream);
+      onStartDownload(downloadTarget, {
         format: isImg ? 'JPG ' + chosenQuality : 'MP4 ' + chosenQuality,
         formatType: isImg ? 'IMAGE' : 'VIDEO',
         mediaType: isImg ? 'image' : 'video',
@@ -1020,6 +1027,10 @@ export default function PluginTabContainer({
         author: m.author || plugin.name,
         thumbnail: m.thumbnail || m.imageUrl || '',
         isAdult: isAdultPlugin,
+        isYouTube: isYouTubePlugin,
+        pluginId: plugin?.id,
+        source: plugin?.id || (isYouTubePlugin ? 'youtube' : undefined),
+        originalUrl: ytWebUrl,
         category: isAdultPlugin ? 'adult' : (plugin?.category || 'media'),
         customFolder: customDownloadFolder || null
       });

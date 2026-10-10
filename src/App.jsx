@@ -862,9 +862,17 @@ export default function App() {
       const ext = isVideo ? ".mp4" : (isImage ? ".jpg" : ".bin");
       const quality = options.quality || options.qualityLabel || (isVideo ? "1080p HD" : "Original");
 
-      // Custom folder or Adult/PornHub folder or Videos/Pictures folder
+      const isYouTube = options.isYouTube === true ||
+        (options.author && /youtube/i.test(options.author)) ||
+        (options.source && /youtube/i.test(options.source)) ||
+        (options.pluginId && /youtube/i.test(options.pluginId)) ||
+        (trimmed && (trimmed.includes('youtube.com') || trimmed.includes('youtu.be') || trimmed.includes('googlevideo.com')));
+
+      // Custom folder or Adult/PornHub folder or YouTube folder or Videos/Pictures folder
       let targetFolder = (isVideo && isAdult)
         ? "C:\\Users\\nishant\\Videos\\Adult\\PornHub"
+        : (isVideo && isYouTube)
+        ? "C:\\Users\\nishant\\Videos\\YouTube"
         : isVideo
         ? "C:\\Users\\nishant\\Videos"
         : (isImage ? "C:\\Users\\nishant\\Pictures" : "C:\\Users\\nishant\\Downloads");
@@ -906,6 +914,8 @@ export default function App() {
             formatType: isVideo ? "VIDEO" : (isImage ? "IMAGE" : "FILE"),
             qualityLabel: quality,
             isAdult,
+            isYouTube,
+            originalUrl: options.originalUrl || options.webpageUrl || options.url || trimmed,
             artworkUrl: options.thumbnail || newTask.artworkUrl || '',
           });
         } catch (e) {

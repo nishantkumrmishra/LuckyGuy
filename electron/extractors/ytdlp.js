@@ -26,8 +26,28 @@ class YtDlpWrapper {
   }
 
   resolveFfmpeg() {
+    // 1. Check bundled electron/bin
     const bundledFfmpeg = path.join(__dirname, '..', 'bin', 'ffmpeg.exe');
     if (fs.existsSync(bundledFfmpeg)) return path.dirname(bundledFfmpeg);
+
+    // 2. Check local AppData WinGet path
+    const wingetFfmpegDir = path.join(
+      process.env.LOCALAPPDATA || '',
+      'Microsoft', 'WinGet', 'Packages',
+      'yt-dlp.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe'
+    );
+    if (fs.existsSync(wingetFfmpegDir)) {
+      try {
+        const subdirs = fs.readdirSync(wingetFfmpegDir);
+        for (const sub of subdirs) {
+          const binPath = path.join(wingetFfmpegDir, sub, 'bin');
+          if (fs.existsSync(path.join(binPath, 'ffmpeg.exe'))) {
+            return binPath;
+          }
+        }
+      } catch (e) {}
+    }
+
     return null;
   }
 
@@ -40,8 +60,9 @@ class YtDlpWrapper {
         '--skip-download',
       ];
 
-      if (this.ffmpegPath) {
-        args.push('--ffmpeg-location', this.ffmpegPath);
+      const ffmpegDir = this.resolveFfmpeg();
+      if (ffmpegDir) {
+        args.push('--ffmpeg-location', ffmpegDir);
       }
 
       args.push(targetUrl);
@@ -109,33 +130,4 @@ class YtDlpWrapper {
 
       execFile(this.binPath, args, { maxBuffer: 15 * 1024 * 1024 }, (err, stdout) => {
         if (err || !stdout) {
-          return resolve([]);
-        }
-
-        const items = [];
-        const lines = stdout.trim().split('\n');
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const raw = JSON.parse(line.trim());
-            items.push({
-              id: 'yt-' + raw.id,
-              title: raw.title || 'YouTube Video',
-              author: raw.uploader || raw.channel || 'Creator',
-              duration: raw.duration_string || (raw.duration ? `${Math.floor(raw.duration / 60)}:${raw.duration % 60}` : '3:45'),
-              thumbnail: raw.thumbnail || (raw.thumbnails && raw.thumbnails[0]?.url) || `https://i.ytimg.com/vi/${raw.id}/hqdefault.jpg`,
-              url: `https://www.youtube.com/watch?v=${raw.id}`,
-              views: raw.view_count ? `${(raw.view_count / 1000).toFixed(0)}K` : 'YouTube',
-              quality: '1080p HD',
-              formatType: 'VIDEO',
-              mediaType: 'video',
-            });
-          } catch (e) {}
-        }
-        resolve(items);
-      });
-    });
-  }
-}
-
-module.exports = new YtDlpWrapper();
+          return resolve([]);\n        }\n\n        const items = [];\n        const lines = stdout.trim().split('\\n');\n        for (const line of lines) {\n          if (!line.trim()) continue;\n          try {\n            const raw = JSON.parse(line.trim());\n            items.push({\n              id: 'yt-' + raw.id,\n              title: raw.title || 'YouTube Video',\n              author: raw.uploader || raw.channel || 'Creator',\n              duration: raw.duration_string || (raw.duration ? `${Math.floor(raw.duration / 60)}:${raw.duration % 60}` : '3:45'),\n              thumbnail: raw.thumbnail || (raw.thumbnails && raw.thumbnails[0]?.url) || `https://i.ytimg.com/vi/${raw.id}/hqdefault.jpg`,\n              url: `https://www.youtube.com/watch?v=${raw.id}`,\n              views: raw.view_count ? `${(raw.view_count / 1000).toFixed(0)}K` : 'YouTube',\n              quality: '1080p HD',\n              formatType: 'VIDEO',\n              mediaType: 'video',\n            });\n          } catch (e) {}\n        }\n        resolve(items);\n      });\n    });\n  }\n\n  download(url, destinationPath, onProgress, options = {}) {\n    return new Promise((resolve, reject) => {\n      const isAudioOnly = options.formatType === 'AUDIO' || options.mediaType === 'audio';\n      const ffmpegDir = this.resolveFfmpeg();\n\n      const args = [\n        '--newline',\n        '--progress-template', 'PROGRESS:%(progress._percent_str)s|%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress._speed_str)s|%(progress._eta_str)s',\n        '--no-playlist',\n      ];\n\n      if (ffmpegDir) {\n        args.push('--ffmpeg-location', ffmpegDir);\n      }\n\n      if (isAudioOnly) {\n        args.push('-x', '--audio-format', 'mp3');\n      } else {\n        args.push(\n          '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',\n          '--merge-output-format', 'mp4'\n        );\n      }\n\n      args.push('--write-thumbnail', '--convert-thumbnails', 'jpg');\n      args.push('-o', destinationPath);\n      args.push(url);\n\n      const proc = spawn(this.binPath, args, { windowsHide: true });\n      let stderrOutput = '';\n\n      proc.stdout.on('data', (chunk) => {\n        const text = chunk.toString();\n        const lines = text.split('\\n');\n        for (const line of lines) {\n          if (line.startsWith('PROGRESS:')) {\n            const parts = line.replace('PROGRESS:', '').trim().split('|');\n            const downloadedBytes = parseInt(parts[1], 10) || 0;\n            const totalBytes = parseInt(parts[2], 10) || 0;\n            const rawSpeed = parts[3] || '';\n            const rawEta = parts[4] || '';\n            \n            let speedBytesPerSec = 0;\n            if (rawSpeed.includes('MiB/s')) speedBytesPerSec = Math.round(parseFloat(rawSpeed) * 1024 * 1024);\n            else if (rawSpeed.includes('KiB/s')) speedBytesPerSec = Math.round(parseFloat(rawSpeed) * 1024);\n            else if (rawSpeed.includes('B/s')) speedBytesPerSec = Math.round(parseFloat(rawSpeed));\n\n            let etaSeconds = 0;\n            if (rawEta.includes(':')) {\n              const [min, sec] = rawEta.split(':').map(Number);\n              etaSeconds = (min || 0) * 60 + (sec || 0);\n            }\n\n            if (onProgress) {\n              onProgress({\n                downloadedBytes,\n                totalBytes,\n                speedBytesPerSec,\n                etaSeconds,\n                percentStr: parts[0]?.trim()\n              });\n            }\n          }\n        }\n      });\n\n      proc.stderr.on('data', (chunk) => {\n        stderrOutput += chunk.toString();\n      });\n\n      proc.on('close', (code) => {\n        if (code === 0) {\n          if (fs.existsSync(destinationPath) && fs.statSync(destinationPath).size > 0) {\n            const base = destinationPath.replace(/\\.[^/.]+$/, '');\n            const jpgThumb = `${base}.jpg`;\n            const webpThumb = `${base}.webp`;\n            if (fs.existsSync(webpThumb) && !fs.existsSync(jpgThumb)) {\n              if (ffmpegDir) {\n                const ffmpegExe = path.join(ffmpegDir, 'ffmpeg.exe');\n                execFile(ffmpegExe, ['-y', '-i', webpThumb, jpgThumb], () => {\n                  try { fs.unlinkSync(webpThumb); } catch (e) {}\n                });\n              }\n            }\n            resolve({ destinationPath });\n          } else {\n            reject(new Error(`Download finished but output file not found: ${stderrOutput}`));\n          }\n        } else {\n          reject(new Error(`yt-dlp download failed with code ${code}: ${stderrOutput}`));\n        }\n      });\n\n      proc.on('error', (err) => {\n        reject(err);\n      });\n\n      if (options.registerProcess) {\n        options.registerProcess(proc);\n      }\n    });\n  }\n}\n\nmodule.exports = new YtDlpWrapper();\n
